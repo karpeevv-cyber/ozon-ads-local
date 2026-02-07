@@ -564,6 +564,7 @@ with tab2:
             clicks = int(round(float(pd.to_numeric(df_camp.get("clicks", 0), errors="coerce").fillna(0).sum())))
             orders = int(round(float(pd.to_numeric(df_camp.get("orders", 0), errors="coerce").fillna(0).sum())))
             revenue = float(pd.to_numeric(df_camp.get("total_revenue", 0), errors="coerce").fillna(0).sum())
+            orders_money_ads = float(pd.to_numeric(df_camp.get("orders_money_ads", 0), errors="coerce").fillna(0).sum())
             units = int(round(float(pd.to_numeric(df_camp.get("ordered_units", 0), errors="coerce").fillna(0).sum())))
 
             click_price = (spend / clicks) if clicks > 0 else 0.0
@@ -589,7 +590,7 @@ with tab2:
                     "views": views,
                     "clicks": clicks,
                     "click_price": click_price,
-                    "orders_money_ads": "",
+                    "orders_money_ads": orders_money_ads,
                     "total_revenue": revenue,
                     "ordered_units": units,
                     "total_drr_pct": round(total_drr_pct, 2),

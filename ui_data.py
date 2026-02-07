@@ -110,6 +110,7 @@ def fetch_ads_daily_totals(
                         "views": views,
                         "clicks": clicks,
                         "click_price": float(click_price),
+                        "orders_money_ads": float(orders_money),
                         "orders": orders,
                     }
 
@@ -174,6 +175,7 @@ def build_campaign_daily_rows_cached(
         clicks = int(stats.get("clicks", 0) or 0)
         click_price = float(stats.get("click_price", 0.0) or 0.0)
         orders = int(stats.get("orders", 0) or 0)
+        orders_money_ads = float(stats.get("orders_money_ads", 0.0) or 0.0)
 
         total_revenue = 0.0
         total_units = 0
@@ -201,6 +203,7 @@ def build_campaign_daily_rows_cached(
                 "views": views,
                 "clicks": clicks,
                 "click_price": click_price,
+                "orders_money_ads": orders_money_ads,
                 "cpm": round(cpm, 0),
                 "total_revenue": total_revenue,
                 "ordered_units": total_units,
@@ -307,6 +310,7 @@ def build_campaign_daily_rows(
         clicks = int(round(to_num_series(pd.Series([sr.get("clicks", 0)])).iloc[0]))
         click_price_api = float(to_num_series(pd.Series([sr.get("clickPrice", 0)])).iloc[0])
         orders = int(round(to_num_series(pd.Series([sr.get("orders", 0)])).iloc[0]))
+        orders_money_ads = float(to_num_series(pd.Series([sr.get("ordersMoney", 0)])).iloc[0])
         click_price = (money_spent / clicks) if clicks > 0 else click_price_api
 
         total_revenue = 0.0
@@ -335,6 +339,7 @@ def build_campaign_daily_rows(
                 "views": views,
                 "clicks": clicks,
                 "click_price": click_price,
+                "orders_money_ads": orders_money_ads,
                 "cpm": round(cpm, 0),
                 "total_revenue": total_revenue,
                 "ordered_units": total_units,
