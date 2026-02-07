@@ -205,7 +205,7 @@ if "rows_csv" not in st.session_state:
             st.session_state.cache_loaded = False
 
 # ---- GO button: load data only on explicit click ----
-refresh_stocks = st.sidebar.checkbox("Refresh stocks", value=False)
+    refresh_stocks = False
 
 go = st.sidebar.button("Update data")
 refresh_finance = go
@@ -1264,4 +1264,4 @@ with tab5:
     render_finance_tab(date_from, date_to, seller_client_id=seller_client_id, seller_api_key=seller_api_key, refresh_finance=refresh_finance)
 
 with tab6:
-    render_stocks_tab(seller_client_id=seller_client_id, seller_api_key=seller_api_key, refresh_stocks=refresh_stocks)
+    render_stocks_tab(seller_client_id=seller_client_id, seller_api_key=seller_api_key)

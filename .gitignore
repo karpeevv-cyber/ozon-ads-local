@@ -1,2 +1,5 @@
 *.pkl
 *_cache*.pkl
+.env
+b/.env
+bb/.env

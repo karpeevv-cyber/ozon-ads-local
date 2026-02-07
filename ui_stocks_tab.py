@@ -68,13 +68,14 @@ def render_stocks_tab(
     *,
     seller_client_id: str | None,
     seller_api_key: str | None,
-    refresh_stocks: bool,
 ) -> None:
     st.subheader("Stocks by warehouse")
 
     if not seller_client_id or not seller_api_key:
         st.warning("Seller creds are missing for selected company.")
         return
+
+    refresh_stocks = st.button("Refresh stocks")
 
     cache_key = f"stocks:{seller_client_id}"
     ts_key = f"{cache_key}:ts"
