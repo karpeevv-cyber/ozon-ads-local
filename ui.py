@@ -4,7 +4,7 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-from datetime import date
+from datetime import date, timedelta
 import time
 import logging
 from pathlib import Path
@@ -337,6 +337,7 @@ target_drr = st.session_state.get("target_drr", target_drr)
 products_by_campaign_id = st.session_state.get("products_by_campaign_id", {})
 running_ids = st.session_state.get("running_ids", [])
 ads_daily_by_campaign = st.session_state.get("ads_daily_by_campaign", {})
+by_day_sku = st.session_state.get("by_day_sku")
 comments_df = load_campaign_comments(COMMENTS_PATH)
 data_company = st.session_state.get("data_company")
 if data_company and selected_company and data_company != selected_company:
@@ -449,6 +450,186 @@ with tab1:
         st.warning("Нет данных по дням.")
 
 with tab2:
+    try:
+        loaded_from = date.fromisoformat(str(st.session_state.get("date_from", date_from)))
+        loaded_to = date.fromisoformat(str(st.session_state.get("date_to", date_to)))
+    except Exception:
+        loaded_from = date_from
+        loaded_to = date_to
+
+    st.caption("Local date filter (within loaded range)")
+    if "tab2_one_day" not in st.session_state:
+        st.session_state.tab2_one_day = False
+    if "tab2_day" not in st.session_state:
+        st.session_state.tab2_day = loaded_to
+    if "tab2_range_valid" not in st.session_state:
+        st.session_state.tab2_range_valid = (loaded_from, loaded_to)
+
+    if st.session_state.tab2_day < loaded_from or st.session_state.tab2_day > loaded_to:
+        st.session_state.tab2_day = loaded_to
+    cur_from, cur_to = st.session_state.tab2_range_valid
+    if cur_from < loaded_from or cur_to > loaded_to:
+        st.session_state.tab2_range_valid = (loaded_from, loaded_to)
+        cur_from, cur_to = st.session_state.tab2_range_valid
+    if cur_from < loaded_from or cur_to > loaded_to:
+        st.session_state.tab2_range = (loaded_from, loaded_to)
+
+    def _shift_day(delta: int):
+        cur = st.session_state.tab2_day
+        next_day = cur + timedelta(days=delta)
+        if next_day < loaded_from:
+            next_day = loaded_from
+        if next_day > loaded_to:
+            next_day = loaded_to
+        st.session_state.tab2_day = next_day
+
+    st.checkbox("1 day step", key="tab2_one_day")
+    if st.session_state.tab2_one_day:
+        col_prev, col_day, col_next = st.columns([0.6, 1.4, 0.6])
+        with col_prev:
+            st.button("◀", key="tab2_prev_day", on_click=_shift_day, args=(-1,))
+        with col_day:
+            local_day = st.date_input(
+                "day",
+                value=st.session_state.tab2_day,
+                min_value=loaded_from,
+                max_value=loaded_to,
+                key="tab2_day",
+            )
+        with col_next:
+            st.button("▶", key="tab2_next_day", on_click=_shift_day, args=(1,))
+        local_from = local_day
+        local_to = local_day
+    else:
+        _range_value = st.date_input(
+            "range",
+            value=st.session_state.tab2_range_valid,
+            min_value=loaded_from,
+            max_value=loaded_to,
+            key="tab2_range",
+        )
+        if isinstance(_range_value, tuple) and len(_range_value) == 2:
+            local_from, local_to = _range_value
+            if local_from < loaded_from:
+                local_from = loaded_from
+            if local_to > loaded_to:
+                local_to = loaded_to
+            st.session_state.tab2_range_valid = (local_from, local_to)
+        elif isinstance(_range_value, date):
+            # in-progress selection: keep last valid range
+            local_from, local_to = st.session_state.tab2_range_valid
+        else:
+            local_from, local_to = st.session_state.tab2_range_valid
+    use_local = local_from != loaded_from or local_to != loaded_to
+    if local_from > local_to:
+        st.warning("Local date range is invalid; using full loaded range.")
+        use_local = False
+
+    if use_local:
+        if not (ads_daily_by_campaign and by_day_sku):
+            st.warning("Local filter needs cached daily data. Press GO to load data.")
+            use_local = False
+
+    if use_local:
+        base_df = df_campaigns.copy()
+        base_df = base_df[base_df["campaign_id"] != "GRAND_TOTAL"].copy()
+        title_map = base_df.set_index("campaign_id")["title"].astype(str).to_dict()
+        sku_map = base_df.set_index("campaign_id")["sku"].astype(str).to_dict()
+        rows_filtered = []
+        gt_money_spent = 0.0
+        gt_views = 0
+        gt_clicks = 0
+        gt_orders = 0
+        gt_revenue = 0.0
+        gt_units = 0
+
+        for cid in base_df["campaign_id"].astype(str).tolist():
+            items = products_by_campaign_id.get(cid, []) or []
+            out_sku, out_title, out_bid, skus = campaign_display_fields(title_map.get(cid, ""), items)
+
+            camp_daily = build_campaign_daily_rows_cached(
+                campaign_id=str(cid),
+                date_from=str(local_from),
+                date_to=str(local_to),
+                seller_by_day_sku=by_day_sku,
+                ads_daily_by_campaign=ads_daily_by_campaign,
+                target_drr=target_drr,
+                items=items,
+            )
+            if not camp_daily:
+                continue
+            df_camp = pd.DataFrame(camp_daily)
+            spend = float(pd.to_numeric(df_camp.get("money_spent", 0), errors="coerce").fillna(0).sum())
+            views = int(round(float(pd.to_numeric(df_camp.get("views", 0), errors="coerce").fillna(0).sum())))
+            clicks = int(round(float(pd.to_numeric(df_camp.get("clicks", 0), errors="coerce").fillna(0).sum())))
+            orders = int(round(float(pd.to_numeric(df_camp.get("orders", 0), errors="coerce").fillna(0).sum())))
+            revenue = float(pd.to_numeric(df_camp.get("total_revenue", 0), errors="coerce").fillna(0).sum())
+            units = int(round(float(pd.to_numeric(df_camp.get("ordered_units", 0), errors="coerce").fillna(0).sum())))
+
+            click_price = (spend / clicks) if clicks > 0 else 0.0
+            ctr_pct = (clicks / views * 100.0) if views > 0 else 0.0
+            cr_pct = (units / clicks * 100.0) if clicks > 0 else 0.0
+            vor_pct = (units / views * 100.0) if views > 0 else 0.0
+            vpo = (views / units) if units > 0 else 0.0
+            total_drr_pct = (spend / revenue * 100.0) if revenue > 0 else 0.0
+
+            gt_money_spent += spend
+            gt_views += views
+            gt_clicks += clicks
+            gt_orders += orders
+            gt_revenue += revenue
+            gt_units += units
+
+            rows_filtered.append(
+                {
+                    "campaign_id": str(cid),
+                    "sku": out_sku if out_sku else sku_map.get(cid, ""),
+                    "title": out_title,
+                    "money_spent": spend,
+                    "views": views,
+                    "clicks": clicks,
+                    "click_price": click_price,
+                    "orders_money_ads": "",
+                    "total_revenue": revenue,
+                    "ordered_units": units,
+                    "total_drr_pct": round(total_drr_pct, 2),
+                    "ctr": round(ctr_pct, 1),
+                    "cr": round(cr_pct, 1),
+                    "vor": round(vor_pct, 1),
+                    "vpo": round(vpo, 1),
+                }
+            )
+
+        gt_click_price = (gt_money_spent / gt_clicks) if gt_clicks > 0 else 0.0
+        gt_drr_pct = (gt_money_spent / gt_revenue * 100.0) if gt_revenue > 0 else 0.0
+        gt_ctr = (gt_clicks / gt_views * 100.0) if gt_views > 0 else 0.0
+        gt_cr = (gt_units / gt_clicks * 100.0) if gt_clicks > 0 else 0.0
+        gt_vor = (gt_units / gt_views * 100.0) if gt_views > 0 else 0.0
+        gt_vpo = (gt_views / gt_units) if gt_units > 0 else 0.0
+
+        df_campaigns = pd.DataFrame(rows_filtered)
+        df_total = pd.DataFrame(
+            [
+                {
+                    "campaign_id": "GRAND_TOTAL",
+                    "sku": "",
+                    "title": "",
+                    "money_spent": gt_money_spent,
+                    "views": gt_views,
+                    "clicks": gt_clicks,
+                    "click_price": round(gt_click_price, 2),
+                    "orders_money_ads": "",
+                    "total_revenue": gt_revenue,
+                    "ordered_units": gt_units,
+                    "total_drr_pct": round(gt_drr_pct, 2),
+                    "ctr": round(gt_ctr, 1),
+                    "cr": round(gt_cr, 1),
+                    "vor": round(gt_vor, 1),
+                    "vpo": round(gt_vpo, 1),
+                }
+            ]
+        )
+
     st.subheader("Grand total (за период)")
     if not df_total.empty:
         df_total_view = make_view_df(df_total.rename(columns={"total_drr_pct": "total_drr"}))
@@ -501,8 +682,8 @@ with tab2:
     else:
         df_campaigns["cpc_econ_range"] = "?"
     if comments_df is not None and not comments_df.empty:
-        period_from = str(st.session_state.get("date_from", date_from))
-        period_to = str(st.session_state.get("date_to", date_to))
+        period_from = str(local_from if use_local else st.session_state.get("date_from", date_from))
+        period_to = str(local_to if use_local else st.session_state.get("date_to", date_to))
         comments_period = comments_df[
             (comments_df["day"] >= period_from) & (comments_df["day"] <= period_to)
         ].copy()
@@ -534,8 +715,8 @@ with tab2:
             except Exception:
                 continue
             try:
-                period_from = date.fromisoformat(str(st.session_state.get("date_from", date_from)))
-                period_to = date.fromisoformat(str(st.session_state.get("date_to", date_to)))
+                period_from = date.fromisoformat(str(local_from if use_local else st.session_state.get("date_from", date_from)))
+                period_to = date.fromisoformat(str(local_to if use_local else st.session_state.get("date_to", date_to)))
             except Exception:
                 continue
             date_from_eff = max(upd_date, period_from)
