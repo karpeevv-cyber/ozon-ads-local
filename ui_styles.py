@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pandas as pd
+
+if TYPE_CHECKING:
+    from pandas.io.formats.style import Styler
 
 from ui_formatting import MONEY_COLS, PCT_COLS
 
@@ -30,7 +37,7 @@ def _median_thresholds(median: float, band_pct: float):
     return (low, high)
 
 
-def style_median_table(df: pd.DataFrame, metrics_dir: dict[str, str], band_pct: float = BAND_PCT) -> pd.io.formats.style.Styler:
+def style_median_table(df: pd.DataFrame, metrics_dir: dict[str, str], band_pct: float = BAND_PCT) -> Styler:
     """
     metrics_dir: col -> "higher" (higher is better) or "lower" (lower is better)
     Colors:
