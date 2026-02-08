@@ -2,8 +2,8 @@ name: Send Finance Yesterday
 
 on:
   schedule:
-    # 12:55 UTC = 15:55 Europe/Moscow
-    - cron: "55 12 * * *"
+    # 13:00 UTC = 16:00 Europe/Moscow
+    - cron: "0 13 * * *"
   workflow_dispatch:
 
 jobs:
