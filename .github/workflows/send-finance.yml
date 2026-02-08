@@ -1,0 +1,36 @@
+name: Send Finance Yesterday
+
+on:
+  schedule:
+    # 07:00 UTC = 10:00 Europe/Moscow
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Send finance report
+        env:
+          TZ: Europe/Moscow
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          COMPANY_NAME: ${{ secrets.COMPANY_NAME }}
+          PERF_CLIENT_ID: ${{ secrets.PERF_CLIENT_ID }}
+          PERF_CLIENT_SECRET: ${{ secrets.PERF_CLIENT_SECRET }}
+          SELLER_CLIENT_ID: ${{ secrets.SELLER_CLIENT_ID }}
+          SELLER_API_KEY: ${{ secrets.SELLER_API_KEY }}
+        run: python send_finance_yesterday.py
