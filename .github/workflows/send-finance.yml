@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install requests pandas
 
       - name: Send finance report
         env:
@@ -34,3 +34,12 @@ jobs:
           SELLER_CLIENT_ID: ${{ secrets.SELLER_CLIENT_ID }}
           SELLER_API_KEY: ${{ secrets.SELLER_API_KEY }}
         run: python send_finance_yesterday.py
+
+      - name: Show app log on failure
+        if: failure()
+        run: |
+          if [ -f app.log ]; then
+            cat app.log
+          else
+            echo "app.log not found"
+          fi
