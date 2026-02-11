@@ -26,6 +26,7 @@ NUMERIC_COLS = [
     "target_cpc",
     "vpo",
     "total_revenue",
+    "total_revenue_per_day",
     "ordered_units",
     "ordered_units_per_day",
     "bid",
@@ -39,7 +40,7 @@ NUMERIC_COLS = [
     "organic_pct",
 ]
 
-MONEY_COLS = {"money_spent", "money_spent_per_day", "orders_money_ads", "click_price", "rpc", "target_cpc", "total_revenue", "cpm", "bid"}
+MONEY_COLS = {"money_spent", "money_spent_per_day", "orders_money_ads", "click_price", "rpc", "target_cpc", "total_revenue", "total_revenue_per_day", "cpm", "bid"}
 PCT_COLS = {"ctr", "cr", "vor", "organic_pct", "total_drr_pct", "total_drr", "total_drr_after_chng"}
 
 

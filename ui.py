@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 # ui.py FULL REPLACEMENT
 
 import streamlit as st
@@ -584,6 +584,7 @@ with tab1:
             if "days_in_period" in df_weekly_main_raw.columns:
                 days_den = pd.to_numeric(df_weekly_main_raw["days_in_period"], errors="coerce").replace(0, pd.NA)
                 for src_col, dst_col in (
+                    ("total_revenue", "total_revenue_per_day"),
                     ("money_spent", "money_spent_per_day"),
                     ("views", "views_per_day"),
                     ("clicks", "clicks_per_day"),
@@ -603,6 +604,7 @@ with tab1:
             weekly_cols = [
                 "week",
                 "total_revenue",
+                "total_revenue_per_day",
                 "money_spent_per_day",
                 "total_drr_pct",
                 "views_per_day",
@@ -629,16 +631,102 @@ with tab1:
                 "rpc": "higher",
                 "vpo": "lower",
             }
+            weekly_cfg = build_column_config(df_weekly_main)
+            excluded_progress_cols_weekly = {"comment", "bid_changes_cnt", "week", "days_in_period"}
+            money_progress_cols = {
+                "money_spent",
+                "money_spent_per_day",
+                "total_revenue",
+                "total_revenue_per_day",
+                "rpc",
+                "cpm",
+                "click_price",
+                "bid",
+                "orders_money_ads",
+            }
+            pct_progress_cols = {
+                "total_drr_pct",
+                "ctr",
+                "cr",
+                "organic_pct",
+                "total_drr",
+                "total_drr_after_chng",
+                "vor",
+            }
+            one_decimal_cols = {"vpo"}
+
+            for col in df_weekly_main.columns:
+                if col in excluded_progress_cols_weekly:
+                    continue
+                s_num = pd.to_numeric(df_weekly_main[col], errors="coerce")
+                if s_num.isna().all():
+                    continue
+
+                max_val = float(s_num.fillna(0).max())
+                if col in money_progress_cols:
+                    fmt = "%.0f ₽"
+                elif col in pct_progress_cols or col.endswith("_pct"):
+                    fmt = "%.1f%%"
+                elif col in one_decimal_cols:
+                    fmt = "%.1f"
+                else:
+                    fmt = "%.0f"
+
+                weekly_cfg[col] = st.column_config.ProgressColumn(
+                    col,
+                    min_value=0.0,
+                    max_value=max(1.0, max_val),
+                    format=fmt,
+                )
             st.dataframe(
-                style_median_table(df_weekly_main, metrics_weekly_main, band_pct=BAND_PCT),
+                df_weekly_main,
                 width="stretch",
                 hide_index=True,
+                column_config=weekly_cfg,
             )
         st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+        daily_cfg = build_column_config(df_daily)
+        excluded_progress_cols = {"comment", "bid_changes_cnt", "day"}
+        money_progress_cols = {"money_spent", "total_revenue", "rpc", "cpm", "click_price", "bid", "orders_money_ads"}
+        pct_progress_cols = {
+            "total_drr_pct",
+            "ctr",
+            "cr",
+            "organic_pct",
+            "total_drr",
+            "total_drr_after_chng",
+            "vor",
+        }
+        one_decimal_cols = {"vpo"}
+
+        for col in df_daily.columns:
+            if col in excluded_progress_cols:
+                continue
+            s_num = pd.to_numeric(df_daily[col], errors="coerce")
+            if s_num.isna().all():
+                continue
+
+            max_val = float(s_num.fillna(0).max())
+            if col in money_progress_cols:
+                fmt = "%.0f ₽"
+            elif col in pct_progress_cols or col.endswith("_pct"):
+                fmt = "%.1f%%"
+            elif col in one_decimal_cols:
+                fmt = "%.1f"
+            else:
+                fmt = "%.0f"
+
+            daily_cfg[col] = st.column_config.ProgressColumn(
+                col,
+                min_value=0.0,
+                max_value=max(1.0, max_val),
+                format=fmt,
+            )
         st.dataframe(
-            style_median_table(df_daily, metrics_daily_totals, band_pct=BAND_PCT),
+            df_daily,
             width="stretch",
             hide_index=True,
+            column_config=daily_cfg,
         )
     else:
         st.warning("Нет данных по дням.")
@@ -681,7 +769,7 @@ with tab2:
     if st.session_state.tab2_one_day:
         col_prev, col_day, col_next = st.columns([0.6, 1.4, 0.6])
         with col_prev:
-            st.button("◀", key="tab2_prev_day", on_click=_shift_day, args=(-1,))
+            st.button("в—Ђ", key="tab2_prev_day", on_click=_shift_day, args=(-1,))
         with col_day:
             local_day = st.date_input(
                 "day",
@@ -691,7 +779,7 @@ with tab2:
                 key="tab2_day",
             )
         with col_next:
-            st.button("▶", key="tab2_next_day", on_click=_shift_day, args=(1,))
+            st.button("в–¶", key="tab2_next_day", on_click=_shift_day, args=(1,))
         local_from = local_day
         local_to = local_day
     else:
@@ -872,7 +960,7 @@ with tab2:
     cpc_econ_bounds_map = st.session_state.get("cpc_econ_bounds_map") or {}
     if cpc_econ_range_map:
         df_campaigns["cpc_econ_range"] = (
-            df_campaigns["campaign_id"].astype(str).map(cpc_econ_range_map).fillna("—")
+            df_campaigns["campaign_id"].astype(str).map(cpc_econ_range_map).fillna("вЂ”")
         )
     else:
         df_campaigns["cpc_econ_range"] = "?"
@@ -1020,7 +1108,7 @@ with tab3:
     if picked_campaign_id and by_day_sku:
         refresh_detail = st.button("Обновить кампанию")
         if refresh_detail or last_loaded_campaign_id != picked_campaign_id:
-            with st.spinner("Загружаю деталку кампании..."):
+            with st.spinner("Загружаю детально по кампании..."):
                 token = perf_token(perf_client_id, perf_client_secret)
                 campaign_daily_rows = build_campaign_daily_rows(
                     token=token,
@@ -1091,7 +1179,7 @@ with tab3:
         if bid_sku_for_detail and picked_campaign_id:
             current_bid_key = f"{picked_campaign_id}:{bid_sku_for_detail}"
             if st.session_state.get("current_bid_key") != current_bid_key:
-                with st.spinner("Р—Р°РіСЂСѓР¶Р°СЋ С‚РµРєСѓС‰РёР№ bid..."):
+                with st.spinner("Загружаю текущий bid..."):
                     current_bid_rub = _fetch_current_bid_rub(picked_campaign_id, bid_sku_for_detail)
                 st.session_state.current_bid_key = current_bid_key
                 st.session_state.current_bid_rub = current_bid_rub
@@ -1186,9 +1274,9 @@ with tab3:
                     current_strategy_display = str(_row.iloc[0].get("strategy_id", "")).strip() or None
         st.markdown("### Параметры стратегии")
         cpc_econ_range = (
-            f"{fmt_rub_1(econ.get('cpc_econ_min')) if econ.get('cpc_econ_min') is not None else '—'}"
-            f" - {fmt_rub_1(econ.get('cpc_econ')) if econ.get('cpc_econ') is not None else '—'}"
-            f" - {fmt_rub_1(econ.get('cpc_econ_max')) if econ.get('cpc_econ_max') is not None else '—'}"
+            f"{fmt_rub_1(econ.get('cpc_econ_min')) if econ.get('cpc_econ_min') is not None else 'вЂ”'}"
+            f" - {fmt_rub_1(econ.get('cpc_econ')) if econ.get('cpc_econ') is not None else 'вЂ”'}"
+            f" - {fmt_rub_1(econ.get('cpc_econ_max')) if econ.get('cpc_econ_max') is not None else 'вЂ”'}"
         )
         lines = [
             f"Текущий bid: {fmt_rub_1(current_bid_rub) if current_bid_rub is not None else '—'}",
@@ -1351,7 +1439,7 @@ with tab3:
                     current_strategy = "?"
 
                 with st.form("bid_form", clear_on_submit=False):
-                    bid_rub = st.number_input("Bid (₽)", min_value=0.0, step=0.5, key="bid_rub_input")
+                    bid_rub = st.number_input("Bid (в‚Ѕ)", min_value=0.0, step=0.5, key="bid_rub_input")
                     bid_reason = st.selectbox(
                         "reason",
                         options=["Выбери reason", "test", "manual change", "strategy"],
@@ -1430,7 +1518,7 @@ with tab3:
                             st.session_state.current_bid_key = None
                             st.session_state.current_bid_rub = None
                             st.success(
-                                f"Готово. Отправлено: {bid_rub:.2f} ₽ "
+                                f"Р“РѕС‚РѕРІРѕ. РћС‚РїСЂР°РІР»РµРЅРѕ: {bid_rub:.2f} в‚Ѕ "
                                 f"(API bid={result.new_bid_micro}, reason={bid_reason})."
                             )
                             by_day_sku = st.session_state.get("by_day_sku")
@@ -1514,3 +1602,4 @@ with tab5:
 
 with tab6:
     render_stocks_tab(seller_client_id=seller_client_id, seller_api_key=seller_api_key)
+
