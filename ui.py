@@ -339,6 +339,11 @@ running_ids = st.session_state.get("running_ids", [])
 ads_daily_by_campaign = st.session_state.get("ads_daily_by_campaign", {})
 by_day_sku = st.session_state.get("by_day_sku")
 comments_df = load_campaign_comments(COMMENTS_PATH)
+if comments_df is not None and not comments_df.empty:
+    if "company" in comments_df.columns and selected_company:
+        comments_df = comments_df[comments_df["company"].astype(str) == str(selected_company)].copy()
+    elif "company" in comments_df.columns and not selected_company:
+        comments_df = comments_df[comments_df["company"].astype(str).str.strip() == ""].copy()
 data_company = st.session_state.get("data_company")
 if data_company and selected_company and data_company != selected_company:
     rows_csv = None
@@ -365,6 +370,49 @@ df = pd.DataFrame(rows_csv)
 df_campaigns = df[df["campaign_id"] != "GRAND_TOTAL"].copy()
 df_total = df[df["campaign_id"] == "GRAND_TOTAL"].copy()
 
+def _combine_comment_values(values) -> str:
+    out = []
+    seen = set()
+    for v in values:
+        txt = str(v or "").strip()
+        if not txt or txt in seen:
+            continue
+        seen.add(txt)
+        out.append(txt)
+    return "\n\n".join(out)
+
+
+def _combine_comments_with_day(df_comments: pd.DataFrame) -> str:
+    out = []
+    seen = set()
+    if df_comments is None or df_comments.empty:
+        return ""
+    df_sorted = df_comments.sort_values(["day", "ts"], ascending=[False, False])
+    for _, row in df_sorted.iterrows():
+        txt = str(row.get("comment", "") or "").strip()
+        if not txt:
+            continue
+        day_str = str(row.get("day", "") or "").strip()
+        item = f"{day_str}: {txt}" if day_str else txt
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return "\n\n".join(out)
+
+campaign_title_map = st.session_state.get("campaign_title_map") or {}
+if not campaign_title_map:
+    try:
+        running_for_names = fetch_running_campaigns_cached(perf_client_id, perf_client_secret)
+        campaign_title_map = {
+            str(c.get("id")): str(c.get("title", "") or "").strip()
+            for c in running_for_names
+            if c.get("id") is not None
+        }
+    except Exception:
+        campaign_title_map = {}
+    st.session_state.campaign_title_map = campaign_title_map
+
 tab1, tab2, tab3, tab5, tab6, tab4 = st.tabs(
     [
         "Main",
@@ -380,6 +428,94 @@ with tab1:
     st.subheader("Итоги по дням (за период)")
     if daily_rows:
         df_daily_raw = pd.DataFrame(daily_rows)
+        week_comment_map = {}
+        bid_changes_day_map = {}
+        bid_changes_week_map = {}
+        bid_log_df_tab1 = st.session_state.get("bid_log_df")
+        if bid_log_df_tab1 is None:
+            bid_log_df_tab1 = load_bid_log_df()
+            st.session_state.bid_log_df = bid_log_df_tab1
+        if bid_log_df_tab1 is not None and not bid_log_df_tab1.empty:
+            campaign_ids_set = set(df_campaigns["campaign_id"].astype(str).tolist())
+            bid_log_local = bid_log_df_tab1.copy()
+            bid_log_local["campaign_id"] = bid_log_local["campaign_id"].astype(str)
+            bid_log_local = bid_log_local[bid_log_local["campaign_id"].isin(campaign_ids_set)]
+            if not bid_log_local.empty:
+                bid_log_local["date"] = pd.to_datetime(bid_log_local["date"], errors="coerce")
+                bid_log_local = bid_log_local.dropna(subset=["date"])
+                if not bid_log_local.empty:
+                    bid_log_local["date_iso"] = bid_log_local["date"].dt.date.astype(str)
+                    bid_changes_day_map = bid_log_local.groupby("date_iso").size().to_dict()
+                    bid_log_local["week"] = bid_log_local["date"].dt.date.apply(
+                        lambda d: d - timedelta(days=d.weekday())
+                    ).astype(str)
+                    bid_changes_week_map = bid_log_local.groupby("week").size().to_dict()
+        if comments_df is not None and not comments_df.empty and "day" in df_daily_raw.columns:
+            period_from = str(st.session_state.get("date_from", date_from))
+            period_to = str(st.session_state.get("date_to", date_to))
+            comments_period = comments_df[
+                (comments_df["day"] >= period_from) & (comments_df["day"] <= period_to)
+            ].copy()
+            if not comments_period.empty:
+                comments_period = comments_period.sort_values(["day", "ts"], ascending=[True, False])
+
+                def _merge_day_comments(group: pd.DataFrame) -> str:
+                    out = []
+                    seen = set()
+                    title_map = st.session_state.get("campaign_title_map") or {}
+                    for _, row in group.iterrows():
+                        txt = str(row.get("comment", "") or "").strip()
+                        if not txt:
+                            continue
+                        cid = str(row.get("campaign_id", "") or "").strip()
+                        if cid.lower() == "all":
+                            label = "all"
+                        else:
+                            label = str(title_map.get(cid) or "").strip()
+                        item = f"{label}: {txt}" if label else txt
+                        if item not in seen:
+                            seen.add(item)
+                            out.append(item)
+                    return "\n\n".join(out)
+
+                day_comment_map = comments_period.groupby("day").apply(_merge_day_comments).to_dict()
+
+                comments_period_week = comments_period.copy()
+                comments_period_week["week"] = (
+                    pd.to_datetime(comments_period_week["day"], errors="coerce")
+                    .dt.to_period("W-SUN")
+                    .dt.start_time
+                    .dt.date
+                    .astype(str)
+                )
+
+                def _merge_week_comments(group: pd.DataFrame) -> str:
+                    out = []
+                    seen = set()
+                    for _, row in group.sort_values(["day", "ts"], ascending=[False, False]).iterrows():
+                        txt = str(row.get("comment", "") or "").strip()
+                        if not txt:
+                            continue
+                        day_str = str(row.get("day", "") or "").strip()
+                        item = f"{day_str}: {txt}" if day_str else txt
+                        if item in seen:
+                            continue
+                        seen.add(item)
+                        out.append(item)
+                    return "\n\n".join(out)
+
+                week_comment_map = comments_period_week.groupby("week").apply(_merge_week_comments).to_dict()
+            else:
+                day_comment_map = {}
+            df_daily_raw["comment"] = df_daily_raw["day"].astype(str).map(day_comment_map).fillna("")
+        else:
+            df_daily_raw["comment"] = ""
+        if "day" in df_daily_raw.columns:
+            df_daily_raw["bid_changes_cnt"] = (
+                df_daily_raw["day"].astype(str).map(bid_changes_day_map).fillna(0).astype(int)
+            )
+        else:
+            df_daily_raw["bid_changes_cnt"] = 0
         if "day" in df_daily_raw.columns:
             df_daily_raw["day_dt"] = pd.to_datetime(df_daily_raw["day"], errors="coerce")
             df_daily_raw = df_daily_raw.sort_values("day_dt", ascending=False).drop(columns=["day_dt"], errors="ignore")
@@ -428,6 +564,8 @@ with tab1:
             "rpc",
             "vpo",
             "organic_pct",
+            "bid_changes_cnt",
+            "comment",
         ]
         df_daily = df_daily[[c for c in daily_cols if c in df_daily.columns]]
         if "day" in df_daily.columns:
@@ -440,6 +578,62 @@ with tab1:
             "rpc": "higher",
             "vpo": "lower",
         }
+        st.markdown("### Итоги по неделям (за период)")
+        df_weekly_main_raw = campaign_weekly_aggregate(df_daily_raw, target_drr=target_drr)
+        if not df_weekly_main_raw.empty:
+            if "days_in_period" in df_weekly_main_raw.columns:
+                days_den = pd.to_numeric(df_weekly_main_raw["days_in_period"], errors="coerce").replace(0, pd.NA)
+                for src_col, dst_col in (
+                    ("money_spent", "money_spent_per_day"),
+                    ("views", "views_per_day"),
+                    ("clicks", "clicks_per_day"),
+                    ("ordered_units", "ordered_units_per_day"),
+                ):
+                    if src_col in df_weekly_main_raw.columns:
+                        src = pd.to_numeric(df_weekly_main_raw[src_col], errors="coerce").fillna(0)
+                        df_weekly_main_raw[dst_col] = (src / days_den).fillna(0)
+            if "week" in df_weekly_main_raw.columns:
+                df_weekly_main_raw["week_dt"] = pd.to_datetime(df_weekly_main_raw["week"], errors="coerce")
+                df_weekly_main_raw = df_weekly_main_raw.sort_values("week_dt", ascending=False).drop(columns=["week_dt"], errors="ignore")
+                df_weekly_main_raw["comment"] = df_weekly_main_raw["week"].astype(str).map(week_comment_map).fillna("")
+                df_weekly_main_raw["bid_changes_cnt"] = (
+                    df_weekly_main_raw["week"].astype(str).map(bid_changes_week_map).fillna(0).astype(int)
+                )
+            df_weekly_main = make_view_df(df_weekly_main_raw).drop(columns=["vor", "target_cpc"], errors="ignore")
+            weekly_cols = [
+                "week",
+                "total_revenue",
+                "money_spent_per_day",
+                "total_drr_pct",
+                "views_per_day",
+                "clicks_per_day",
+                "ordered_units_per_day",
+                "cpm",
+                "ctr",
+                "cr",
+                "rpc",
+                "vpo",
+                "organic_pct",
+                "days_in_period",
+                "bid_changes_cnt",
+                "comment",
+            ]
+            df_weekly_main = df_weekly_main[[c for c in weekly_cols if c in df_weekly_main.columns]]
+            if "week" in df_weekly_main.columns:
+                df_weekly_main["week"] = format_date_ddmmyyyy(df_weekly_main["week"])
+            metrics_weekly_main = {
+                "cpm": "lower",
+                "total_drr_pct": "lower",
+                "ctr": "higher",
+                "cr": "higher",
+                "rpc": "higher",
+                "vpo": "lower",
+            }
+            st.dataframe(
+                style_median_table(df_weekly_main, metrics_weekly_main, band_pct=BAND_PCT),
+                width="stretch",
+                hide_index=True,
+            )
         st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
         st.dataframe(
             style_median_table(df_daily, metrics_daily_totals, band_pct=BAND_PCT),
@@ -689,13 +883,25 @@ with tab2:
             (comments_df["day"] >= period_from) & (comments_df["day"] <= period_to)
         ].copy()
         if not comments_period.empty:
-            comments_period = comments_period.sort_values(["day", "ts"])
-            last_comment_map = comments_period.groupby("campaign_id")["comment"].last().to_dict()
+            comments_period = comments_period.sort_values(["day", "ts"], ascending=[False, False])
+            comments_all = comments_period[comments_period["campaign_id"].astype(str).str.lower() == "all"]
+            comments_campaign = comments_period[comments_period["campaign_id"].astype(str).str.lower() != "all"]
+            last_comment_map = (
+                comments_campaign.groupby("campaign_id")
+                .apply(_combine_comments_with_day)
+                .to_dict()
+            )
+            all_comment = ""
+            if not comments_all.empty:
+                all_comment = _combine_comments_with_day(comments_all)
         else:
             last_comment_map = {}
+            all_comment = ""
     else:
         last_comment_map = {}
+        all_comment = ""
     df_campaigns["comment"] = df_campaigns["campaign_id"].astype(str).map(last_comment_map).fillna("")
+    df_campaigns["comment_all"] = all_comment if all_comment else ""
     if "strategy_df" not in locals():
         strategy_df = load_strategy_map_cached()
     if not strategy_df.empty:
@@ -1000,18 +1206,36 @@ with tab3:
         )
         if comments_df is not None and not comments_df.empty:
             camp_comments = comments_df[comments_df["campaign_id"] == str(picked_campaign_id)]
+            all_comments = comments_df[comments_df["campaign_id"].astype(str).str.lower() == "all"]
+            week_map_campaign = {}
+            week_map_all = {}
             if not camp_comments.empty:
-                week_map = (
-                    camp_comments.sort_values(["week", "ts"])
+                week_map_campaign = (
+                    camp_comments.sort_values(["week", "ts"], ascending=[False, False])
                     .groupby("week")["comment"]
-                    .last()
+                    .apply(_combine_comment_values)
                     .to_dict()
                 )
-                df_weekly_raw["comment"] = df_weekly_raw["week"].astype(str).map(week_map).fillna("")
+            if not all_comments.empty:
+                week_map_all = (
+                    all_comments.sort_values(["week", "ts"], ascending=[False, False])
+                    .groupby("week")["comment"]
+                    .apply(_combine_comment_values)
+                    .to_dict()
+                )
+            if week_map_campaign or week_map_all:
+                df_weekly_raw["comment"] = (
+                    df_weekly_raw["week"].astype(str).map(lambda w: str(week_map_campaign.get(w, "") or "").strip()).fillna("")
+                )
+                df_weekly_raw["comment_all"] = (
+                    df_weekly_raw["week"].astype(str).map(lambda w: str(week_map_all.get(w, "") or "").strip()).fillna("")
+                )
             else:
                 df_weekly_raw["comment"] = ""
+                df_weekly_raw["comment_all"] = ""
         else:
             df_weekly_raw["comment"] = ""
+            df_weekly_raw["comment_all"] = ""
         if "week" in df_weekly_raw.columns:
             df_weekly_raw["week_dt"] = pd.to_datetime(df_weekly_raw["week"], errors="coerce")
             df_weekly_raw = df_weekly_raw.sort_values("week_dt", ascending=False).drop(columns=["week_dt"], errors="ignore")
@@ -1050,20 +1274,36 @@ with tab3:
         )
         if comments_df is not None and not comments_df.empty:
             camp_comments = comments_df[comments_df["campaign_id"] == str(picked_campaign_id)]
+            all_comments = comments_df[comments_df["campaign_id"].astype(str).str.lower() == "all"]
+            day_map_campaign = {}
+            day_map_all = {}
             if not camp_comments.empty:
-                day_map = (
-                    camp_comments.sort_values(["day", "ts"])
+                day_map_campaign = (
+                    camp_comments.sort_values(["day", "ts"], ascending=[False, False])
                     .groupby("day")["comment"]
-                    .last()
+                    .apply(_combine_comment_values)
                     .to_dict()
                 )
+            if not all_comments.empty:
+                day_map_all = (
+                    all_comments.sort_values(["day", "ts"], ascending=[False, False])
+                    .groupby("day")["comment"]
+                    .apply(_combine_comment_values)
+                    .to_dict()
+                )
+            if day_map_campaign or day_map_all:
                 df_camp_daily_raw_with_bids["comment"] = (
-                    df_camp_daily_raw_with_bids["day"].astype(str).map(day_map).fillna("")
+                    df_camp_daily_raw_with_bids["day"].astype(str).map(lambda d: str(day_map_campaign.get(d, "") or "").strip()).fillna("")
+                )
+                df_camp_daily_raw_with_bids["comment_all"] = (
+                    df_camp_daily_raw_with_bids["day"].astype(str).map(lambda d: str(day_map_all.get(d, "") or "").strip()).fillna("")
                 )
             else:
                 df_camp_daily_raw_with_bids["comment"] = ""
+                df_camp_daily_raw_with_bids["comment_all"] = ""
         else:
             df_camp_daily_raw_with_bids["comment"] = ""
+            df_camp_daily_raw_with_bids["comment_all"] = ""
         if "day" in df_camp_daily_raw_with_bids.columns:
             df_camp_daily_raw_with_bids["day_dt"] = pd.to_datetime(df_camp_daily_raw_with_bids["day"], errors="coerce")
             df_camp_daily_raw_with_bids = df_camp_daily_raw_with_bids.sort_values("day_dt", ascending=False).drop(columns=["day_dt"], errors="ignore")
@@ -1214,49 +1454,58 @@ with tab3:
                             st.error(f"Ошибка при обновлении bid: {e}")
         with col_comments:
             st.subheader("Комментарии по кампании")
-            if not picked_campaign_id:
-                st.info("Выбери кампанию, чтобы оставить комментарий.")
-            else:
-                with st.form("campaign_comment_form", clear_on_submit=True):
-                    default_comment_day = st.session_state.get("comment_day_input")
-                    if default_comment_day is None:
-                        try:
-                            default_comment_day = date.fromisoformat(
-                                str(st.session_state.get("date_to", date_to))
-                            )
-                        except Exception:
-                            default_comment_day = date.today()
-                    comment_day = st.date_input(
-                        "Дата комментария",
-                        value=default_comment_day,
-                        key="comment_day_input",
-                    )
-                    comment_text = st.text_area("Комментарий", height=120)
-                    add_comment = st.form_submit_button("Добавить")
-                if add_comment:
-                    if not comment_text.strip():
-                        st.error("Нужен текст комментария.")
-                    else:
-                        append_campaign_comment(
-                            path=COMMENTS_PATH,
-                            campaign_id=str(picked_campaign_id),
-                            comment=comment_text.strip(),
-                            day=comment_day,
+            with st.form("campaign_comment_form", clear_on_submit=True):
+                default_comment_day = st.session_state.get("comment_day_input")
+                if default_comment_day is None:
+                    try:
+                        default_comment_day = date.fromisoformat(
+                            str(st.session_state.get("date_to", date_to))
                         )
-                        st.success("Комментарий сохранен.")
-                        st.rerun()
-                camp_comments = comments_df[comments_df["campaign_id"] == str(picked_campaign_id)]
-                if camp_comments.empty:
-                    st.caption("Нет комментариев.")
+                    except Exception:
+                        default_comment_day = date.today()
+                comment_day = st.date_input(
+                    "Дата изменения",
+                    value=default_comment_day,
+                    key="comment_day_input",
+                )
+                comment_all_campaigns = st.checkbox("all campaigns", value=False, key="comment_all_campaigns")
+                comment_text = st.text_area("Комментарий", height=120)
+                add_comment = st.form_submit_button("Добавить")
+            if add_comment:
+                if not comment_text.strip():
+                    st.error("Нужен текст комментария.")
+                elif (not picked_campaign_id) and (not comment_all_campaigns):
+                    st.error("Выбери кампанию или отметь all campaigns.")
                 else:
-                    camp_comments_view = camp_comments.sort_values("ts", ascending=False).head(10).copy()
-                    if "ts" in camp_comments_view.columns:
-                        camp_comments_view["ts"] = format_date_ddmmyyyy(camp_comments_view["ts"])
-                    st.dataframe(
-                        camp_comments_view[["ts", "comment"]],
-                        width="stretch",
-                        hide_index=True,
+                    comment_campaign_id = "all" if comment_all_campaigns else str(picked_campaign_id)
+                    append_campaign_comment(
+                        path=COMMENTS_PATH,
+                        campaign_id=comment_campaign_id,
+                        comment=comment_text.strip(),
+                        day=comment_day,
+                        company=selected_company,
                     )
+                    st.success("Комментарий сохранен.")
+                    st.rerun()
+
+            if comment_all_campaigns:
+                camp_comments = comments_df[comments_df["campaign_id"].astype(str).str.lower() == "all"]
+            elif picked_campaign_id:
+                camp_comments = comments_df[comments_df["campaign_id"] == str(picked_campaign_id)]
+            else:
+                camp_comments = pd.DataFrame()
+
+            if camp_comments.empty:
+                st.caption("Нет комментариев.")
+            else:
+                camp_comments_view = camp_comments.sort_values("ts", ascending=False).head(10).copy()
+                if "ts" in camp_comments_view.columns:
+                    camp_comments_view["ts"] = format_date_ddmmyyyy(camp_comments_view["ts"])
+                st.dataframe(
+                    camp_comments_view[["day", "ts", "comment"]],
+                    width="stretch",
+                    hide_index=True,
+                )
 with tab4:
     render_tab4()
 

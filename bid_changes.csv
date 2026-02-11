@@ -28,3 +28,5 @@ ts_iso;date;campaign_id;sku;old_bid_micro;new_bid_micro;reason;comment
 2026-02-03T18:50:18.492675+03:00;2026-02-03;21340379;3286716416;4000000;3000000;strategy;"reason=strategy; strategy=3;"
 2026-02-03T18:51:08.198172+03:00;2026-02-03;21340399;3286716441;5000000;3000000;strategy;"reason=strategy; strategy=3;"
 2026-02-06T12:08:52.812769+03:00;2026-02-06;21340491;3286716340;16000000;9000000;strategy;"reason=strategy; strategy=2;"
+2026-02-11T11:44:01.011511+03:00;2026-02-11;21352958;3169186366;4000000;7000000;manual change;"reason=manual change; strategy=?; карточку чуть починили, проверяем"
+2026-02-11T12:28:42.692919+03:00;2026-02-11;21343337;3286716094;15000000;20000000;manual change;"reason=manual change; strategy=?;"

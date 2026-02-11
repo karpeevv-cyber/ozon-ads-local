@@ -15,14 +15,19 @@ def default_window():
 
 NUMERIC_COLS = [
     "money_spent",
+    "money_spent_per_day",
+    "orders_money_ads",
     "views",
+    "views_per_day",
     "clicks",
+    "clicks_per_day",
     "click_price",
     "rpc",
     "target_cpc",
     "vpo",
     "total_revenue",
     "ordered_units",
+    "ordered_units_per_day",
     "bid",
     "total_drr_pct",
     "total_drr",
@@ -34,7 +39,7 @@ NUMERIC_COLS = [
     "organic_pct",
 ]
 
-MONEY_COLS = {"money_spent", "click_price", "rpc", "target_cpc", "total_revenue", "cpm", "bid"}
+MONEY_COLS = {"money_spent", "money_spent_per_day", "orders_money_ads", "click_price", "rpc", "target_cpc", "total_revenue", "cpm", "bid"}
 PCT_COLS = {"ctr", "cr", "vor", "organic_pct", "total_drr_pct", "total_drr", "total_drr_after_chng"}
 
 
@@ -96,7 +101,7 @@ def build_column_config(df: pd.DataFrame) -> dict:
             cfg[col] = st.column_config.NumberColumn(col, format="%.1f%%")
 
     # ints
-    for col in ("views", "clicks", "ordered_units"):
+    for col in ("views", "views_per_day", "clicks", "clicks_per_day", "ordered_units", "ordered_units_per_day"):
         if col in df.columns:
             cfg[col] = st.column_config.NumberColumn(col, format="%.0f")
 

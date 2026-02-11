@@ -263,6 +263,7 @@ def compute_daily_breakdown(ads_daily_rows: list[dict], seller_by_day: dict, tar
                 "views": views,
                 "clicks": clicks,
                 "money_spent": spend,
+                "orders_money_ads": orders_money_ads,
                 "total_revenue": float(rev),
                 "ordered_units": int(units),
                 "total_drr_pct": round(drr, 1),
@@ -372,6 +373,15 @@ def campaign_weekly_aggregate(df_camp_daily_raw: pd.DataFrame, target_drr: float
     dfw["day_str"] = dfw["day"].astype(str)
     if "orders" not in dfw.columns:
         dfw["orders"] = 0
+    if "orders_money_ads" not in dfw.columns:
+        # Backward compatibility for cached daily rows created before orders_money_ads
+        # was included in compute_daily_breakdown output.
+        if "organic_pct" in dfw.columns and "total_revenue" in dfw.columns:
+            rev = pd.to_numeric(dfw["total_revenue"], errors="coerce").fillna(0.0)
+            org = pd.to_numeric(dfw["organic_pct"], errors="coerce").fillna(0.0).clip(lower=0.0, upper=100.0)
+            dfw["orders_money_ads"] = (rev * (100.0 - org) / 100.0).fillna(0.0)
+        else:
+            dfw["orders_money_ads"] = 0.0
 
     agg = (
         dfw.groupby("week_start", as_index=False)
@@ -381,6 +391,7 @@ def campaign_weekly_aggregate(df_camp_daily_raw: pd.DataFrame, target_drr: float
             views=("views", "sum"),
             clicks=("clicks", "sum"),
             orders=("orders", "sum"),
+            orders_money_ads=("orders_money_ads", "sum"),
             total_revenue=("total_revenue", "sum"),
             ordered_units=("ordered_units", "sum"),
         )
@@ -405,6 +416,10 @@ def campaign_weekly_aggregate(df_camp_daily_raw: pd.DataFrame, target_drr: float
     agg["vpo"] = agg.apply(
         lambda r: (r["views"] / r["ordered_units"]) if r["ordered_units"] else 0.0, axis=1
     )
+    agg["organic_pct"] = agg.apply(
+        lambda r: (100.0 - (r["orders_money_ads"] / r["total_revenue"] * 100.0)) if r["total_revenue"] else 0.0,
+        axis=1,
+    ).clip(lower=0.0, upper=100.0)
 
     agg = agg.rename(columns={"week_start": "week"})
     agg["week"] = agg["week"].astype(str)
@@ -426,6 +441,7 @@ def campaign_weekly_aggregate(df_camp_daily_raw: pd.DataFrame, target_drr: float
         "total_revenue",
         "ordered_units",
         "total_drr_pct",
+        "organic_pct",
     ]
     return agg[cols]
 

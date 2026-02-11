@@ -107,9 +107,9 @@ def save_campaign_reco_map(path: str, reco_map: dict) -> None:
 
 def _normalize_comments_df(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
-        return pd.DataFrame(columns=["ts", "day", "week", "campaign_id", "comment"])
+        return pd.DataFrame(columns=["ts", "day", "week", "company", "campaign_id", "comment"])
     df = df.copy()
-    for col in ["ts", "day", "week", "campaign_id", "comment"]:
+    for col in ["ts", "day", "week", "company", "campaign_id", "comment"]:
         if col not in df.columns:
             df[col] = ""
     missing_day = df["day"].isna() | (df["day"].astype(str).str.strip() == "")
@@ -127,21 +127,28 @@ def _normalize_comments_df(df: pd.DataFrame) -> pd.DataFrame:
 
         df.loc[missing_week, "week"] = df.loc[missing_week, "day"].apply(_week_start)
     df["campaign_id"] = df["campaign_id"].astype(str)
+    df["company"] = df["company"].astype(str)
     df["comment"] = df["comment"].astype(str)
-    return df[["ts", "day", "week", "campaign_id", "comment"]]
+    return df[["ts", "day", "week", "company", "campaign_id", "comment"]]
 
 
 def load_campaign_comments(path: str) -> pd.DataFrame:
     if not os.path.exists(path):
-        return pd.DataFrame(columns=["ts", "day", "week", "campaign_id", "comment"])
+        return pd.DataFrame(columns=["ts", "day", "week", "company", "campaign_id", "comment"])
     try:
         df = pd.read_csv(path)
     except Exception:
-        return pd.DataFrame(columns=["ts", "day", "week", "campaign_id", "comment"])
+        return pd.DataFrame(columns=["ts", "day", "week", "company", "campaign_id", "comment"])
     return _normalize_comments_df(df)
 
 
-def append_campaign_comment(path: str, campaign_id: str, comment: str, day: date | None = None) -> None:
+def append_campaign_comment(
+    path: str,
+    campaign_id: str,
+    comment: str,
+    day: date | None = None,
+    company: str | None = None,
+) -> None:
     if not comment:
         return
     now = datetime.now()
@@ -152,6 +159,7 @@ def append_campaign_comment(path: str, campaign_id: str, comment: str, day: date
         "ts": now.isoformat(timespec="seconds"),
         "day": day_str,
         "week": week_start,
+        "company": str(company or "").strip(),
         "campaign_id": str(campaign_id),
         "comment": str(comment).strip(),
     }

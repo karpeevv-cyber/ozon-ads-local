@@ -132,7 +132,7 @@ def style_median_table(df: pd.DataFrame, metrics_dir: dict[str, str], band_pct: 
             fmt[col] = lambda x: "" if pd.isna(x) else f"{float(x):.1f}"
         elif col in MONEY_COLS:
             fmt[col] = lambda x: "" if pd.isna(x) else f"{float(x):.0f} ₽"
-        elif col in ("views", "clicks", "ordered_units", "days_in_period"):
+        elif col in ("views", "views_per_day", "clicks", "clicks_per_day", "ordered_units", "ordered_units_per_day", "days_in_period"):
             fmt[col] = lambda x: "" if pd.isna(x) else f"{int(round(float(x)))}"
 
     try:

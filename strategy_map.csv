@@ -1,6 +1,6 @@
 campaign_id,sku,strategy_id,updated_at,notes
 19295588,2878122467,3,2026-01-31T13:56:07Z,reason=strategy; strategy=3;
-21352958,3169186366,3,2026-01-31T14:35:27Z,reason=strategy; strategy=3;
+21352958,3169186366,?,2026-02-11T08:43:59Z,"reason=manual change; strategy=?; карточку чуть починили, проверяем"
 19295559,2878122540,3,2026-01-31T14:46:30Z,reason=strategy; strategy=3;
 19596500,2850691199,1,2026-01-31T15:39:58Z,reason=strategy; strategy=1;
 21352649,3169379200,1,2026-01-31T15:43:07Z,reason=strategy; strategy=1;
@@ -18,3 +18,4 @@ campaign_id,sku,strategy_id,updated_at,notes
 21340379,3286716416,3,2026-02-03T15:50:17Z,reason=strategy; strategy=3;
 21340399,3286716441,3,2026-02-03T15:51:07Z,reason=strategy; strategy=3;
 21340491,3286716340,2,2026-02-06T09:08:51Z,reason=strategy; strategy=2;
+21343337,3286716094,?,2026-02-11T09:28:41Z,reason=manual change; strategy=?;

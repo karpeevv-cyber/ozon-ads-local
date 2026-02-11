@@ -75,11 +75,11 @@ def render_stocks_tab(
         st.warning("Seller creds are missing for selected company.")
         return
 
-    refresh_stocks = st.button("Refresh stocks")
-
     cache_key = f"stocks:{seller_client_id}"
     ts_key = f"{cache_key}:ts"
     cache_file = Path(f"stocks_cache_{seller_client_id}.pkl")
+
+    refresh_stocks = st.button("Refresh stocks", key=f"{cache_key}:refresh")
 
     if cache_key not in st.session_state and cache_file.exists():
         try:
