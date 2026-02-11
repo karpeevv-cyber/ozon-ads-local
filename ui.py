@@ -591,7 +591,7 @@ with tab1:
                 ):
                     if src_col in df_weekly_main_raw.columns:
                         src = pd.to_numeric(df_weekly_main_raw[src_col], errors="coerce").fillna(0)
-                        df_weekly_main_raw[dst_col] = (src / days_den).fillna(0)
+                        df_weekly_main_raw[dst_col] = (src / days_den).fillna(0).round(0)
             if "week" in df_weekly_main_raw.columns:
                 df_weekly_main_raw["week_dt"] = pd.to_datetime(df_weekly_main_raw["week"], errors="coerce")
                 df_weekly_main_raw = df_weekly_main_raw.sort_values("week_dt", ascending=False).drop(columns=["week_dt"], errors="ignore")
