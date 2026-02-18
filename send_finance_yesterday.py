@@ -75,7 +75,9 @@ def _format_balance_row(day_str: str, data: dict) -> dict[str, str]:
     services = cashflows.get("services", []) or []
     logistics = 0.0
     cross_docking = 0.0
+    storage = 0.0
     marketing = 0.0
+    promotion_with_cpo = 0.0
     acquiring = 0.0
     seller_bonuses = 0.0
     points_for_reviews = 0.0
@@ -86,8 +88,12 @@ def _format_balance_row(day_str: str, data: dict) -> dict[str, str]:
             logistics += val
         if name == "cross_docking":
             cross_docking += val
+        if name == "product_placement_in_ozon_warehouses":
+            storage += val
         if name == "pay_per_click":
             marketing += val
+        if name == "promotion_with_cost_per_order":
+            promotion_with_cpo += val
         if name == "acquiring":
             acquiring += val
         if name == "seller_bonuses":
@@ -103,7 +109,9 @@ def _format_balance_row(day_str: str, data: dict) -> dict[str, str]:
         + acquiring
         + logistics
         + cross_docking
+        + storage
         + marketing
+        + promotion_with_cpo
         + points_for_reviews
         + seller_bonuses
         - accrued
@@ -118,7 +126,9 @@ def _format_balance_row(day_str: str, data: dict) -> dict[str, str]:
         "выплаты": str(_ceil_int(payments)),
         "логистика": str(_ceil_int(logistics)),
         "кросс-докинг": str(_ceil_int(cross_docking)),
+        "Хранение": str(_ceil_int(storage)),
         "реклама": str(_ceil_int(marketing)),
+        "реклама - за заказ": str(_ceil_int(promotion_with_cpo)),
         "баллы за отзывы": str(_ceil_int(points_for_reviews)),
         "бонусы продавца": str(_ceil_int(seller_bonuses)),
         "на конец дня": str(_ceil_int(closing_balance)),
@@ -183,7 +193,9 @@ def main() -> int:
         "выплаты",
         "логистика",
         "кросс-докинг",
+        "Хранение",
         "реклама",
+        "реклама - за заказ",
         "баллы за отзывы",
         "бонусы продавца",
         "проверка",

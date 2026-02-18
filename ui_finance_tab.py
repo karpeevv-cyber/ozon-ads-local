@@ -70,7 +70,9 @@ def _fetch_finance_rows_cached_static(
         services = cashflows.get("services", []) or []
         logistics = 0.0
         cross_docking = 0.0
+        storage = 0.0
         marketing = 0.0
+        promotion_with_cpo = 0.0
         acquiring = 0.0
         seller_bonuses = 0.0
         points_for_reviews = 0.0
@@ -81,14 +83,19 @@ def _fetch_finance_rows_cached_static(
                 logistics += val
             if name == "cross_docking":
                 cross_docking += val
+            if name == "product_placement_in_ozon_warehouses":
+                storage += val
             if name == "pay_per_click":
                 marketing += val
+            if name == "promotion_with_cost_per_order":
+                promotion_with_cpo += val
             if name == "acquiring":
                 acquiring += val
             if name == "seller_bonuses":
                 seller_bonuses += val
             if name == "points_for_reviews":
                 points_for_reviews += val
+
         sales_val = float(sales or 0)
         pct_logistics = (logistics / sales_val * 100.0) if sales_val else 0.0
         check_value = (
@@ -97,7 +104,9 @@ def _fetch_finance_rows_cached_static(
             + acquiring
             + logistics
             + cross_docking
+            + storage
             + marketing
+            + promotion_with_cpo
             + points_for_reviews
             + seller_bonuses
             - accrued
@@ -107,17 +116,19 @@ def _fetch_finance_rows_cached_static(
             {
                 "день": d.strftime("%d.%m.%Y"),
                 "на начало дня": _ceil_int(opening_balance),
+                "на конец дня": _ceil_int(closing_balance),
+                "изменение": _ceil_int(accrued),
                 "продажи": _ceil_int(sales),
                 "комиссия": _ceil_int(fee),
                 "эквайринг": _ceil_int(acquiring),
                 "выплаты": _ceil_int(payments),
                 "логистика": _ceil_int(logistics),
                 "кросс-докинг": _ceil_int(cross_docking),
+                "Хранение": _ceil_int(storage),
                 "реклама": _ceil_int(marketing),
+                "реклама - за заказ": _ceil_int(promotion_with_cpo),
                 "баллы за отзывы": _ceil_int(points_for_reviews),
                 "бонусы продавца": _ceil_int(seller_bonuses),
-                "на конец дня": _ceil_int(closing_balance),
-                "изменение": _ceil_int(accrued),
                 "проверка": _ceil_int(check_value),
                 "% логистики": round(pct_logistics, 1),
             }
@@ -180,7 +191,6 @@ def render_finance_tab(
         return
 
     df = pd.DataFrame(rows)
-    # enforce column order
     cols = [
         "день",
         "на начало дня",
@@ -192,7 +202,9 @@ def render_finance_tab(
         "выплаты",
         "логистика",
         "кросс-докинг",
+        "Хранение",
         "реклама",
+        "реклама - за заказ",
         "баллы за отзывы",
         "бонусы продавца",
         "проверка",
@@ -201,18 +213,13 @@ def render_finance_tab(
     df = df[[c for c in cols if c in df.columns]]
     if "% логистики" in df.columns:
         df["% логистики"] = pd.to_numeric(df["% логистики"], errors="coerce").round(1)
+
     highlight_cols = {"на начало дня", "на конец дня", "продажи", "изменение"}
 
     def _highlight(row):
-        return [
-            "background-color: #FFF3BF" if col in highlight_cols else ""
-            for col in row.index
-        ]
+        return ["background-color: #FFF3BF" if col in highlight_cols else "" for col in row.index]
 
     style = df.style.apply(_highlight, axis=1)
-    fmt = {}
     if "% логистики" in df.columns:
-        fmt["% логистики"] = "{:.1f}%"
-    if fmt:
-        style = style.format(fmt)
+        style = style.format({"% логистики": "{:.1f}%"})
     st.dataframe(style, width="stretch", hide_index=True)
