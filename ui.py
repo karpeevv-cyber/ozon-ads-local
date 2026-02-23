@@ -1015,16 +1015,17 @@ with tab3:
 
     running_campaigns_for_pick = fetch_running_campaigns_cached(perf_client_id, perf_client_secret)
     campaign_options = {f'{c.get("title","")} | {c.get("id")}': str(c.get("id")) for c in running_campaigns_for_pick}
+    overview_label = "Обзор"
 
     picked_label = st.selectbox(
         "Кампания",
-        options=["(не выбрано)"] + list(campaign_options.keys()),
+        options=["(не выбрано)", overview_label] + list(campaign_options.keys()),
         index=0,
         key="campaign_pick",
     )
 
     picked_campaign_id = None
-    if picked_label != "(не выбрано)":
+    if picked_label in campaign_options:
         picked_campaign_id = campaign_options[picked_label]
     else:
         st.session_state.picked_campaign_id = None
@@ -1033,6 +1034,224 @@ with tab3:
     campaign_daily_rows = st.session_state.get("campaign_daily_rows") or []
     last_loaded_campaign_id = st.session_state.get("picked_campaign_id")
     by_day_sku = st.session_state.get("by_day_sku")
+    if picked_label == overview_label:
+        st.markdown("### Обзор: DRR по неделям")
+        if not by_day_sku or not ads_daily_by_campaign:
+            st.info("Сначала нажми GO, чтобы загрузить данные за период.")
+        else:
+            period_from = str(st.session_state.get("date_from", date_from))
+            period_to = str(st.session_state.get("date_to", date_to))
+            overview_parts = []
+            for camp_label, camp_id in campaign_options.items():
+                camp_daily = build_campaign_daily_rows_cached(
+                    campaign_id=str(camp_id),
+                    date_from=period_from,
+                    date_to=period_to,
+                    seller_by_day_sku=by_day_sku,
+                    ads_daily_by_campaign=ads_daily_by_campaign,
+                    target_drr=target_drr,
+                    items=products_by_campaign_id.get(str(camp_id), []) or [],
+                )
+                if not camp_daily:
+                    continue
+                df_camp_over = pd.DataFrame(camp_daily)
+                if df_camp_over.empty:
+                    continue
+                df_week_over = campaign_weekly_aggregate(df_camp_over, target_drr=target_drr)
+                if df_week_over.empty:
+                    continue
+                rev_over = pd.to_numeric(df_week_over.get("total_revenue", 0), errors="coerce").fillna(0.0)
+                drr_over = pd.to_numeric(df_week_over.get("total_drr_pct", 0), errors="coerce").fillna(0.0)
+                drr_over = drr_over.where(rev_over > 0, 100.0)
+                part = pd.DataFrame(
+                    {
+                        "week": df_week_over["week"].astype(str),
+                        "campaign": camp_label,
+                        "drr": drr_over.round(1),
+                        "spend": pd.to_numeric(df_week_over.get("money_spent", 0), errors="coerce").fillna(0.0),
+                        "revenue": rev_over.round(0),
+                    }
+                )
+                overview_parts.append(part)
+
+            if not overview_parts:
+                st.info("Нет данных по выбранному периоду.")
+            else:
+                df_over = pd.concat(overview_parts, ignore_index=True)
+                pivot_drr = df_over.pivot_table(index="campaign", columns="week", values="drr", aggfunc="first")
+                pivot_rev = df_over.pivot_table(index="campaign", columns="week", values="revenue", aggfunc="first")
+                week_cols_sorted = sorted([c for c in pivot_drr.columns])
+                pivot_drr = pivot_drr[week_cols_sorted]
+                pivot_rev = pivot_rev.reindex(columns=week_cols_sorted)
+                week_labels = format_date_ddmmyyyy(pd.Series(week_cols_sorted)).tolist()
+                pivot_drr.columns = week_labels
+                pivot_rev.columns = week_labels
+
+                totals = (
+                    df_over.groupby("campaign", as_index=False)
+                    .agg(total_spend=("spend", "sum"), total_revenue=("revenue", "sum"))
+                )
+                totals["total_drr"] = totals.apply(
+                    lambda r: (r["total_spend"] / r["total_revenue"] * 100.0) if float(r["total_revenue"]) > 0 else 100.0,
+                    axis=1,
+                )
+                totals = totals.set_index("campaign")
+
+                # Build period-level text columns per campaign for overview table.
+                def _fmt_bid_micro(micro):
+                    try:
+                        v = float(micro) / 1_000_000.0
+                        if float(v).is_integer():
+                            return str(int(v))
+                        return f"{v:.2f}".rstrip("0").rstrip(".")
+                    except Exception:
+                        return "n/a"
+
+                bid_log_df_over = st.session_state.get("bid_log_df")
+                if bid_log_df_over is None:
+                    bid_log_df_over = load_bid_log_df()
+                    st.session_state.bid_log_df = bid_log_df_over
+
+                bid_change_map = {}
+                bid_comment_map = {}
+                if bid_log_df_over is not None and not bid_log_df_over.empty:
+                    campaign_ids_set = set(campaign_options.values())
+                    bid_src = bid_log_df_over.copy()
+                    bid_src["campaign_id"] = bid_src["campaign_id"].astype(str)
+                    bid_src = bid_src[bid_src["campaign_id"].isin(campaign_ids_set)]
+                    bid_src = bid_src[(bid_src["date"].astype(str) >= period_from) & (bid_src["date"].astype(str) <= period_to)]
+                    if not bid_src.empty:
+                        bid_src = bid_src.sort_values("ts_iso", ascending=False)
+                        for camp_label, camp_id in campaign_options.items():
+                            sub = bid_src[bid_src["campaign_id"] == str(camp_id)]
+                            if sub.empty:
+                                continue
+                            ch_items = []
+                            cm_items = []
+                            seen_ch = set()
+                            seen_cm = set()
+                            for _, r in sub.iterrows():
+                                d = str(r.get("date", "") or "").strip()
+                                old_v = _fmt_bid_micro(r.get("old_bid_micro"))
+                                new_v = _fmt_bid_micro(r.get("new_bid_micro"))
+                                ch = f"{d}: {old_v} -> {new_v}" if d else f"{old_v} -> {new_v}"
+                                if ch and ch not in seen_ch:
+                                    seen_ch.add(ch)
+                                    ch_items.append(ch)
+                                cm = str(r.get("comment", "") or "").strip()
+                                if cm and cm not in seen_cm:
+                                    seen_cm.add(cm)
+                                    cm_items.append(cm)
+                            bid_change_map[camp_label] = "\n\n".join(ch_items)
+                            bid_comment_map[camp_label] = "\n\n".join(cm_items)
+
+                comment_map = {}
+                comment_all_text = ""
+                if comments_df is not None and not comments_df.empty:
+                    comments_period = comments_df[
+                        (comments_df["day"].astype(str) >= period_from) & (comments_df["day"].astype(str) <= period_to)
+                    ].copy()
+                    if not comments_period.empty:
+                        comments_campaign = comments_period[comments_period["campaign_id"].astype(str).str.lower() != "all"]
+                        comments_all = comments_period[comments_period["campaign_id"].astype(str).str.lower() == "all"]
+                        if not comments_campaign.empty:
+                            comments_campaign = comments_campaign.sort_values(["day", "ts"], ascending=[False, False])
+                            by_cid = comments_campaign.groupby("campaign_id").apply(_combine_comments_with_day).to_dict()
+                            for camp_label, camp_id in campaign_options.items():
+                                comment_map[camp_label] = str(by_cid.get(str(camp_id), "") or "").strip()
+                        if not comments_all.empty:
+                            comment_all_text = _combine_comments_with_day(
+                                comments_all.sort_values(["day", "ts"], ascending=[False, False])
+                            )
+
+                def _style_drr(x):
+                    try:
+                        x = float(x)
+                    except Exception:
+                        return ""
+                    if x <= 15:
+                        return "background-color: rgba(0, 200, 0, 0.20);"
+                    if x <= 25:
+                        return ""
+                    return "background-color: rgba(255, 0, 0, 0.18);"
+
+                def _fmt_cell(drr_val, rev_val):
+                    if pd.isna(drr_val):
+                        return ""
+                    try:
+                        drr_txt = f"{float(drr_val):.1f}"
+                    except Exception:
+                        drr_txt = str(drr_val)
+                    try:
+                        rev_txt = f"{int(round(float(rev_val)))}"
+                    except Exception:
+                        rev_txt = "0"
+                    return f"{drr_txt} ({rev_txt})"
+
+                pivot_show = pd.DataFrame(index=pivot_drr.index, columns=pivot_drr.columns)
+                for col in pivot_show.columns:
+                    pivot_show[col] = [
+                        _fmt_cell(drr_v, rev_v)
+                        for drr_v, rev_v in zip(pivot_drr[col], pivot_rev[col])
+                    ]
+                pivot_show.insert(
+                    0,
+                    "Тотал выручка (период)",
+                    [
+                        float(totals.at[idx, "total_revenue"]) if idx in totals.index else 0.0
+                        for idx in pivot_show.index
+                    ],
+                )
+                pivot_show.insert(
+                    0,
+                    "Тотал ДРР (период)",
+                    [
+                        float(totals.at[idx, "total_drr"]) if idx in totals.index else 100.0
+                        for idx in pivot_show.index
+                    ],
+                )
+                pivot_show.insert(
+                    0,
+                    "comment all",
+                    [str(comment_all_text or "") for _ in pivot_show.index],
+                )
+                pivot_show.insert(
+                    0,
+                    "comment",
+                    [str(comment_map.get(idx, "") or "") for idx in pivot_show.index],
+                )
+                pivot_show.insert(
+                    0,
+                    "Комментарий к bid",
+                    [str(bid_comment_map.get(idx, "") or "") for idx in pivot_show.index],
+                )
+                pivot_show.insert(
+                    0,
+                    "Изменение bid",
+                    [str(bid_change_map.get(idx, "") or "") for idx in pivot_show.index],
+                )
+
+                def _style_overview(_frame: pd.DataFrame):
+                    styles = pd.DataFrame("", index=_frame.index, columns=_frame.columns)
+                    if "Тотал ДРР (период)" in styles.columns:
+                        styles["Тотал ДРР (период)"] = [
+                            _style_drr(totals.at[idx, "total_drr"]) if idx in totals.index else _style_drr(100.0)
+                            for idx in styles.index
+                        ]
+                    for col in styles.columns:
+                        if col in pivot_drr.columns:
+                            styles[col] = pivot_drr[col].apply(_style_drr)
+                    return styles
+
+                st.dataframe(
+                    pivot_show.style.apply(_style_overview, axis=None).format(
+                        {
+                            "Тотал ДРР (период)": "{:.1f}",
+                            "Тотал выручка (период)": "{:.0f}",
+                        }
+                    ),
+                    width="stretch",
+                )
 
     if picked_campaign_id and by_day_sku:
         refresh_detail = st.button("Обновить кампанию")
