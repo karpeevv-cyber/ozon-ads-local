@@ -1372,7 +1372,7 @@ with tab3:
                         token = perf_token(perf_client_id, perf_client_secret)
 
                         try:
-                            full_comment = str(bid_comment or "").strip()
+                            full_comment = f"reason={bid_reason}; {bid_comment}".strip()
                             result = apply_bid_and_log(
                                 token=token,
                                 campaign_id=str(campaign_id_for_bid),
