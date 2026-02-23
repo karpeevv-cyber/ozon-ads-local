@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime, date
@@ -16,6 +17,7 @@ BID_LOG_PATH_DEFAULT = "bid_changes.csv"
 TZ_DEFAULT = ZoneInfo("Europe/Moscow")
 GSHEET_BACKEND_NAME = "gsheets"
 GIST_BACKEND_NAME = "gist"
+logger = logging.getLogger("ozon_ads")
 
 BID_LOG_COLUMNS = [
     "ts_iso",         # 2026-01-28T14:32:10+03:00
@@ -117,9 +119,10 @@ def append_bid_change(
         try:
             _append_gist_row(payload)
             return row
-        except Exception:
-            # If Gist write fails, keep local logging to avoid data loss.
-            pass
+        except Exception as e:
+            # For gist backend we fail loudly to avoid silent CSV fallback.
+            logger.exception("Gist append failed")
+            raise RuntimeError(f"Gist append failed: {e}") from e
 
     with open(path, "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=BID_LOG_COLUMNS, delimiter=";")
@@ -132,17 +135,16 @@ def load_bid_changes(path: str = BID_LOG_PATH_DEFAULT) -> pd.DataFrame:
     if _use_gist_backend():
         try:
             df = _load_gist_rows()
-            if not df.empty:
-                for c in BID_LOG_COLUMNS:
-                    if c not in df.columns:
-                        df[c] = ""
-                df = df[BID_LOG_COLUMNS].copy()
-                df["old_bid_micro"] = df["old_bid_micro"].apply(_to_int_or_none).astype("Int64")
-                df["new_bid_micro"] = df["new_bid_micro"].apply(_to_int_or_none).astype("Int64")
-                return df
-        except Exception:
-            # If Gist is unavailable, fall back to local CSV.
-            pass
+            for c in BID_LOG_COLUMNS:
+                if c not in df.columns:
+                    df[c] = ""
+            df = df[BID_LOG_COLUMNS].copy()
+            df["old_bid_micro"] = df["old_bid_micro"].apply(_to_int_or_none).astype("Int64")
+            df["new_bid_micro"] = df["new_bid_micro"].apply(_to_int_or_none).astype("Int64")
+            return df
+        except Exception as e:
+            logger.exception("Gist load failed")
+            raise RuntimeError(f"Gist load failed: {e}") from e
     if _use_gsheet_backend():
         try:
             df = _load_gsheet_rows()
