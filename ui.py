@@ -30,7 +30,6 @@ from bid_ui_helpers import (
     add_bid_columns_weekly,
     load_bid_log_df,
 )
-from strategy_map import load_strategy_map, upsert_strategy
 from ui_data import (
     fetch_running_campaigns_cached,
     fetch_ads_stats_by_campaign_cached,
@@ -69,10 +68,6 @@ if not logger.handlers:
     handler = logging.FileHandler(LOG_PATH, encoding="utf-8")
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     logger.addHandler(handler)
-
-@st.cache_data(show_spinner=False, ttl=300)
-def load_strategy_map_cached() -> pd.DataFrame:
-    return load_strategy_map()
 
 st.set_page_config(page_title="Ozon Ads ? Report UI", layout="wide")
 st.title("Ozon Ads ? Report UI (MVP)")
@@ -926,25 +921,6 @@ with tab2:
 
     st.subheader("Кампании (за период)")
     df_campaigns = df_campaigns.copy().drop(columns=["vor"], errors="ignore")
-    if "strategy" not in df_campaigns.columns:
-        strategy_df = load_strategy_map_cached()
-        if not strategy_df.empty:
-            strategy_df["campaign_id"] = strategy_df["campaign_id"].astype(str)
-            strategy_df["sku"] = strategy_df["sku"].astype(str)
-            strategy_map = {
-                (row["campaign_id"], row["sku"]): str(row.get("strategy_id", "")).strip()
-                for _, row in strategy_df.iterrows()
-            }
-        else:
-            strategy_map = {}
-
-        def _strategy_for_row(r):
-            sku = str(r.get("sku", "") or "").strip()
-            if sku in {"", "None", "several"}:
-                return ""
-            return strategy_map.get((str(r.get("campaign_id")), sku), "")
-
-        df_campaigns["strategy"] = df_campaigns.apply(_strategy_for_row, axis=1)
     def _bid_for_row(r):
         cid = str(r.get("campaign_id"))
         items = products_by_campaign_id.get(cid, []) or []
@@ -990,53 +966,6 @@ with tab2:
         all_comment = ""
     df_campaigns["comment"] = df_campaigns["campaign_id"].astype(str).map(last_comment_map).fillna("")
     df_campaigns["comment_all"] = all_comment if all_comment else ""
-    if "strategy_df" not in locals():
-        strategy_df = load_strategy_map_cached()
-    if not strategy_df.empty:
-        strategy_df["campaign_id"] = strategy_df["campaign_id"].astype(str)
-        strategy_df["updated_date"] = strategy_df["updated_at"].astype(str).str.split("T").str[0]
-        updated_map = strategy_df.groupby("campaign_id")["updated_date"].max().to_dict()
-        df_campaigns["strategy_updated_at"] = df_campaigns["campaign_id"].astype(str).map(updated_map).fillna("")
-    else:
-        df_campaigns["strategy_updated_at"] = ""
-        updated_map = {}
-
-    by_day_sku = st.session_state.get("by_day_sku")
-    if by_day_sku and ads_daily_by_campaign and updated_map:
-        drr_after_map: dict[str, float] = {}
-        for cid, upd in updated_map.items():
-            try:
-                upd_date = date.fromisoformat(str(upd))
-            except Exception:
-                continue
-            try:
-                period_from = date.fromisoformat(str(local_from if use_local else st.session_state.get("date_from", date_from)))
-                period_to = date.fromisoformat(str(local_to if use_local else st.session_state.get("date_to", date_to)))
-            except Exception:
-                continue
-            date_from_eff = max(upd_date, period_from)
-            if date_from_eff > period_to:
-                continue
-            camp_daily = build_campaign_daily_rows_cached(
-                campaign_id=str(cid),
-                date_from=str(date_from_eff),
-                date_to=str(period_to),
-                seller_by_day_sku=by_day_sku,
-                ads_daily_by_campaign=ads_daily_by_campaign,
-                target_drr=target_drr,
-                items=products_by_campaign_id.get(str(cid), []) or [],
-            )
-            if not camp_daily:
-                continue
-            df_camp = pd.DataFrame(camp_daily)
-            spend = float(pd.to_numeric(df_camp.get("money_spent", 0), errors="coerce").fillna(0).sum())
-            rev = float(pd.to_numeric(df_camp.get("total_revenue", 0), errors="coerce").fillna(0).sum())
-            if rev <= 0:
-                continue
-            drr_after_map[str(cid)] = round(spend / rev * 100.0, 1)
-        df_campaigns["total_drr_after_chng"] = df_campaigns["campaign_id"].astype(str).map(drr_after_map).fillna("")
-    else:
-        df_campaigns["total_drr_after_chng"] = ""
     df_campaigns = df_campaigns.rename(columns={"total_drr_pct": "total_drr"})
     df_campaigns_view = make_view_df(df_campaigns)
     metrics_campaigns = {
@@ -1260,19 +1189,7 @@ with tab3:
             hide_index=True,
         )
 
-        current_strategy_display = None
-        if bid_sku_for_detail and picked_campaign_id:
-            _strategy_df = load_strategy_map_cached()
-            if not _strategy_df.empty:
-                _strategy_df["campaign_id"] = _strategy_df["campaign_id"].astype(str)
-                _strategy_df["sku"] = _strategy_df["sku"].astype(str)
-                _row = _strategy_df[
-                    (_strategy_df["campaign_id"] == str(picked_campaign_id))
-                    & (_strategy_df["sku"] == str(bid_sku_for_detail))
-                ]
-                if not _row.empty:
-                    current_strategy_display = str(_row.iloc[0].get("strategy_id", "")).strip() or None
-        st.markdown("### Параметры стратегии")
+        st.markdown("### Параметры")
         cpc_econ_range = (
             f"{fmt_rub_1(econ.get('cpc_econ_min')) if econ.get('cpc_econ_min') is not None else 'вЂ”'}"
             f" - {fmt_rub_1(econ.get('cpc_econ')) if econ.get('cpc_econ') is not None else 'вЂ”'}"
@@ -1434,23 +1351,13 @@ with tab3:
             else:
                 st.caption(f"SKU: {bid_sku_for_detail}")
 
-                current_strategy = current_strategy_display
-                if current_strategy not in {"1", "2", "3"}:
-                    current_strategy = "?"
-
                 with st.form("bid_form", clear_on_submit=False):
                     bid_rub = st.number_input("Bid (в‚Ѕ)", min_value=0.0, step=0.5, key="bid_rub_input")
                     bid_reason = st.selectbox(
                         "reason",
-                        options=["Выбери reason", "test", "manual change", "strategy"],
+                        options=["Выбери reason", "Рост продаж", "Снижение остатков", "Снижение ДРР"],
                         index=0,
                         key="bid_reason_input",
-                    )
-                    bid_strategy = st.selectbox(
-                        "strategy",
-                        options=["?", "1", "2", "3"],
-                        index=(["?", "1", "2", "3"].index(current_strategy)),
-                        key="bid_strategy_input",
                     )
                     bid_comment = st.text_input("comment", value="", key="bid_comment_input")
                     apply_bid = st.form_submit_button("APPLY BID")
@@ -1465,14 +1372,7 @@ with tab3:
                         token = perf_token(perf_client_id, perf_client_secret)
 
                         try:
-                            full_comment = f"reason={bid_reason}; strategy={bid_strategy}; {bid_comment}".strip()
-                            upsert_strategy(
-                                campaign_id=str(campaign_id_for_bid),
-                                sku=str(bid_sku_for_detail),
-                                strategy_id=str(bid_strategy),
-                                notes=full_comment,
-                            )
-                            load_strategy_map_cached.clear()
+                            full_comment = f"reason={bid_reason}; {bid_comment}".strip()
                             result = apply_bid_and_log(
                                 token=token,
                                 campaign_id=str(campaign_id_for_bid),

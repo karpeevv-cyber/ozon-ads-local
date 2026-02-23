@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime, date
 from typing import Optional
@@ -221,7 +222,7 @@ def format_changes_for_day_with_comment(
     comments: list[str] = []
     for _, r in rows.iterrows():
         parts.append(_format_one_change(r))
-        c = str(r.get("comment", "")).strip()
+        c = _clean_bid_comment(r.get("comment", ""))
         if c:
             comments.append(f"{r.get('date','')}: {c}")
     return ("; ".join(parts), "; ".join(comments))
@@ -251,7 +252,7 @@ def format_changes_for_day_with_comment_compact(
     comments: list[str] = []
     for _, r in rows.iterrows():
         parts.append(_format_one_change_compact(r))
-        c = str(r.get("comment", "")).strip()
+        c = _clean_bid_comment(r.get("comment", ""))
         if c:
             comments.append(c)
     return ("; ".join(parts), "; ".join(comments))
@@ -291,7 +292,7 @@ def format_changes_for_week_with_comment(
     comments: list[str] = []
     for _, r in rows.iterrows():
         parts.append(_format_one_change(r))
-        c = str(r.get("comment", "")).strip()
+        c = _clean_bid_comment(r.get("comment", ""))
         if c:
             comments.append(f"{r.get('date','')}: {c}")
     return ("; ".join(parts), "; ".join(comments))
@@ -335,11 +336,23 @@ def _format_one_change(row) -> str:
     d = str(row.get("date", "")).strip()
     old_micro = _to_int_or_none(row.get("old_bid_micro"))
     new_micro = _to_int_or_none(row.get("new_bid_micro"))
-    reason = str(row.get("reason", "")).strip()
-    return f"{d}: {_fmt_rub_value(old_micro)} -> {_fmt_rub_value(new_micro)}, reason={reason}"
+    return f"{d}: {_fmt_rub_value(old_micro)} -> {_fmt_rub_value(new_micro)}"
 
 
 def _format_one_change_compact(row) -> str:
     old_micro = _to_int_or_none(row.get("old_bid_micro"))
     new_micro = _to_int_or_none(row.get("new_bid_micro"))
     return f"{_fmt_rub_value(old_micro)} -> {_fmt_rub_value(new_micro)}"
+
+
+def _clean_bid_comment(raw) -> str:
+    txt = str(raw or "").strip()
+    if not txt:
+        return ""
+    # Remove legacy "reason=..." and "strategy=..." parts from displayed comments.
+    txt = re.sub(r"(^|[;\s])reason\s*=\s*[^;]*;?", " ", txt, flags=re.IGNORECASE)
+    txt = re.sub(r"(^|[;\s])strategy\s*=\s*[^;]*;?", " ", txt, flags=re.IGNORECASE)
+    txt = re.sub(r"\s*;\s*;\s*", "; ", txt)
+    txt = re.sub(r"^\s*;\s*|\s*;\s*$", "", txt)
+    txt = re.sub(r"\s{2,}", " ", txt)
+    return txt.strip()
