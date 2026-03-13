@@ -7,26 +7,110 @@ import pickle
 import traceback
 
 import pandas as pd
+import requests
 import streamlit as st
 
 _IMPORT_ERROR = ""
 try:
-    from clients_seller import (
-        seller_product_list,
-        seller_product_info_list,
-        seller_analytics_stocks,
-        seller_supply_order_list,
-        seller_supply_order_get,
-        seller_supply_order_bundle_query,
-    )
+    import clients_seller as _cs
 except Exception as e:
-    seller_product_list = None
-    seller_product_info_list = None
-    seller_analytics_stocks = None
-    seller_supply_order_list = None
-    seller_supply_order_get = None
-    seller_supply_order_bundle_query = None
+    _cs = None
     _IMPORT_ERROR = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
+
+
+def _require_cs_func(name: str):
+    fn = getattr(_cs, name, None) if _cs is not None else None
+    if callable(fn):
+        return fn
+    raise RuntimeError(f"clients_seller.{name} is missing")
+
+
+def _seller_post_fallback(
+    *,
+    path: str,
+    body: dict,
+    client_id: str | None,
+    api_key: str | None,
+) -> dict:
+    base = getattr(_cs, "SELLER_BASE", "https://api-seller.ozon.ru") if _cs is not None else "https://api-seller.ozon.ru"
+    headers = {
+        "Client-Id": str(client_id or ""),
+        "Api-Key": str(api_key or ""),
+    }
+    if _cs is not None and callable(getattr(_cs, "_post_with_backoff", None)):
+        r = _cs._post_with_backoff(f"{base}{path}", headers=headers, body=body, timeout=60)
+        return r.json()
+    r = requests.post(f"{base}{path}", json=body, headers=headers, timeout=60)
+    r.raise_for_status()
+    return r.json()
+
+
+def seller_product_list(**kwargs):
+    return _require_cs_func("seller_product_list")(**kwargs)
+
+
+def seller_product_info_list(**kwargs):
+    return _require_cs_func("seller_product_info_list")(**kwargs)
+
+
+def seller_analytics_stocks(**kwargs):
+    return _require_cs_func("seller_analytics_stocks")(**kwargs)
+
+
+def seller_supply_order_list(**kwargs):
+    fn = getattr(_cs, "seller_supply_order_list", None) if _cs is not None else None
+    if callable(fn):
+        return fn(**kwargs)
+    return _seller_post_fallback(
+        path="/v3/supply-order/list",
+        body={
+            "filter": kwargs.get("filter", {}) or {},
+            "last_id": str(kwargs.get("last_id", "") or ""),
+            "limit": int(kwargs.get("limit", 100)),
+            "sort_by": str(kwargs.get("sort_by", "ORDER_CREATION")),
+            "sort_dir": str(kwargs.get("sort_dir", "DESC")),
+        },
+        client_id=kwargs.get("client_id"),
+        api_key=kwargs.get("api_key"),
+    )
+
+
+def seller_supply_order_get(**kwargs):
+    fn = getattr(_cs, "seller_supply_order_get", None) if _cs is not None else None
+    if callable(fn):
+        return fn(**kwargs)
+    ids = [str(x) for x in (kwargs.get("order_ids") or []) if str(x).strip()]
+    return _seller_post_fallback(
+        path="/v3/supply-order/get",
+        body={"order_ids": ids},
+        client_id=kwargs.get("client_id"),
+        api_key=kwargs.get("api_key"),
+    )
+
+
+def seller_supply_order_bundle_query(**kwargs):
+    fn = getattr(_cs, "seller_supply_order_bundle_query", None) if _cs is not None else None
+    if callable(fn):
+        return fn(**kwargs)
+    body = {
+        "bundle_ids": [str(x) for x in (kwargs.get("bundle_ids") or []) if str(x).strip()],
+        "is_asc": bool(kwargs.get("is_asc", True)),
+        "item_tags_calculation": {
+            "dropoff_warehouse_id": str(kwargs.get("dropoff_warehouse_id", "") or ""),
+            "storage_warehouse_ids": [str(x) for x in (kwargs.get("storage_warehouse_ids") or []) if str(x).strip()],
+        },
+        "limit": int(kwargs.get("limit", 100)),
+        "sort_field": str(kwargs.get("sort_field", "NAME")),
+    }
+    last_id = str(kwargs.get("last_id", "") or "").strip()
+    if last_id:
+        body["last_id"] = last_id
+    return _seller_post_fallback(
+        path="/v1/supply-order/bundle",
+        body=body,
+        client_id=kwargs.get("client_id"),
+        api_key=kwargs.get("api_key"),
+    )
 
 
 def _chunks(values: list[str], size: int):
