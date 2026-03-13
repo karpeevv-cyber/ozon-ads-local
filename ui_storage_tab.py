@@ -4,18 +4,29 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from pathlib import Path
 import pickle
+import traceback
 
 import pandas as pd
 import streamlit as st
 
-from clients_seller import (
-    seller_product_list,
-    seller_product_info_list,
-    seller_analytics_stocks,
-    seller_supply_order_list,
-    seller_supply_order_get,
-    seller_supply_order_bundle_query,
-)
+_IMPORT_ERROR = ""
+try:
+    from clients_seller import (
+        seller_product_list,
+        seller_product_info_list,
+        seller_analytics_stocks,
+        seller_supply_order_list,
+        seller_supply_order_get,
+        seller_supply_order_bundle_query,
+    )
+except Exception as e:
+    seller_product_list = None
+    seller_product_info_list = None
+    seller_analytics_stocks = None
+    seller_supply_order_list = None
+    seller_supply_order_get = None
+    seller_supply_order_bundle_query = None
+    _IMPORT_ERROR = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
 
 
 def _chunks(values: list[str], size: int):
@@ -531,6 +542,10 @@ def render_storage_tab(
     seller_api_key: str | None,
 ) -> None:
     st.subheader("Storage (shipments, FIFO, 120 days)")
+    if _IMPORT_ERROR:
+        st.error("Storage dependencies failed to import.")
+        st.code(_IMPORT_ERROR)
+        return
     if not seller_client_id or not seller_api_key:
         st.warning("Seller creds are missing for selected company.")
         return
