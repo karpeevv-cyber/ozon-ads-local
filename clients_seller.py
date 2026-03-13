@@ -341,3 +341,134 @@ def seller_analytics_stocks(
         body["item_tags"] = item_tags
     r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
     return r.json()
+
+
+def seller_supply_order_list(
+    *,
+    filter: dict,
+    last_id: str = "",
+    limit: int = 100,
+    sort_by: str = "ORDER_CREATION",
+    sort_dir: str = "DESC",
+    client_id: str | None = None,
+    api_key: str | None = None,
+):
+    """
+    POST /v3/supply-order/list
+    """
+    url = f"{SELLER_BASE}/v3/supply-order/list"
+    headers = {
+        "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
+        "Api-Key": api_key or must_env("SELLER_API_KEY"),
+    }
+    body = {
+        "filter": filter or {},
+        "last_id": str(last_id or ""),
+        "limit": int(limit),
+        "sort_by": str(sort_by),
+        "sort_dir": str(sort_dir),
+    }
+    r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
+    return r.json()
+
+
+def seller_supply_order_get(
+    *,
+    order_ids: list[str],
+    client_id: str | None = None,
+    api_key: str | None = None,
+):
+    """
+    POST /v3/supply-order/get
+    """
+    url = f"{SELLER_BASE}/v3/supply-order/get"
+    headers = {
+        "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
+        "Api-Key": api_key or must_env("SELLER_API_KEY"),
+    }
+    ids = [str(x) for x in order_ids if str(x).strip()]
+    body_variants = [
+        {"order_ids": ids},
+        {"supply_order_ids": ids},
+        {"ids": ids},
+    ]
+    last_exc = None
+    for body in body_variants:
+        try:
+            r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
+            return r.json()
+        except Exception as e:
+            last_exc = e
+    if last_exc:
+        raise last_exc
+    raise RuntimeError("seller_supply_order_get failed without exception")
+
+
+def seller_supply_order_bundle(
+    *,
+    order_id: str,
+    client_id: str | None = None,
+    api_key: str | None = None,
+):
+    """
+    POST /v1/supply-order/bundle
+    """
+    url = f"{SELLER_BASE}/v1/supply-order/bundle"
+    headers = {
+        "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
+        "Api-Key": api_key or must_env("SELLER_API_KEY"),
+    }
+    oid = str(order_id)
+    body_variants = [
+        {"order_id": oid},
+        {"supply_order_id": oid},
+        {"order_ids": [oid]},
+        {"supply_order_ids": [oid]},
+    ]
+    last_exc = None
+    for body in body_variants:
+        try:
+            r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
+            return r.json()
+        except Exception as e:
+            last_exc = e
+    if last_exc:
+        raise last_exc
+    raise RuntimeError("seller_supply_order_bundle failed without exception")
+
+
+def seller_supply_order_bundle_query(
+    *,
+    bundle_ids: list[str],
+    dropoff_warehouse_id: str,
+    storage_warehouse_ids: list[str],
+    limit: int = 100,
+    sort_field: str = "NAME",
+    is_asc: bool = True,
+    last_id: str = "",
+    client_id: str | None = None,
+    api_key: str | None = None,
+):
+    """
+    POST /v1/supply-order/bundle
+    Exact schema used by Ozon docs for bundle listing by bundle_ids.
+    """
+    url = f"{SELLER_BASE}/v1/supply-order/bundle"
+    headers = {
+        "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
+        "Api-Key": api_key or must_env("SELLER_API_KEY"),
+    }
+    body = {
+        "bundle_ids": [str(x) for x in bundle_ids if str(x).strip()],
+        "is_asc": bool(is_asc),
+        "item_tags_calculation": {
+            "dropoff_warehouse_id": str(dropoff_warehouse_id),
+            "storage_warehouse_ids": [str(x) for x in storage_warehouse_ids if str(x).strip()],
+        },
+        "limit": int(limit),
+        "sort_field": str(sort_field),
+    }
+    if str(last_id or "").strip():
+        body["last_id"] = str(last_id)
+    r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
+    return r.json()

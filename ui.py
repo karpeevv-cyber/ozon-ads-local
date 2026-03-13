@@ -58,6 +58,7 @@ from ui_helpers import (
 from ui_tabs_misc import render_tab4
 from ui_finance_tab import render_finance_tab
 from ui_stocks_tab import render_stocks_tab
+from ui_storage_tab import render_storage_tab
 
 # ---------------- UI ----------------
 
@@ -408,13 +409,14 @@ if not campaign_title_map:
         campaign_title_map = {}
     st.session_state.campaign_title_map = campaign_title_map
 
-tab1, tab2, tab3, tab5, tab6, tab4 = st.tabs(
+tab1, tab2, tab3, tab5, tab6, tab7, tab4 = st.tabs(
     [
         "Main",
         "All campaigns",
         "Current campaigns",
         "Finance balance",
         "Stocks",
+        "Storage",
         "Formulas",
     ]
 )
@@ -1711,4 +1713,7 @@ with tab5:
 
 with tab6:
     render_stocks_tab(seller_client_id=seller_client_id, seller_api_key=seller_api_key)
+
+with tab7:
+    render_storage_tab(seller_client_id=seller_client_id, seller_api_key=seller_api_key)
 
