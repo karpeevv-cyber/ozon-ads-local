@@ -1113,7 +1113,6 @@ with tab3:
                     st.session_state.bid_log_df = bid_log_df_over
 
                 bid_change_map = {}
-                bid_comment_map = {}
                 if bid_log_df_over is not None and not bid_log_df_over.empty:
                     campaign_ids_set = set(campaign_options.values())
                     bid_src = bid_log_df_over.copy()
@@ -1127,23 +1126,19 @@ with tab3:
                             if sub.empty:
                                 continue
                             ch_items = []
-                            cm_items = []
                             seen_ch = set()
-                            seen_cm = set()
                             for _, r in sub.iterrows():
                                 d = str(r.get("date", "") or "").strip()
                                 old_v = _fmt_bid_micro(r.get("old_bid_micro"))
                                 new_v = _fmt_bid_micro(r.get("new_bid_micro"))
                                 ch = f"{d}: {old_v} -> {new_v}" if d else f"{old_v} -> {new_v}"
+                                cm = str(r.get("comment", "") or "").strip()
+                                if cm:
+                                    ch = f"{ch}; comment={cm}"
                                 if ch and ch not in seen_ch:
                                     seen_ch.add(ch)
                                     ch_items.append(ch)
-                                cm = str(r.get("comment", "") or "").strip()
-                                if cm and cm not in seen_cm:
-                                    seen_cm.add(cm)
-                                    cm_items.append(cm)
                             bid_change_map[camp_label] = "\n\n".join(ch_items)
-                            bid_comment_map[camp_label] = "\n\n".join(cm_items)
 
                 comment_map = {}
                 comment_all_text = ""
@@ -1219,11 +1214,6 @@ with tab3:
                     0,
                     "comment",
                     [str(comment_map.get(idx, "") or "") for idx in pivot_show.index],
-                )
-                pivot_show.insert(
-                    0,
-                    "Комментарий к bid",
-                    [str(bid_comment_map.get(idx, "") or "") for idx in pivot_show.index],
                 )
                 pivot_show.insert(
                     0,

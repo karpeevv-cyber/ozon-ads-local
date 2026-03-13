@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 from datetime import datetime
@@ -23,7 +23,13 @@ def _load_all_product_ids(
 ) -> list[str]:
     out: list[str] = []
     last_id = ""
+    seen_last_ids: set[str] = set()
+    max_pages = 1000
+    pages = 0
     while True:
+        pages += 1
+        if pages > max_pages:
+            break
         resp = seller_product_list(
             last_id=last_id,
             limit=1000,
@@ -39,9 +45,16 @@ def _load_all_product_ids(
             pid = it.get("product_id")
             if pid is not None:
                 out.append(str(pid))
-        last_id = str(result.get("last_id", "")) if result.get("last_id") is not None else ""
-        if not last_id:
+        next_last_id = str(result.get("last_id", "")) if result.get("last_id") is not None else ""
+        if not next_last_id:
             break
+        if next_last_id in seen_last_ids:
+            # Guard against broken pagination loops where API repeats the same cursor.
+            break
+        seen_last_ids.add(next_last_id)
+        last_id = next_last_id
+    # Keep stable order and remove duplicates from repeated pages.
+    out = list(dict.fromkeys(out))
     return out
 
 
@@ -62,6 +75,11 @@ def _load_sku_title_map(product_ids: list[str], *, seller_client_id: str, seller
             if sku is not None:
                 sku_title[str(sku)] = str(name)
     return sku_title
+
+
+def _chunks(values: list[str], size: int):
+    for i in range(0, len(values), size):
+        yield values[i : i + size]
 
 
 def render_stocks_tab(
@@ -112,35 +130,39 @@ def render_stocks_tab(
             )
             skus = list(sku_title.keys())
             rows = []
-            for sku in skus:
+            sku_batch_size = 200
+            for sku_batch in _chunks(skus, sku_batch_size):
                 resp = seller_analytics_stocks(
-                    skus=[sku],
+                    skus=sku_batch,
                     client_id=seller_client_id,
                     api_key=seller_api_key,
                 )
                 items = resp.get("items", []) or []
                 if not items:
                     continue
-                cluster_filter = {
-                    147: "Rostov",
-                    148: "Ufa",
-                    152: "Omsk",
-                    154: "MO",
-                    17: "Krasnodar",
-                    2: "SPB",
-                }
                 for it in items:
+                    sku = str(it.get("sku") or "")
+                    if not sku:
+                        continue
                     cluster_id = it.get("cluster_id")
                     cluster_name = it.get("cluster_name") or ""
                     turnover_grade = it.get("turnover_grade_cluster") or it.get("turnover_grade") or ""
-                    if cluster_id not in cluster_filter:
-                        continue
+                    full_cluster_label = (
+                        f"{cluster_id} {cluster_name}".strip()
+                        if cluster_id is not None
+                        else str(cluster_name).strip()
+                    )
+                    parts = full_cluster_label.split()
+                    cluster_label = parts[1].strip(",.;:") if len(parts) > 1 else full_cluster_label
+                    if not cluster_label:
+                        cluster_label = "UNKNOWN"
                     rows.append(
                         {
                             "sku": sku,
+                            "article": it.get("offer_id") or str(sku),
                             "sku title": it.get("name") or sku_title.get(str(sku), ""),
                             "offer_id": it.get("offer_id") or "",
-                            "cluster": cluster_filter.get(cluster_id, f"{cluster_id} {cluster_name}").strip(),
+                            "cluster": cluster_label,
                             "turnover_grade": str(turnover_grade),
                             "available_stock_count": float(it.get("available_stock_count", 0) or 0),
                             "ads_cluster": float(it.get("ads_cluster", 0) or 0),
@@ -171,7 +193,7 @@ def render_stocks_tab(
     if ts:
         st.caption(f"As of: {ts.strftime('%d.%m.%Y %H:%M')}")
     else:
-        st.caption("As of: —")
+        st.caption("As of: вЂ”")
 
     if not rows:
         sku_count = st.session_state.get(f"{cache_key}:sku_count", 0)
@@ -182,6 +204,14 @@ def render_stocks_tab(
     if df.empty:
         st.info("No data.")
         return
+    if "article" not in df.columns:
+        if "offer_id" in df.columns:
+            df["article"] = df["offer_id"].astype(str)
+        else:
+            df["article"] = df.get("sku", "").astype(str)
+    df["article"] = df["article"].fillna("").astype(str)
+    if "sku" in df.columns:
+        df.loc[df["article"].str.strip() == "", "article"] = df["sku"].astype(str)
     position_filter = st.selectbox("Position filter", ["ALL", "CORE", "ADDITIONAL"], index=0)
     only_shortages = st.checkbox("Only positions with shortage vs 60-day need", value=False)
     if position_filter != "ALL" and "offer_id" in df.columns:
@@ -192,36 +222,41 @@ def render_stocks_tab(
             df = df[~is_additional].copy()
     # shortage filter is applied after aggregation, to avoid partial cluster sums
 
-    if {"sku title", "cluster", "available_stock_count", "turnover_grade"}.issubset(df.columns):
+    if {"article", "cluster", "available_stock_count", "turnover_grade"}.issubset(df.columns):
         transit_days_map = {
-            "Omsk": 20,
-            "Ufa": 5,
-            "MO": 5,
-            "SPB": 5,
-            "Krasnodar": 5,
-            "Rostov": 5,
-            "Rostov/Krasnodar": 5,
+            "омск": 20,
+            "omsk": 20,
+            "уфа": 5,
+            "ufa": 5,
+            "москва": 5,
+            "moscow": 5,
+            "санкт-петербург": 5,
+            "spb": 5,
+            "краснодар": 5,
+            "krasnodar": 5,
+            "ростов": 5,
+            "rostov": 5,
         }
         df_pivot = df.pivot_table(
-            index="sku title",
+            index="article",
             columns="cluster",
             values="available_stock_count",
             aggfunc="sum",
         )
         df_ads = df.pivot_table(
-            index="sku title",
+            index="article",
             columns="cluster",
             values="ads_cluster",
             aggfunc="mean",
         )
         df_transit = df.pivot_table(
-            index="sku title",
+            index="article",
             columns="cluster",
             values="transit_stock_count",
             aggfunc="sum",
         )
         grade_map = df.pivot_table(
-            index="sku title",
+            index="article",
             columns="cluster",
             values="turnover_grade",
             aggfunc=lambda s: next((str(x) for x in s if x), ""),
@@ -231,47 +266,17 @@ def render_stocks_tab(
         df_transit = df_transit.reindex_like(df_pivot)
         grade_map = grade_map.reindex_like(df_pivot)
 
-                        # keep stable set/order of clusters
-        cluster_order = ["Rostov/Krasnodar", "Ufa", "Omsk", "MO", "SPB"]
-        combine_pair = ("Rostov", "Krasnodar")
-
-        # combine Rostov + Krasnodar into one column (before dropping originals)
-        if all(c in df_pivot.columns for c in combine_pair):
-            df_pivot["Rostov/Krasnodar"] = (
-                df_pivot[combine_pair[0]].fillna(0) + df_pivot[combine_pair[1]].fillna(0)
-            )
-            df_ads["Rostov/Krasnodar"] = (
-                df_ads[combine_pair[0]].fillna(0) + df_ads[combine_pair[1]].fillna(0)
-            )
-            df_transit["Rostov/Krasnodar"] = (
-                df_transit[combine_pair[0]].fillna(0) + df_transit[combine_pair[1]].fillna(0)
-            )
-            # pick worst grade for combined
-            grade_order = {"NO_SALES": 0, "DEFICIT": 1, "POPULAR": 2, "ACTUAL": 3, "SURPLUS": 4}
-
-            def _pick_worst(a, b):
-                a = str(a) if a is not None else ""
-                b = str(b) if b is not None else ""
-                if a not in grade_order and b not in grade_order:
-                    return ""
-                if a not in grade_order:
-                    return b
-                if b not in grade_order:
-                    return a
-                return a if grade_order[a] <= grade_order[b] else b
-
-            combined = []
-            for r in grade_map.index:
-                ga = grade_map.at[r, combine_pair[0]]
-                gb = grade_map.at[r, combine_pair[1]]
-                combined.append(_pick_worst(ga, gb))
-            grade_map["Rostov/Krasnodar"] = combined
-
-        # ensure final order (drop originals)
-        df_pivot = df_pivot.reindex(columns=cluster_order)
-        df_ads = df_ads.reindex(columns=cluster_order)
-        df_transit = df_transit.reindex(columns=cluster_order)
-        grade_map = grade_map.reindex(columns=cluster_order)
+        # sort clusters by total stock including in-transit (desc)
+        cluster_totals = df_pivot.fillna(0).sum(axis=0) + df_transit.fillna(0).sum(axis=0)
+        ordered_clusters = (
+            cluster_totals.sort_values(ascending=False)
+            .index.astype(str)
+            .tolist()
+        )
+        df_pivot = df_pivot.reindex(columns=ordered_clusters)
+        df_ads = df_ads.reindex(columns=ordered_clusters)
+        df_transit = df_transit.reindex(columns=ordered_clusters)
+        grade_map = grade_map.reindex(columns=ordered_clusters)
         # guard against duplicate columns
         df_pivot = df_pivot.loc[:, ~df_pivot.columns.duplicated()]
         df_ads = df_ads.loc[:, ~df_ads.columns.duplicated()]
@@ -281,7 +286,7 @@ def render_stocks_tab(
         if only_shortages:
             need60 = df_ads.fillna(0) * 60.0
             for col in need60.columns:
-                days = transit_days_map.get(col, 0)
+                days = transit_days_map.get(str(col).strip().lower(), 0)
                 if days:
                     need60[col] = need60[col] * (1.0 + (days / 60.0))
             stock = df_pivot.fillna(0)
@@ -315,13 +320,14 @@ def render_stocks_tab(
             return styles
 
         st.markdown(
-            "**Легенда:** "
-            "Зеленый — > 28 дней. "
-            "Светло зеленый — 28–56 дней. "
-            "Синий — 56–120 дней. "
-            "Розовый — 120+ дней. "
-            "Красный — не было продаж."
+            "**Legend:** "
+            "Green = > 28 days. "
+            "Light green = 28-56 days. "
+            "Blue = 56-120 days. "
+            "Pink = 120+ days. "
+            "Red = no sales."
         )
+        st.caption("Cell format: Stock/Need60/InTransit")
         df_pivot = df_pivot.round(0)
         def _format_cell(val, r, c):
             try:
@@ -331,7 +337,7 @@ def render_stocks_tab(
             try:
                 ads_val = df_ads.at[r, c]
                 ads60 = float(ads_val) * 60.0
-                days = transit_days_map.get(c, 0)
+                days = transit_days_map.get(str(c).strip().lower(), 0)
                 if days:
                     ads60 = ads60 * (1.0 + (days / 60.0))
                 ads60 = int(round(ads60))
@@ -342,20 +348,27 @@ def render_stocks_tab(
                 transit = int(round(float(transit_val)))
             except Exception:
                 transit = 0
-            return f"{base} ({ads60}/{transit})"
+            return f"{base} | {ads60} | {transit}"
 
         df_display = df_pivot.copy().astype(object)
         for r in df_display.index:
             for c in df_display.columns:
                 if only_shortages and pd.isna(df_display.at[r, c]):
-                    df_display.at[r, c] = "—"
+                    df_display.at[r, c] = "вЂ”"
                 else:
                     df_display.at[r, c] = _format_cell(df_display.at[r, c], r, c)
 
+        row_h = 35
+        header_h = 38
+        table_h = header_h + (len(df_display) + 3) * row_h
         st.dataframe(
             df_display.style.apply(_style, axis=None),
             width="stretch",
+            height=table_h,
         )
     else:
-        st.dataframe(df, width="stretch", hide_index=True)
+        row_h = 35
+        header_h = 38
+        table_h = header_h + (len(df) + 3) * row_h
+        st.dataframe(df, width="stretch", hide_index=True, height=table_h)
 

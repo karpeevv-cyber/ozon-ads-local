@@ -94,6 +94,14 @@ def load_bid_log_df(log_path: str = "bid_changes.csv") -> pd.DataFrame:
     return load_bid_changes(path=log_path)
 
 
+def _merge_change_and_comment(change_text: str, comment_text: str) -> str:
+    change = str(change_text or "").strip()
+    comment = str(comment_text or "").strip()
+    if change and comment:
+        return f"{change}; comment={comment}"
+    return change or ""
+
+
 
 def add_bid_columns_daily(
     df_daily: pd.DataFrame,
@@ -103,7 +111,6 @@ def add_bid_columns_daily(
     sku: str,
     day_col: str = "day",
     out_change_col: str = "Изменение bid",
-    out_comment_col: str = "Комментарий к bid",
 ) -> pd.DataFrame:
     if df_daily is None or df_daily.empty:
         return df_daily
@@ -124,11 +131,9 @@ def add_bid_columns_daily(
 
     if day_col in out.columns:
         formatted = out[day_col].astype(str).apply(_fmt)
-        out[out_change_col] = formatted.apply(lambda t: t[0])
-        out[out_comment_col] = formatted.apply(lambda t: t[1])
+        out[out_change_col] = formatted.apply(lambda t: _merge_change_and_comment(t[0], t[1]))
     else:
         out[out_change_col] = ""
-        out[out_comment_col] = ""
 
     return out
 
@@ -141,7 +146,6 @@ def add_bid_columns_weekly(
     sku: str,
     week_col: str = "week",  # YYYY-MM-DD (week start)
     out_change_col: str = "Изменение bid",
-    out_comment_col: str = "Комментарий к bid",
 ) -> pd.DataFrame:
     if df_weekly is None or df_weekly.empty:
         return df_weekly
@@ -162,10 +166,8 @@ def add_bid_columns_weekly(
 
     if week_col in out.columns:
         formatted = out[week_col].astype(str).apply(_fmt)
-        out[out_change_col] = formatted.apply(lambda t: t[0])
-        out[out_comment_col] = formatted.apply(lambda t: t[1])
+        out[out_change_col] = formatted.apply(lambda t: _merge_change_and_comment(t[0], t[1]))
     else:
         out[out_change_col] = ""
-        out[out_comment_col] = ""
 
     return out
