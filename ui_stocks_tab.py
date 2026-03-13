@@ -93,9 +93,10 @@ def render_stocks_tab(
         st.warning("Seller creds are missing for selected company.")
         return
 
-    cache_key = f"stocks:{seller_client_id}"
+    cache_version = "v2"
+    cache_key = f"stocks:{cache_version}:{seller_client_id}"
     ts_key = f"{cache_key}:ts"
-    cache_file = Path(f"stocks_cache_{seller_client_id}.pkl")
+    cache_file = Path(f"stocks_cache_{cache_version}_{seller_client_id}.pkl")
 
     refresh_stocks = st.button("Refresh stocks", key=f"{cache_key}:refresh")
 
