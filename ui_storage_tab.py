@@ -855,6 +855,7 @@ def render_storage_tab(
     df_risk = _build_fee_risk_forecast_table(df_lots)
     cols = [
         "city",
+        "storage_warehouse_name",
         "article",
         "item_volume_liters",
         "shipped_qty",
@@ -870,6 +871,11 @@ def render_storage_tab(
     cols = [c for c in cols if c in df_lots.columns]
     if cols:
         df_lots = df_lots[cols].copy()
+        df_lots = df_lots.rename(
+            columns={
+                "storage_warehouse_name": "warehouse",
+            }
+        )
 
     st.markdown("### Shipments Table")
     st.dataframe(df_lots, width="stretch", hide_index=True)
