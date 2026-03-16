@@ -76,6 +76,16 @@ st.title("Ozon Ads ? Report UI (MVP)")
 UI_STATE_CACHE_PATH = "ui_state_cache.pkl"
 COMMENTS_PATH = "campaign_comments.csv"
 
+
+@st.cache_data(show_spinner=False, ttl=60)
+def _load_comments_cached(path: str):
+    return load_campaign_comments(path)
+
+
+@st.cache_data(show_spinner=False, ttl=60)
+def _load_bid_log_cached():
+    return load_bid_log_df()
+
 company_configs = load_company_configs(".env")
 if not company_configs:
     default_company = default_company_from_env()
@@ -334,7 +344,7 @@ products_by_campaign_id = st.session_state.get("products_by_campaign_id", {})
 running_ids = st.session_state.get("running_ids", [])
 ads_daily_by_campaign = st.session_state.get("ads_daily_by_campaign", {})
 by_day_sku = st.session_state.get("by_day_sku")
-comments_df = load_campaign_comments(COMMENTS_PATH)
+comments_df = _load_comments_cached(COMMENTS_PATH)
 if comments_df is not None and not comments_df.empty:
     if "company" in comments_df.columns and selected_company:
         comments_df = comments_df[comments_df["company"].astype(str) == str(selected_company)].copy()
@@ -409,19 +419,23 @@ if not campaign_title_map:
         campaign_title_map = {}
     st.session_state.campaign_title_map = campaign_title_map
 
-tab1, tab2, tab3, tab5, tab6, tab7, tab4 = st.tabs(
-    [
-        "Main",
-        "All campaigns",
-        "Current campaigns",
-        "Finance balance",
-        "Stocks",
-        "Storage",
-        "Formulas",
-    ]
+tab_options = [
+    "Main",
+    "All campaigns",
+    "Current campaigns",
+    "Finance balance",
+    "Stocks",
+    "Storage",
+    "Formulas",
+]
+selected_tab = st.radio(
+    "Section",
+    options=tab_options,
+    horizontal=True,
+    label_visibility="collapsed",
 )
 
-with tab1:
+if selected_tab == "Main":
     st.subheader("Итоги по дням (за период)")
     if daily_rows:
         df_daily_raw = pd.DataFrame(daily_rows)
@@ -430,7 +444,7 @@ with tab1:
         bid_changes_week_map = {}
         bid_log_df_tab1 = st.session_state.get("bid_log_df")
         if bid_log_df_tab1 is None:
-            bid_log_df_tab1 = load_bid_log_df()
+            bid_log_df_tab1 = _load_bid_log_cached()
             st.session_state.bid_log_df = bid_log_df_tab1
         if bid_log_df_tab1 is not None and not bid_log_df_tab1.empty:
             campaign_ids_set = set(df_campaigns["campaign_id"].astype(str).tolist())
@@ -728,7 +742,7 @@ with tab1:
     else:
         st.warning("Нет данных по дням.")
 
-with tab2:
+if selected_tab == "All campaigns":
     try:
         loaded_from = date.fromisoformat(str(st.session_state.get("date_from", date_from)))
         loaded_to = date.fromisoformat(str(st.session_state.get("date_to", date_to)))
@@ -1012,7 +1026,7 @@ with tab2:
         column_config=build_column_config(df_campaigns_view),
     )
 
-with tab3:
+if selected_tab == "Current campaigns":
     st.subheader("Детально по кампании")
 
     running_campaigns_for_pick = fetch_running_campaigns_cached(perf_client_id, perf_client_secret)
@@ -1111,7 +1125,7 @@ with tab3:
 
                 bid_log_df_over = st.session_state.get("bid_log_df")
                 if bid_log_df_over is None:
-                    bid_log_df_over = load_bid_log_df()
+                    bid_log_df_over = _load_bid_log_cached()
                     st.session_state.bid_log_df = bid_log_df_over
 
                 bid_change_map = {}
@@ -1249,14 +1263,14 @@ with tab3:
         refresh_detail = st.button("Обновить кампанию")
         if refresh_detail or last_loaded_campaign_id != picked_campaign_id:
             with st.spinner("Загружаю детально по кампании..."):
-                token = perf_token(perf_client_id, perf_client_secret)
-                campaign_daily_rows = build_campaign_daily_rows(
-                    token=token,
+                campaign_daily_rows = build_campaign_daily_rows_cached(
                     campaign_id=str(picked_campaign_id),
                     date_from=str(st.session_state.get("date_from", date_from)),
                     date_to=str(st.session_state.get("date_to", date_to)),
                     seller_by_day_sku=by_day_sku,
+                    ads_daily_by_campaign=ads_daily_by_campaign,
                     target_drr=target_drr,
+                    items=products_by_campaign_id.get(str(picked_campaign_id), []) or [],
                 )
                 st.session_state.campaign_daily_rows = campaign_daily_rows
                 st.session_state.picked_campaign_id = picked_campaign_id
@@ -1271,7 +1285,7 @@ with tab3:
         df_camp_daily_raw = pd.DataFrame(campaign_daily_rows)
         bid_log_df = st.session_state.get("bid_log_df")
         if bid_log_df is None:
-            bid_log_df = load_bid_log_df()
+            bid_log_df = _load_bid_log_cached()
         bid_sku_for_detail = ""
         if "sku" in df_camp_daily_raw.columns:
             unique_skus = (
@@ -1549,11 +1563,6 @@ with tab3:
         with col_bid:
             st.subheader("Управление ставками (ручной тест)")
 
-            if st.session_state.get("clear_bid_form"):
-                st.session_state.bid_rub_input = 0.0
-                st.session_state.bid_reason_input = "Выбери reason"
-                st.session_state.bid_comment_input = ""
-                st.session_state.clear_bid_form = False
             if "bid_rub_input" not in st.session_state:
                 st.session_state.bid_rub_input = 0.0
 
@@ -1562,7 +1571,7 @@ with tab3:
             else:
                 st.caption(f"SKU: {bid_sku_for_detail}")
 
-                with st.form("bid_form", clear_on_submit=False):
+                with st.form("bid_form", clear_on_submit=True):
                     bid_rub = st.number_input("Bid (в‚Ѕ)", min_value=0.0, step=0.5, key="bid_rub_input")
                     bid_reason = st.selectbox(
                         "reason",
@@ -1635,19 +1644,22 @@ with tab3:
                             by_day_sku = st.session_state.get("by_day_sku")
                             if by_day_sku:
                                 with st.spinner("Обновляю кампанию..."):
-                                    campaign_daily_rows = build_campaign_daily_rows(
-                                        token=token,
+                                    campaign_daily_rows = build_campaign_daily_rows_cached(
                                         campaign_id=str(campaign_id_for_bid),
                                         date_from=str(st.session_state.get("date_from", date_from)),
                                         date_to=str(st.session_state.get("date_to", date_to)),
                                         seller_by_day_sku=by_day_sku,
+                                        ads_daily_by_campaign=st.session_state.get("ads_daily_by_campaign") or {},
                                         target_drr=target_drr,
+                                        items=(st.session_state.get("products_by_campaign_id") or {}).get(str(campaign_id_for_bid), []) or [],
                                     )
                                     st.session_state.campaign_daily_rows = campaign_daily_rows
                                     st.session_state.picked_campaign_id = str(campaign_id_for_bid)
-                            st.session_state.bid_log_df = load_bid_log_df()
-                            st.session_state.clear_bid_form = True
-                            st.rerun()
+                            _load_bid_log_cached.clear()
+                            st.session_state.bid_log_df = _load_bid_log_cached()
+                            if bid_sku_for_detail and picked_campaign_id:
+                                st.session_state.current_bid_key = f"{picked_campaign_id}:{bid_sku_for_detail}"
+                                st.session_state.current_bid_rub = float(bid_rub)
                         except Exception as e:
                             logger.exception("Apply bid failed")
                             st.error(f"Ошибка при обновлении bid: {e}")
@@ -1684,6 +1696,7 @@ with tab3:
                         day=comment_day,
                         company=selected_company,
                     )
+                    _load_comments_cached.clear()
                     st.success("Комментарий сохранен.")
                     st.rerun()
 
@@ -1705,15 +1718,15 @@ with tab3:
                     width="stretch",
                     hide_index=True,
                 )
-with tab4:
+if selected_tab == "Formulas":
     render_tab4()
 
-with tab5:
+if selected_tab == "Finance balance":
     render_finance_tab(date_from, date_to, seller_client_id=seller_client_id, seller_api_key=seller_api_key, refresh_finance=refresh_finance)
 
-with tab6:
+if selected_tab == "Stocks":
     render_stocks_tab(seller_client_id=seller_client_id, seller_api_key=seller_api_key)
 
-with tab7:
+if selected_tab == "Storage":
     render_storage_tab(seller_client_id=seller_client_id, seller_api_key=seller_api_key)
 

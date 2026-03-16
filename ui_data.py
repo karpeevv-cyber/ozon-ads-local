@@ -11,7 +11,7 @@ from clients_ads import (
 )
 from clients_seller import seller_analytics_sku_day
 from report import chunks, campaign_display_fields
-from ui_formatting import to_num_series, fmt_rub_1
+from ui_formatting import fmt_rub_1
 
 
 def daterange(date_from: date, date_to: date):
@@ -23,6 +23,25 @@ def daterange(date_from: date, date_to: date):
 
 def rub_to_api_bid_micro(rub_value: float) -> int:
     return int(round(float(rub_value) * 1_000_000))
+
+
+def _to_num(value) -> float:
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        text = str(value).strip().replace(" ", "").replace(",", ".")
+        return float(text) if text else 0.0
+    except Exception:
+        return 0.0
+
+
+def _to_int_round(value) -> int:
+    try:
+        return int(round(_to_num(value)))
+    except Exception:
+        return 0
 
 
 @st.cache_data(show_spinner=False, ttl=300)
@@ -89,12 +108,12 @@ def fetch_ads_daily_totals(
         for batch in chunks(running_ids, int(batch_size)):
             stats_day = get_campaign_stats_json(token, day_str, day_str, batch)
             for r in (stats_day.get("rows", []) or []):
-                spend = to_num_series(pd.Series([r.get("moneySpent", 0)])).iloc[0]
-                views = int(round(to_num_series(pd.Series([r.get("views", 0)])).iloc[0]))
-                clicks = int(round(to_num_series(pd.Series([r.get("clicks", 0)])).iloc[0]))
-                orders_money = to_num_series(pd.Series([r.get("ordersMoney", 0)])).iloc[0]
-                orders = int(round(to_num_series(pd.Series([r.get("orders", 0)])).iloc[0]))
-                click_price_api = float(to_num_series(pd.Series([r.get("clickPrice", 0)])).iloc[0])
+                spend = _to_num(r.get("moneySpent", 0))
+                views = _to_int_round(r.get("views", 0))
+                clicks = _to_int_round(r.get("clicks", 0))
+                orders_money = _to_num(r.get("ordersMoney", 0))
+                orders = _to_int_round(r.get("orders", 0))
+                click_price_api = _to_num(r.get("clickPrice", 0))
                 click_price = (spend / clicks) if clicks > 0 else click_price_api
 
                 day_spend += spend
@@ -306,12 +325,12 @@ def build_campaign_daily_rows(
         rows = stats_day.get("rows", []) or []
         sr = rows[0] if rows else {}
 
-        money_spent = float(to_num_series(pd.Series([sr.get("moneySpent", 0)])).iloc[0])
-        views = int(round(to_num_series(pd.Series([sr.get("views", 0)])).iloc[0]))
-        clicks = int(round(to_num_series(pd.Series([sr.get("clicks", 0)])).iloc[0]))
-        click_price_api = float(to_num_series(pd.Series([sr.get("clickPrice", 0)])).iloc[0])
-        orders = int(round(to_num_series(pd.Series([sr.get("orders", 0)])).iloc[0]))
-        orders_money_ads = float(to_num_series(pd.Series([sr.get("ordersMoney", 0)])).iloc[0])
+        money_spent = _to_num(sr.get("moneySpent", 0))
+        views = _to_int_round(sr.get("views", 0))
+        clicks = _to_int_round(sr.get("clicks", 0))
+        click_price_api = _to_num(sr.get("clickPrice", 0))
+        orders = _to_int_round(sr.get("orders", 0))
+        orders_money_ads = _to_num(sr.get("ordersMoney", 0))
         click_price = (money_spent / clicks) if clicks > 0 else click_price_api
 
         total_revenue = 0.0

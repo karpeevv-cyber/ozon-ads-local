@@ -3,6 +3,7 @@ import time
 import requests
 
 SELLER_BASE = "https://api-seller.ozon.ru"
+_SESSION = requests.Session()
 
 
 def must_env(name: str) -> str:
@@ -41,7 +42,7 @@ def _post_with_backoff(
 
     for _attempt in range(max_retries):
         try:
-            r = requests.post(url, json=body, headers=headers, timeout=timeout)
+            r = _SESSION.post(url, json=body, headers=headers, timeout=timeout)
 
             if r.status_code == 429:
                 ra = r.headers.get("Retry-After")
