@@ -133,10 +133,6 @@ def append_bid_change(
     return row
 
 
-def use_bid_log_backend_for_campaign_comments() -> bool:
-    return _use_gist_backend()
-
-
 def append_campaign_comment(
     *,
     campaign_id: str,
