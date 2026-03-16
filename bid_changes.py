@@ -6,7 +6,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Optional, Any
 from zoneinfo import ZoneInfo
 
@@ -29,6 +29,8 @@ BID_LOG_COLUMNS = [
     "reason",         # "test" | "manual change"
     "comment",        # free text
 ]
+
+CAMPAIGN_COMMENT_SKU = "__campaign_comment__"
 
 
 @dataclass(frozen=True)
@@ -131,6 +133,80 @@ def append_bid_change(
     return row
 
 
+def use_bid_log_backend_for_campaign_comments() -> bool:
+    return _use_gist_backend()
+
+
+def append_campaign_comment(
+    *,
+    campaign_id: str,
+    comment: str,
+    day: date | None = None,
+    company: str | None = None,
+    path: str = BID_LOG_PATH_DEFAULT,
+    tz: ZoneInfo = TZ_DEFAULT,
+) -> None:
+    comment_text = str(comment or "").strip()
+    if not comment_text:
+        return
+
+    ensure_bid_log(path)
+
+    now = datetime.now(tz)
+    day_value = day or now.date()
+    payload = {
+        "ts_iso": now.isoformat(),
+        "date": day_value.isoformat(),
+        "campaign_id": str(campaign_id),
+        "sku": CAMPAIGN_COMMENT_SKU,
+        "old_bid_micro": "",
+        "new_bid_micro": "",
+        "reason": str(company or "").strip(),
+        "comment": comment_text,
+    }
+
+    if _use_gist_backend():
+        try:
+            _append_gist_row(payload)
+            return
+        except Exception as e:
+            logger.exception("Gist append failed")
+            raise RuntimeError(f"Gist append failed: {e}") from e
+
+    with open(path, "a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=BID_LOG_COLUMNS, delimiter=";")
+        writer.writerow(payload)
+
+
+def load_campaign_comments_from_bid_log(path: str = BID_LOG_PATH_DEFAULT) -> pd.DataFrame:
+    if _use_gist_backend():
+        try:
+            df = _load_gist_rows()
+        except Exception as e:
+            logger.exception("Gist load failed")
+            raise RuntimeError(f"Gist load failed: {e}") from e
+    else:
+        if not os.path.exists(path):
+            return pd.DataFrame(columns=["ts", "day", "week", "company", "campaign_id", "comment"])
+        df = pd.read_csv(path, sep=";", encoding="utf-8", dtype=str).fillna("")
+
+    for c in BID_LOG_COLUMNS:
+        if c not in df.columns:
+            df[c] = ""
+
+    comments = df[df["sku"].astype(str) == CAMPAIGN_COMMENT_SKU].copy()
+    if comments.empty:
+        return pd.DataFrame(columns=["ts", "day", "week", "company", "campaign_id", "comment"])
+
+    comments["ts"] = comments["ts_iso"].astype(str)
+    comments["day"] = comments["date"].astype(str)
+    comments["week"] = comments["day"].apply(_week_start_iso)
+    comments["company"] = comments["reason"].astype(str)
+    comments["campaign_id"] = comments["campaign_id"].astype(str)
+    comments["comment"] = comments["comment"].astype(str)
+    return comments[["ts", "day", "week", "company", "campaign_id", "comment"]].copy()
+
+
 def load_bid_changes(path: str = BID_LOG_PATH_DEFAULT) -> pd.DataFrame:
     if _use_gist_backend():
         try:
@@ -138,7 +214,7 @@ def load_bid_changes(path: str = BID_LOG_PATH_DEFAULT) -> pd.DataFrame:
             for c in BID_LOG_COLUMNS:
                 if c not in df.columns:
                     df[c] = ""
-            df = df[BID_LOG_COLUMNS].copy()
+            df = _filter_bid_change_rows(df)[BID_LOG_COLUMNS].copy()
             df["old_bid_micro"] = df["old_bid_micro"].apply(_to_int_or_none).astype("Int64")
             df["new_bid_micro"] = df["new_bid_micro"].apply(_to_int_or_none).astype("Int64")
             return df
@@ -152,7 +228,7 @@ def load_bid_changes(path: str = BID_LOG_PATH_DEFAULT) -> pd.DataFrame:
                 for c in BID_LOG_COLUMNS:
                     if c not in df.columns:
                         df[c] = ""
-                df = df[BID_LOG_COLUMNS].copy()
+                df = _filter_bid_change_rows(df)[BID_LOG_COLUMNS].copy()
                 df["old_bid_micro"] = df["old_bid_micro"].apply(_to_int_or_none).astype("Int64")
                 df["new_bid_micro"] = df["new_bid_micro"].apply(_to_int_or_none).astype("Int64")
                 return df
@@ -169,6 +245,7 @@ def load_bid_changes(path: str = BID_LOG_PATH_DEFAULT) -> pd.DataFrame:
         if c not in df.columns:
             df[c] = ""
 
+    df = _filter_bid_change_rows(df)
     df["old_bid_micro"] = df["old_bid_micro"].apply(_to_int_or_none).astype("Int64")
     df["new_bid_micro"] = df["new_bid_micro"].apply(_to_int_or_none).astype("Int64")
 
@@ -378,6 +455,23 @@ def _filter_rows(df: pd.DataFrame, *, campaign_id: str, sku: str) -> pd.DataFram
         (df["campaign_id"].astype(str) == str(campaign_id))
         & (df["sku"].astype(str) == str(sku))
     ].copy()
+
+
+def _filter_bid_change_rows(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame(columns=BID_LOG_COLUMNS)
+    out = df.copy()
+    if "sku" not in out.columns:
+        out["sku"] = ""
+    return out[out["sku"].astype(str) != CAMPAIGN_COMMENT_SKU].copy()
+
+
+def _week_start_iso(day_str: str) -> str:
+    try:
+        d = date.fromisoformat(str(day_str))
+        return (d - timedelta(days=d.weekday())).isoformat()
+    except Exception:
+        return ""
 
 
 def _fmt_rub_value(micro: Optional[int]) -> str:

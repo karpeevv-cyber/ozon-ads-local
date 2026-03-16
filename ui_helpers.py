@@ -9,6 +9,12 @@ import json
 
 import pandas as pd
 
+from bid_changes import (
+    append_campaign_comment as append_campaign_comment_to_bid_log,
+    load_campaign_comments_from_bid_log,
+    use_bid_log_backend_for_campaign_comments,
+)
+
 
 def load_ui_state_cache(path: str) -> dict:
     p = Path(path)
@@ -133,6 +139,25 @@ def _normalize_comments_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_campaign_comments(path: str) -> pd.DataFrame:
+    if use_bid_log_backend_for_campaign_comments():
+        shared_df = _normalize_comments_df(load_campaign_comments_from_bid_log())
+        if not os.path.exists(path):
+            return shared_df
+        try:
+            local_df = pd.read_csv(path)
+        except Exception:
+            return shared_df
+        local_df = _normalize_comments_df(local_df)
+        if shared_df.empty:
+            return local_df
+        if local_df.empty:
+            return shared_df
+        combined = pd.concat([shared_df, local_df], ignore_index=True)
+        combined = combined.drop_duplicates(
+            subset=["ts", "day", "week", "company", "campaign_id", "comment"],
+            keep="first",
+        )
+        return _normalize_comments_df(combined)
     if not os.path.exists(path):
         return pd.DataFrame(columns=["ts", "day", "week", "company", "campaign_id", "comment"])
     try:
@@ -150,6 +175,14 @@ def append_campaign_comment(
     company: str | None = None,
 ) -> None:
     if not comment:
+        return
+    if use_bid_log_backend_for_campaign_comments():
+        append_campaign_comment_to_bid_log(
+            campaign_id=campaign_id,
+            comment=comment,
+            day=day,
+            company=company,
+        )
         return
     now = datetime.now()
     day_value = day or now.date()

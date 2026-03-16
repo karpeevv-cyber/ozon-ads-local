@@ -200,10 +200,16 @@ Accept: application/json
 - если кликов > 0: `money_spent / clicks`
 - иначе: берем `clickPrice` из статистики
 
-## Логи изменений ставок (локально)
+## Логи изменений ставок и комментариев
 
-Файл: `bid_changes.csv`  
+Файл: `bid_changes.csv` или gist `bid_changes.json`  
 Столбцы:
-- `ts_iso`, `date`, `campaign_id`, `sku`, `old_bid_micro`, `new_bid_micro`, `reason`
+- `ts_iso`, `date`, `campaign_id`, `sku`, `old_bid_micro`, `new_bid_micro`, `reason`, `comment`
 
 Используется для отображения “Изменение bid” в деталке.
+
+Комментарии кампаний при gist-backend тоже хранятся в этом же списке записей:
+- для них `sku="__campaign_comment__"`
+- `reason` содержит `company`
+- `comment` содержит текст комментария
+- `date` используется как дата комментария, `week` вычисляется при чтении
