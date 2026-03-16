@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import timedelta, datetime, date
 import pandas as pd
 import streamlit as st
@@ -42,6 +43,25 @@ def _to_int_round(value) -> int:
         return int(round(_to_num(value)))
     except Exception:
         return 0
+
+
+def _load_products_parallel(token: str, campaign_ids: list[str], page_size: int = 100) -> dict[str, list[dict]]:
+    if not campaign_ids:
+        return {}
+
+    out: dict[str, list[dict]] = {str(cid): [] for cid in campaign_ids}
+    max_workers = min(4, max(1, len(campaign_ids)))
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_map = {
+            executor.submit(get_campaign_products_all, token, str(cid), page_size): str(cid)
+            for cid in campaign_ids
+        }
+        for future in as_completed(future_map):
+            cid = future_map[future]
+            out[cid] = future.result()
+
+    return out
 
 
 @st.cache_data(show_spinner=False, ttl=300)
@@ -468,9 +488,8 @@ def campaign_weekly_aggregate(df_camp_daily_raw: pd.DataFrame, target_drr: float
 def fetch_products_by_campaign(running: list[dict], token: str, include_products: bool) -> dict[str, list[dict]]:
     products_by_campaign_id: dict[str, list[dict]] = {}
     if include_products:
-        for c in running:
-            cid = str(c["id"])
-            products_by_campaign_id[cid] = get_campaign_products_all(token, cid, page_size=100)
+        campaign_ids = [str(c["id"]) for c in running]
+        products_by_campaign_id = _load_products_parallel(token, campaign_ids, page_size=100)
     else:
         for c in running:
             products_by_campaign_id[str(c["id"])] = []
@@ -487,8 +506,11 @@ def fetch_products_by_campaign_cached(
     token = perf_token(client_id=perf_client_id, client_secret=perf_client_secret)
     products_by_campaign_id: dict[str, list[dict]] = {}
     if include_products:
-        for cid in running_ids:
-            products_by_campaign_id[str(cid)] = get_campaign_products_all(token, str(cid), page_size=100)
+        products_by_campaign_id = _load_products_parallel(
+            token,
+            [str(cid) for cid in running_ids],
+            page_size=100,
+        )
     else:
         for cid in running_ids:
             products_by_campaign_id[str(cid)] = []
