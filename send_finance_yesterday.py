@@ -74,8 +74,11 @@ def _format_balance_row(day_str: str, data: dict) -> dict[str, str]:
 
     services = cashflows.get("services", []) or []
     logistics = 0.0
+    reverse_logistics = 0.0
+    returns_processing = 0.0
     cross_docking = 0.0
     acceptance = 0.0
+    errors = 0.0
     storage = 0.0
     marketing = 0.0
     promotion_with_cpo = 0.0
@@ -87,10 +90,16 @@ def _format_balance_row(day_str: str, data: dict) -> dict[str, str]:
         val = float(s.get("amount", {}).get("value", 0) or 0)
         if name in {"logistics", "courier_client_reinvoice"}:
             logistics += val
+        if name == "reverse_logistics":
+            reverse_logistics += val
+        if name == "partner_returns_cancellations_processing":
+            returns_processing += val
         if name == "cross_docking":
             cross_docking += val
         if name == "goods_processing_in_shipment":
             acceptance += val
+        if name == "booking_space_and_staff_for_partial_shipment":
+            errors += val
         if name == "product_placement_in_ozon_warehouses":
             storage += val
         if name == "pay_per_click":
@@ -111,8 +120,11 @@ def _format_balance_row(day_str: str, data: dict) -> dict[str, str]:
         + fee
         + acquiring
         + logistics
+        + reverse_logistics
+        + returns_processing
         + cross_docking
         + acceptance
+        + errors
         + storage
         + marketing
         + promotion_with_cpo
@@ -129,8 +141,11 @@ def _format_balance_row(day_str: str, data: dict) -> dict[str, str]:
         "эквайринг": str(_ceil_int(acquiring)),
         "выплаты": str(_ceil_int(payments)),
         "логистика": str(_ceil_int(logistics)),
+        "обратная логистика": str(_ceil_int(reverse_logistics)),
+        "возвраты": str(_ceil_int(returns_processing)),
         "кросс-докинг": str(_ceil_int(cross_docking)),
         "приемка": str(_ceil_int(acceptance)),
+        "ошибки": str(_ceil_int(errors)),
         "Хранение": str(_ceil_int(storage)),
         "реклама": str(_ceil_int(marketing)),
         "реклама - за заказ": str(_ceil_int(promotion_with_cpo)),
@@ -197,8 +212,11 @@ def main() -> int:
         "эквайринг",
         "выплаты",
         "логистика",
+        "обратная логистика",
+        "возвраты",
         "кросс-докинг",
         "приемка",
+        "ошибки",
         "Хранение",
         "реклама",
         "реклама - за заказ",

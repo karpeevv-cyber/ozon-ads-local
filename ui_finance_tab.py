@@ -69,8 +69,11 @@ def _fetch_finance_rows_cached_static(
 
         services = cashflows.get("services", []) or []
         logistics = 0.0
+        reverse_logistics = 0.0
+        returns_processing = 0.0
         cross_docking = 0.0
         acceptance = 0.0
+        errors = 0.0
         storage = 0.0
         marketing = 0.0
         promotion_with_cpo = 0.0
@@ -82,10 +85,16 @@ def _fetch_finance_rows_cached_static(
             val = float(s.get("amount", {}).get("value", 0) or 0)
             if name in {"logistics", "courier_client_reinvoice"}:
                 logistics += val
+            if name == "reverse_logistics":
+                reverse_logistics += val
+            if name == "partner_returns_cancellations_processing":
+                returns_processing += val
             if name == "cross_docking":
                 cross_docking += val
             if name == "goods_processing_in_shipment":
                 acceptance += val
+            if name == "booking_space_and_staff_for_partial_shipment":
+                errors += val
             if name == "product_placement_in_ozon_warehouses":
                 storage += val
             if name == "pay_per_click":
@@ -106,8 +115,11 @@ def _fetch_finance_rows_cached_static(
             + fee
             + acquiring
             + logistics
+            + reverse_logistics
+            + returns_processing
             + cross_docking
             + acceptance
+            + errors
             + storage
             + marketing
             + promotion_with_cpo
@@ -127,8 +139,11 @@ def _fetch_finance_rows_cached_static(
                 "эквайринг": _ceil_int(acquiring),
                 "выплаты": _ceil_int(payments),
                 "логистика": _ceil_int(logistics),
+                "обратная логистика": _ceil_int(reverse_logistics),
+                "возвраты": _ceil_int(returns_processing),
                 "кросс-докинг": _ceil_int(cross_docking),
                 "приемка": _ceil_int(acceptance),
+                "ошибки": _ceil_int(errors),
                 "Хранение": _ceil_int(storage),
                 "реклама": _ceil_int(marketing),
                 "реклама - за заказ": _ceil_int(promotion_with_cpo),
@@ -206,8 +221,11 @@ def render_finance_tab(
         "эквайринг",
         "выплаты",
         "логистика",
+        "обратная логистика",
+        "возвраты",
         "кросс-докинг",
         "приемка",
+        "ошибки",
         "Хранение",
         "реклама",
         "реклама - за заказ",
