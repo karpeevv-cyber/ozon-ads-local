@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import date
 from io import StringIO
+from pathlib import Path
 
 import pandas as pd
 import requests
@@ -11,10 +12,20 @@ import streamlit as st
 from clients_seller import seller_analytics_data, seller_finance_balance
 
 
-UNIT_ECON_SHEETS = {
-    "Osome tea": {"sheet_id": "17W18g8mCD2VxtNIOr8EaVM4Hik4cLI444HeFWx31-Ts", "gid": "703239472"},
-    "Aura tea": {"sheet_id": "1DdBm9Ul__fyUY0hWobwg1fTtIzmILif4ycV_1503R8g", "gid": "703239472"},
-}
+UNIT_ECON_SOURCES = [
+    {
+        "seller_client_ids": {"3813927"},
+        "company_aliases": {"Osome tea"},
+        "sheet_id": "17W18g8mCD2VxtNIOr8EaVM4Hik4cLI444HeFWx31-Ts",
+        "gid": "703239472",
+    },
+    {
+        "seller_client_ids": {"3319846"},
+        "company_aliases": {"Aura tea"},
+        "sheet_id": "1DdBm9Ul__fyUY0hWobwg1fTtIzmILif4ycV_1503R8g",
+        "gid": "703239472",
+    },
+]
 
 SHEET_TEA_COST = "\u0441\u0435\u0431\u0435\u0441 \u043f\u043e\u0440\u0446\u0438\u0438 \u0447\u0430\u044f"
 SHEET_PACKAGE_COST = "\u043a\u043e\u0441\u0442\u044b \u0443\u043f"
@@ -41,24 +52,37 @@ def _sheet_csv_url(sheet_id: str, gid: str) -> str:
     return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
 
 
-def _normalize_company_name(company_name: str | None) -> str:
-    return "".join(ch for ch in str(company_name or "").strip().lower() if ch.isalnum())
+def _normalize_key(value: str | None) -> str:
+    return "".join(ch for ch in str(value or "").strip().lower() if ch.isalnum())
 
 
-def get_unit_econ_sheet_config(company_name: str | None) -> dict[str, str] | None:
-    if not company_name:
-        return None
-    direct = UNIT_ECON_SHEETS.get(str(company_name).strip())
-    if direct:
-        return direct
-    normalized = _normalize_company_name(company_name)
-    normalized_map = {_normalize_company_name(name): cfg for name, cfg in UNIT_ECON_SHEETS.items()}
-    return normalized_map.get(normalized)
+def get_unit_econ_sheet_config(company_name: str | None = None, seller_client_id: str | None = None) -> dict[str, str] | None:
+    seller_key = _normalize_key(seller_client_id)
+    company_key = _normalize_key(company_name)
+    for source in UNIT_ECON_SOURCES:
+        if seller_key and seller_key in {_normalize_key(v) for v in source.get("seller_client_ids", set())}:
+            return {"sheet_id": source["sheet_id"], "gid": source["gid"]}
+    for source in UNIT_ECON_SOURCES:
+        if company_key and company_key in {_normalize_key(v) for v in source.get("company_aliases", set())}:
+            return {"sheet_id": source["sheet_id"], "gid": source["gid"]}
+    return None
 
 
-def get_unit_econ_products_path(company_name: str | None) -> str:
-    safe = _normalize_company_name(company_name) or "default"
+def get_unit_econ_products_path(company_name: str | None = None, seller_client_id: str | None = None) -> str:
+    safe = _normalize_key(seller_client_id) or _normalize_key(company_name) or "default"
     return f"unit_economics_products_{safe}.csv"
+
+
+def _get_unit_econ_products_load_path(company_name: str | None = None, seller_client_id: str | None = None) -> str:
+    primary = get_unit_econ_products_path(company_name=company_name, seller_client_id=seller_client_id)
+    primary_path = Path(primary)
+    if primary_path.exists():
+        return str(primary_path)
+    legacy = get_unit_econ_products_path(company_name=company_name, seller_client_id=None)
+    legacy_path = Path(legacy)
+    if legacy != primary and legacy_path.exists():
+        return str(legacy_path)
+    return str(primary_path)
 
 
 @st.cache_data(show_spinner=False, ttl=60)
@@ -130,12 +154,12 @@ def _load_unit_costs(sheet_id: str, gid: str) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False, ttl=300)
-def load_effective_unit_costs(company_name: str | None) -> pd.DataFrame:
-    cfg = get_unit_econ_sheet_config(company_name)
+def load_effective_unit_costs(company_name: str | None, seller_client_id: str | None = None) -> pd.DataFrame:
+    cfg = get_unit_econ_sheet_config(company_name=company_name, seller_client_id=seller_client_id)
     if not cfg:
         return pd.DataFrame(columns=["sku", "sheet_name", "tea_cost", "package_cost", "label_cost", "packing_cost"])
     base = _load_unit_costs(cfg["sheet_id"], cfg["gid"]).copy()
-    overrides = _load_unit_cost_overrides(get_unit_econ_products_path(company_name)).copy()
+    overrides = _load_unit_cost_overrides(_get_unit_econ_products_load_path(company_name=company_name, seller_client_id=seller_client_id)).copy()
     if overrides.empty:
         return base
     overrides["position"] = overrides["position"].astype(str).fillna("").str.strip()
@@ -297,7 +321,7 @@ def _build_day_sales(raw_sales_df: pd.DataFrame) -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False, ttl=900)
 def load_unit_economics_daily_summary(date_from: str, date_to: str, *, seller_client_id: str | None, seller_api_key: str | None, company_name: str | None) -> pd.DataFrame:
-    costs_df = load_effective_unit_costs(company_name)
+    costs_df = load_effective_unit_costs(company_name, seller_client_id=seller_client_id)
     raw_sales_df = _load_sales_by_sku_day_rows(date_from, date_to, seller_client_id=seller_client_id, seller_api_key=seller_api_key)
     day_sales_df = _build_day_sales(raw_sales_df)
     if costs_df.empty or day_sales_df.empty:
@@ -322,7 +346,7 @@ def load_unit_economics_daily_summary(date_from: str, date_to: str, *, seller_cl
 
 @st.cache_data(show_spinner=False, ttl=900)
 def load_unit_economics_day_table(date_from: str, date_to: str, *, seller_client_id: str | None, seller_api_key: str | None, company_name: str | None) -> pd.DataFrame:
-    costs_df = load_effective_unit_costs(company_name)
+    costs_df = load_effective_unit_costs(company_name, seller_client_id=seller_client_id)
     raw_sales_df = _load_sales_by_sku_day_rows(date_from, date_to, seller_client_id=seller_client_id, seller_api_key=seller_api_key)
     day_sales_df = _build_day_sales(raw_sales_df)
     if costs_df.empty or day_sales_df.empty:
@@ -358,7 +382,7 @@ def load_unit_economics_day_table(date_from: str, date_to: str, *, seller_client
 
 @st.cache_data(show_spinner=False, ttl=900)
 def load_unit_economics_sku_period_summary(date_from: str, date_to: str, *, seller_client_id: str | None, seller_api_key: str | None, company_name: str | None) -> pd.DataFrame:
-    costs_df = load_effective_unit_costs(company_name)
+    costs_df = load_effective_unit_costs(company_name, seller_client_id=seller_client_id)
     raw_sales_df = _load_sales_by_sku_day_rows(date_from, date_to, seller_client_id=seller_client_id, seller_api_key=seller_api_key)
     day_sales_df = _build_day_sales(raw_sales_df)
     if costs_df.empty or day_sales_df.empty:
@@ -383,7 +407,7 @@ def render_unit_economics_tab(date_from: date, date_to: date, *, seller_client_i
     if not seller_client_id or not seller_api_key:
         st.warning("Seller API credentials are missing for the selected company.")
         return
-    if not get_unit_econ_sheet_config(company_name):
+    if not get_unit_econ_sheet_config(company_name=company_name, seller_client_id=seller_client_id):
         st.info("Unit economics source is not configured for the selected company.")
         return
 

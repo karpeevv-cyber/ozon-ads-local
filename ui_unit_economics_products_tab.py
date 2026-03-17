@@ -68,18 +68,18 @@ def render_unit_economics_products_tab(
     if not seller_client_id or not seller_api_key:
         st.warning("Seller API credentials are missing for the selected company.")
         return
-    if not get_unit_econ_sheet_config(company_name):
+    if not get_unit_econ_sheet_config(company_name=company_name, seller_client_id=seller_client_id):
         st.info("Unit economics source is not configured for the selected company.")
         return
 
-    costs_df = load_effective_unit_costs(company_name).rename(columns={"sheet_name": "sheet_title"})
+    costs_df = load_effective_unit_costs(company_name, seller_client_id=seller_client_id).rename(columns={"sheet_name": "sheet_title"})
     if costs_df.empty:
         st.info("No products found in the unit economics source.")
         return
 
     sales_df = _load_sales_by_sku(str(date_from), str(date_to), seller_client_id=seller_client_id, seller_api_key=seller_api_key)
     sku_title_map = _load_sku_title_map(seller_client_id=seller_client_id, seller_api_key=seller_api_key)
-    overrides_df = _load_unit_cost_overrides(get_unit_econ_products_path(company_name))
+    overrides_df = _load_unit_cost_overrides(get_unit_econ_products_path(company_name=company_name, seller_client_id=seller_client_id))
 
     sales_name_df = pd.DataFrame(columns=["sku", "sales_name"])
     if not sales_df.empty and "name" in sales_df.columns:
@@ -153,5 +153,5 @@ def render_unit_economics_products_tab(
         else:
             existing = existing[~existing["sku"].isin(save_df["sku"].astype(str))].copy()
             merged = pd.concat([existing, save_df], ignore_index=True)
-        save_unit_cost_overrides(merged, get_unit_econ_products_path(company_name))
+        save_unit_cost_overrides(merged, get_unit_econ_products_path(company_name=company_name, seller_client_id=seller_client_id))
         st.success("Unit economics products saved.")
