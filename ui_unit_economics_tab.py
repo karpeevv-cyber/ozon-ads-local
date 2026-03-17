@@ -41,14 +41,23 @@ def _sheet_csv_url(sheet_id: str, gid: str) -> str:
     return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
 
 
+def _normalize_company_name(company_name: str | None) -> str:
+    return "".join(ch for ch in str(company_name or "").strip().lower() if ch.isalnum())
+
+
 def get_unit_econ_sheet_config(company_name: str | None) -> dict[str, str] | None:
     if not company_name:
         return None
-    return UNIT_ECON_SHEETS.get(str(company_name).strip())
+    direct = UNIT_ECON_SHEETS.get(str(company_name).strip())
+    if direct:
+        return direct
+    normalized = _normalize_company_name(company_name)
+    normalized_map = {_normalize_company_name(name): cfg for name, cfg in UNIT_ECON_SHEETS.items()}
+    return normalized_map.get(normalized)
 
 
 def get_unit_econ_products_path(company_name: str | None) -> str:
-    safe = (str(company_name or "").strip().lower().replace(" ", "_")) or "default"
+    safe = _normalize_company_name(company_name) or "default"
     return f"unit_economics_products_{safe}.csv"
 
 
