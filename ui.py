@@ -425,8 +425,8 @@ tab_options = [
     "Main",
     "All campaigns",
     "Current campaigns",
-    "юнит экономика",
-    "Товары для юнит-экономики",
+    "Unit Economics",
+    "Unit Economics Products",
     "Finance balance",
     "Stocks",
     "Storage",
@@ -1766,7 +1766,7 @@ if selected_tab == "Formulas":
 if selected_tab == "Finance balance":
     render_finance_tab(date_from, date_to, seller_client_id=seller_client_id, seller_api_key=seller_api_key, refresh_finance=refresh_finance)
 
-if selected_tab == "юнит экономика":
+if selected_tab == "Unit Economics":
     render_unit_economics_tab(
         date_from,
         date_to,
@@ -1775,7 +1775,7 @@ if selected_tab == "юнит экономика":
         company_name=selected_company,
     )
 
-if selected_tab == "Товары для юнит-экономики":
+if selected_tab == "Unit Economics Products":
     render_unit_economics_products_tab(
         date_from,
         date_to,
