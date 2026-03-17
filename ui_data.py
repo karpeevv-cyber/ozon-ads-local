@@ -421,6 +421,8 @@ def campaign_weekly_aggregate(df_camp_daily_raw: pd.DataFrame, target_drr: float
             dfw["orders_money_ads"] = (rev * (100.0 - org) / 100.0).fillna(0.0)
         else:
             dfw["orders_money_ads"] = 0.0
+    if "ebitda" not in dfw.columns:
+        dfw["ebitda"] = 0.0
 
     agg = (
         dfw.groupby("week_start", as_index=False)
@@ -433,6 +435,7 @@ def campaign_weekly_aggregate(df_camp_daily_raw: pd.DataFrame, target_drr: float
             orders_money_ads=("orders_money_ads", "sum"),
             total_revenue=("total_revenue", "sum"),
             ordered_units=("ordered_units", "sum"),
+            ebitda=("ebitda", "sum"),
         )
         .sort_values("week_start")
     )
@@ -459,6 +462,10 @@ def campaign_weekly_aggregate(df_camp_daily_raw: pd.DataFrame, target_drr: float
         lambda r: (100.0 - (r["orders_money_ads"] / r["total_revenue"] * 100.0)) if r["total_revenue"] else 0.0,
         axis=1,
     ).clip(lower=0.0, upper=100.0)
+    agg["ebitda_pct"] = agg.apply(
+        lambda r: (r["ebitda"] / r["total_revenue"] * 100.0) if r["total_revenue"] else 0.0,
+        axis=1,
+    )
 
     agg = agg.rename(columns={"week_start": "week"})
     agg["week"] = agg["week"].astype(str)
@@ -481,6 +488,8 @@ def campaign_weekly_aggregate(df_camp_daily_raw: pd.DataFrame, target_drr: float
         "ordered_units",
         "total_drr_pct",
         "organic_pct",
+        "ebitda",
+        "ebitda_pct",
     ]
     return agg[cols]
 

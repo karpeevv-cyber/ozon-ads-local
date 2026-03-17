@@ -238,6 +238,20 @@ def render_finance_tab(
     if "% логистики" in df.columns:
         df["% логистики"] = pd.to_numeric(df["% логистики"], errors="coerce").round(1)
 
+    total_cols = [c for c in df.columns if c != "день"]
+    totals = {}
+    for col in total_cols:
+        totals[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).sum()
+    if totals:
+        totals_df = pd.DataFrame([totals])
+        if "% логистики" in totals_df.columns:
+            totals_df["% логистики"] = pd.to_numeric(totals_df["% логистики"], errors="coerce").round(1)
+        st.caption("Итого за выбранный период")
+        total_style = totals_df.style
+        if "% логистики" in totals_df.columns:
+            total_style = total_style.format({"% логистики": "{:.1f}%"})
+        st.dataframe(total_style, width="stretch", hide_index=True)
+
     highlight_cols = {"на начало дня", "на конец дня", "продажи", "изменение"}
 
     def _highlight(row):

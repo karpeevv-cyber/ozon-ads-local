@@ -169,6 +169,43 @@ def seller_analytics_sku_day(
     return by_sku, by_day, by_day_sku
 
 
+def seller_analytics_data(
+    *,
+    date_from: str,
+    date_to: str,
+    dimension: list[str],
+    metrics: list[str],
+    limit: int = 1000,
+    offset: int = 0,
+    filters: list[dict] | None = None,
+    sort: list[dict] | None = None,
+    client_id: str | None = None,
+    api_key: str | None = None,
+):
+    """
+    Generic wrapper for POST /v1/analytics/data.
+    """
+    url = f"{SELLER_BASE}/v1/analytics/data"
+    headers = {
+        "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
+        "Api-Key": api_key or must_env("SELLER_API_KEY"),
+    }
+    body = {
+        "date_from": date_from,
+        "date_to": date_to,
+        "dimension": list(dimension or []),
+        "metrics": list(metrics or []),
+        "limit": int(limit),
+        "offset": int(offset),
+    }
+    if filters:
+        body["filters"] = filters
+    if sort:
+        body["sort"] = sort
+    r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
+    return r.json()
+
+
 def seller_total_sales_all(date_from: str, date_to: str, limit: int = 1000):
     """
     Backward-compatible wrapper.

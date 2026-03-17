@@ -59,6 +59,8 @@ from ui_tabs_misc import render_tab4
 from ui_finance_tab import render_finance_tab
 from ui_stocks_tab import render_stocks_tab
 from ui_storage_tab import render_storage_tab
+from ui_unit_economics_tab import render_unit_economics_tab, load_unit_economics_daily_summary
+from ui_unit_economics_products_tab import render_unit_economics_products_tab
 
 # ---------------- UI ----------------
 
@@ -423,6 +425,8 @@ tab_options = [
     "Main",
     "All campaigns",
     "Current campaigns",
+    "юнит экономика",
+    "Товары для юнит-экономики",
     "Finance balance",
     "Stocks",
     "Storage",
@@ -439,6 +443,21 @@ if selected_tab == "Main":
     st.subheader("Итоги по дням (за период)")
     if daily_rows:
         df_daily_raw = pd.DataFrame(daily_rows)
+        ebitda_daily = load_unit_economics_daily_summary(
+            str(st.session_state.get("date_from", date_from)),
+            str(st.session_state.get("date_to", date_to)),
+            seller_client_id=seller_client_id,
+            seller_api_key=seller_api_key,
+            company_name=selected_company,
+        )
+        if not ebitda_daily.empty and "day" in df_daily_raw.columns:
+            df_daily_raw = df_daily_raw.merge(ebitda_daily, on="day", how="left")
+        if "ebitda" not in df_daily_raw.columns:
+            df_daily_raw["ebitda"] = 0.0
+        if "ebitda_pct" not in df_daily_raw.columns:
+            df_daily_raw["ebitda_pct"] = 0.0
+        df_daily_raw["ebitda"] = pd.to_numeric(df_daily_raw["ebitda"], errors="coerce").fillna(0.0)
+        df_daily_raw["ebitda_pct"] = pd.to_numeric(df_daily_raw["ebitda_pct"], errors="coerce").fillna(0.0)
         week_comment_map = {}
         bid_changes_day_map = {}
         bid_changes_week_map = {}
@@ -575,6 +594,8 @@ if selected_tab == "Main":
             "rpc",
             "vpo",
             "organic_pct",
+            "ebitda",
+            "ebitda_pct",
             "bid_changes_cnt",
             "comment",
         ]
@@ -588,6 +609,8 @@ if selected_tab == "Main":
             "cr": "higher",
             "rpc": "higher",
             "vpo": "lower",
+            "ebitda": "higher",
+            "ebitda_pct": "higher",
         }
         st.markdown("### Итоги по неделям (за период)")
         df_weekly_main_raw = campaign_weekly_aggregate(df_daily_raw, target_drr=target_drr)
@@ -621,13 +644,11 @@ if selected_tab == "Main":
                 "views_per_day",
                 "clicks_per_day",
                 "ordered_units_per_day",
-                "cpm",
                 "ctr",
                 "cr",
-                "rpc",
-                "vpo",
                 "organic_pct",
-                "days_in_period",
+                "ebitda",
+                "ebitda_pct",
                 "bid_changes_cnt",
                 "comment",
             ]
@@ -635,36 +656,40 @@ if selected_tab == "Main":
             if "week" in df_weekly_main.columns:
                 df_weekly_main["week"] = format_date_ddmmyyyy(df_weekly_main["week"])
             metrics_weekly_main = {
-                "cpm": "lower",
                 "total_drr_pct": "lower",
                 "ctr": "higher",
                 "cr": "higher",
-                "rpc": "higher",
-                "vpo": "lower",
+                "ebitda": "higher",
+                "ebitda_pct": "higher",
             }
             weekly_cfg = build_column_config(df_weekly_main)
+            weekly_label_map = {
+                "ordered_units_per_day": "units_/_day",
+                "money_spent_per_day": "spent_/_day",
+                "total_revenue_per_day": "revenue_/_day",
+            }
             excluded_progress_cols_weekly = {"comment", "bid_changes_cnt", "week", "days_in_period"}
             money_progress_cols = {
                 "money_spent",
                 "money_spent_per_day",
                 "total_revenue",
                 "total_revenue_per_day",
-                "rpc",
-                "cpm",
                 "click_price",
                 "bid",
                 "orders_money_ads",
+                "ebitda",
             }
             pct_progress_cols = {
                 "total_drr_pct",
                 "ctr",
                 "cr",
                 "organic_pct",
+                "ebitda_pct",
                 "total_drr",
                 "total_drr_after_chng",
                 "vor",
             }
-            one_decimal_cols = {"vpo"}
+            one_decimal_cols = set()
 
             for col in df_weekly_main.columns:
                 if col in excluded_progress_cols_weekly:
@@ -673,7 +698,9 @@ if selected_tab == "Main":
                 if s_num.isna().all():
                     continue
 
+                min_val = float(s_num.fillna(0).min())
                 max_val = float(s_num.fillna(0).max())
+                label = weekly_label_map.get(col, col)
                 if col in money_progress_cols:
                     fmt = "%.0f ₽"
                 elif col in pct_progress_cols or col.endswith("_pct"):
@@ -684,10 +711,18 @@ if selected_tab == "Main":
                     fmt = "%.0f"
 
                 weekly_cfg[col] = st.column_config.ProgressColumn(
-                    col,
-                    min_value=0.0,
+                    label,
+                    min_value=min(0.0, min_val),
                     max_value=max(1.0, max_val),
                     format=fmt,
+                    width="small",
+                    )
+            for col in df_weekly_main.columns:
+                if col in weekly_cfg:
+                    continue
+                weekly_cfg[col] = st.column_config.TextColumn(
+                    weekly_label_map.get(col, col),
+                    width="small",
                 )
             st.dataframe(
                 df_weekly_main,
@@ -698,12 +733,13 @@ if selected_tab == "Main":
         st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
         daily_cfg = build_column_config(df_daily)
         excluded_progress_cols = {"comment", "bid_changes_cnt", "day"}
-        money_progress_cols = {"money_spent", "total_revenue", "rpc", "cpm", "click_price", "bid", "orders_money_ads"}
+        money_progress_cols = {"money_spent", "total_revenue", "rpc", "cpm", "click_price", "bid", "orders_money_ads", "ebitda"}
         pct_progress_cols = {
             "total_drr_pct",
             "ctr",
             "cr",
             "organic_pct",
+            "ebitda_pct",
             "total_drr",
             "total_drr_after_chng",
             "vor",
@@ -717,6 +753,7 @@ if selected_tab == "Main":
             if s_num.isna().all():
                 continue
 
+            min_val = float(s_num.fillna(0).min())
             max_val = float(s_num.fillna(0).max())
             if col in money_progress_cols:
                 fmt = "%.0f ₽"
@@ -729,10 +766,15 @@ if selected_tab == "Main":
 
             daily_cfg[col] = st.column_config.ProgressColumn(
                 col,
-                min_value=0.0,
+                min_value=min(0.0, min_val),
                 max_value=max(1.0, max_val),
                 format=fmt,
+                width="small",
             )
+        for col in df_daily.columns:
+            if col in daily_cfg:
+                continue
+            daily_cfg[col] = st.column_config.TextColumn(col, width="small")
         st.dataframe(
             df_daily,
             width="stretch",
@@ -1723,6 +1765,24 @@ if selected_tab == "Formulas":
 
 if selected_tab == "Finance balance":
     render_finance_tab(date_from, date_to, seller_client_id=seller_client_id, seller_api_key=seller_api_key, refresh_finance=refresh_finance)
+
+if selected_tab == "юнит экономика":
+    render_unit_economics_tab(
+        date_from,
+        date_to,
+        seller_client_id=seller_client_id,
+        seller_api_key=seller_api_key,
+        company_name=selected_company,
+    )
+
+if selected_tab == "Товары для юнит-экономики":
+    render_unit_economics_products_tab(
+        date_from,
+        date_to,
+        seller_client_id=seller_client_id,
+        seller_api_key=seller_api_key,
+        company_name=selected_company,
+    )
 
 if selected_tab == "Stocks":
     render_stocks_tab(seller_client_id=seller_client_id, seller_api_key=seller_api_key)

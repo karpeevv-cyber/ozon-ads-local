@@ -38,10 +38,12 @@ NUMERIC_COLS = [
     "vor",
     "cpm",
     "organic_pct",
+    "ebitda",
+    "ebitda_pct",
 ]
 
-MONEY_COLS = {"money_spent", "money_spent_per_day", "orders_money_ads", "click_price", "rpc", "target_cpc", "total_revenue", "total_revenue_per_day", "cpm", "bid"}
-PCT_COLS = {"ctr", "cr", "vor", "organic_pct", "total_drr_pct", "total_drr", "total_drr_after_chng"}
+MONEY_COLS = {"money_spent", "money_spent_per_day", "orders_money_ads", "click_price", "rpc", "target_cpc", "total_revenue", "total_revenue_per_day", "cpm", "bid", "ebitda"}
+PCT_COLS = {"ctr", "cr", "vor", "organic_pct", "total_drr_pct", "total_drr", "total_drr_after_chng", "ebitda_pct"}
 
 
 def to_num_series(s: pd.Series) -> pd.Series:
