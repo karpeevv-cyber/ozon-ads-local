@@ -24,6 +24,7 @@ from ui_formatting import (
     format_date_ddmmyyyy,
 )
 from ui_styles import style_median_table, BAND_PCT
+from clients_seller import seller_product_list, seller_product_info_list
 from bid_ui_helpers import (
     apply_bid_and_log,
     add_bid_columns_daily,
@@ -89,6 +90,59 @@ def _load_comments_cached(path: str):
 def _load_bid_log_cached():
     return load_bid_log_df()
 
+
+@st.cache_data(show_spinner=False, ttl=900)
+def _load_all_product_ids_for_articles(*, seller_client_id: str, seller_api_key: str) -> list[str]:
+    out: list[str] = []
+    last_id = ""
+    seen_last_ids: set[str] = set()
+    while True:
+        resp = seller_product_list(
+            last_id=last_id,
+            limit=1000,
+            visibility="ALL",
+            client_id=seller_client_id,
+            api_key=seller_api_key,
+        )
+        result = resp.get("result", {}) or {}
+        items = result.get("items", []) or []
+        if not items:
+            break
+        for it in items:
+            pid = it.get("product_id")
+            if pid is not None:
+                out.append(str(pid))
+        next_last_id = str(result.get("last_id", "")) if result.get("last_id") is not None else ""
+        if not next_last_id or next_last_id in seen_last_ids:
+            break
+        seen_last_ids.add(next_last_id)
+        last_id = next_last_id
+    return list(dict.fromkeys(out))
+
+
+@st.cache_data(show_spinner=False, ttl=900)
+def _load_sku_offer_map_for_articles(*, seller_client_id: str, seller_api_key: str) -> dict[str, str]:
+    product_ids = _load_all_product_ids_for_articles(
+        seller_client_id=seller_client_id,
+        seller_api_key=seller_api_key,
+    )
+    out: dict[str, str] = {}
+    chunk = 1000
+    for i in range(0, len(product_ids), chunk):
+        batch = product_ids[i : i + chunk]
+        resp = seller_product_info_list(
+            product_ids=batch,
+            client_id=seller_client_id,
+            api_key=seller_api_key,
+        )
+        items = resp.get("items", []) or (resp.get("result", {}) or {}).get("items", []) or []
+        for it in items:
+            sku = it.get("sku")
+            if sku is None:
+                continue
+            out[str(sku)] = str(it.get("offer_id") or "").strip()
+    return out
+
 company_configs = load_company_configs(".env")
 if not company_configs:
     default_company = default_company_from_env()
@@ -126,6 +180,15 @@ perf_client_id = (selected_creds.get("perf_client_id") or "").strip()
 perf_client_secret = (selected_creds.get("perf_client_secret") or "").strip()
 seller_client_id = (selected_creds.get("seller_client_id") or "").strip()
 seller_api_key = (selected_creds.get("seller_api_key") or "").strip()
+sku_offer_map_for_articles = {}
+if seller_client_id and seller_api_key:
+    try:
+        sku_offer_map_for_articles = _load_sku_offer_map_for_articles(
+            seller_client_id=seller_client_id,
+            seller_api_key=seller_api_key,
+        )
+    except Exception:
+        sku_offer_map_for_articles = {}
 
 prev_company = st.session_state.get("selected_company")
 if selected_company and prev_company != selected_company:
@@ -872,7 +935,10 @@ if selected_tab == "All campaigns":
         def _article_for_items(items):
             vals = []
             for it in items or []:
-                val = str(it.get("offer_id") or it.get("title") or "").strip()
+                sku = str(it.get("sku") or "").strip()
+                val = sku_offer_map_for_articles.get(sku, "")
+                if not val:
+                    val = str(it.get("offer_id") or "").strip()
                 if val:
                     vals.append(val)
             vals = list(dict.fromkeys(vals))
@@ -999,7 +1065,10 @@ if selected_tab == "All campaigns":
         items = products_by_campaign_id.get(cid, []) or []
         vals = []
         for it in items:
-            val = str(it.get("offer_id") or it.get("title") or "").strip()
+            sku = str(it.get("sku") or "").strip()
+            val = sku_offer_map_for_articles.get(sku, "")
+            if not val:
+                val = str(it.get("offer_id") or "").strip()
             if val:
                 vals.append(val)
         vals = list(dict.fromkeys(vals))
