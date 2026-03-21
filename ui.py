@@ -179,21 +179,35 @@ if selected_company and prev_company != selected_company:
     st.session_state.last_error = ""
     st.session_state.cache_loaded = False
 
-d_from_default, d_to_default = default_window()
-_cached_for_dates = normalize_ui_state_cache(load_ui_state_cache(UI_STATE_CACHE_PATH))
-_cached_company = _cached_for_dates.get("selected_company")
-if _cached_company == selected_company:
-    try:
-        d_from_default = date.fromisoformat(str(_cached_for_dates.get("date_from", d_from_default)))
-    except Exception:
-        pass
-    try:
-        d_to_default = date.fromisoformat(str(_cached_for_dates.get("date_to", d_to_default)))
-    except Exception:
-        pass
+def _resolve_sidebar_date_defaults(company_name: str | None) -> tuple[date, date]:
+    d_from_default, d_to_default = default_window()
+    cached_state = normalize_ui_state_cache(load_ui_state_cache(UI_STATE_CACHE_PATH))
+    if cached_state.get("selected_company") == company_name:
+        try:
+            d_from_default = date.fromisoformat(str(cached_state.get("date_from", d_from_default)))
+        except Exception:
+            pass
+        try:
+            d_to_default = date.fromisoformat(str(cached_state.get("date_to", d_to_default)))
+        except Exception:
+            pass
+    return d_from_default, d_to_default
 
-date_from = st.sidebar.date_input("date_from", value=d_from_default)
-date_to = st.sidebar.date_input("date_to", value=d_to_default)
+
+if st.session_state.get("_sidebar_dates_company") != selected_company:
+    d_from_default, d_to_default = _resolve_sidebar_date_defaults(selected_company)
+    st.session_state.sidebar_date_from = d_from_default
+    st.session_state.sidebar_date_to = d_to_default
+    st.session_state._sidebar_dates_company = selected_company
+elif "sidebar_date_from" not in st.session_state or "sidebar_date_to" not in st.session_state:
+    d_from_default, d_to_default = _resolve_sidebar_date_defaults(selected_company)
+    st.session_state.sidebar_date_from = d_from_default
+    st.session_state.sidebar_date_to = d_to_default
+
+st.sidebar.date_input("date_from", key="sidebar_date_from")
+st.sidebar.date_input("date_to", key="sidebar_date_to")
+date_from = st.session_state.sidebar_date_from
+date_to = st.session_state.sidebar_date_to
 
 target_drr_pct = st.sidebar.number_input("target drr", min_value=0.0, max_value=100.0, value=20.0, step=0.5)
 target_drr = float(target_drr_pct) / 100.0
