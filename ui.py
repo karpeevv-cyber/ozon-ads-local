@@ -1848,25 +1848,28 @@ if selected_tab == "Current campaigns":
             else:
                 st.caption(f"SKU: {bid_sku_for_detail}")
 
-                with st.form("bid_form", clear_on_submit=True):
-                    bid_rub = st.number_input("Bid (в‚Ѕ)", min_value=0.0, step=0.5, key="bid_rub_input")
-                    bid_reason = st.selectbox(
-                        "reason",
-                        options=["Выбери reason", "Рост продаж", "Снижение остатков", "Снижение ДРР", "Test"],
-                        index=0,
-                        key="bid_reason_input",
-                    )
-                    test_date_from = None
-                    test_date_to = None
-                    test_essence = ""
-                    test_expectations = ""
-                    if bid_reason == "Test":
-                        test_date_from = st.date_input("test_date_from", value=date.today(), key="test_date_from_input")
-                        test_date_to = st.date_input("test_date_to", value=date.today(), key="test_date_to_input")
-                        test_essence = st.text_input("test_essence", value="", key="test_essence_input")
-                        test_expectations = st.text_area("test_expectations", height=80, key="test_expectations_input")
-                    bid_comment = st.text_input("comment", value="", key="bid_comment_input")
-                    apply_bid = st.form_submit_button("APPLY BID")
+                bid_rub = st.number_input("Bid (в‚Ѕ)", min_value=0.0, step=0.5, key="bid_rub_input")
+                bid_reason = st.selectbox(
+                    "reason",
+                    options=["Выбери reason", "Рост продаж", "Снижение остатков", "Снижение ДРР", "Test"],
+                    index=0,
+                    key="bid_reason_input",
+                )
+                test_date_from = None
+                test_date_to = None
+                test_essence = ""
+                test_expectations = ""
+                if bid_reason == "Test":
+                    if "test_date_from_input" not in st.session_state:
+                        st.session_state.test_date_from_input = date.today()
+                    if "test_date_to_input" not in st.session_state:
+                        st.session_state.test_date_to_input = date.today()
+                    test_date_from = st.date_input("test_date_from", key="test_date_from_input")
+                    test_date_to = st.date_input("test_date_to", key="test_date_to_input")
+                    test_essence = st.text_input("test_essence", value="", key="test_essence_input")
+                    test_expectations = st.text_area("test_expectations", height=80, key="test_expectations_input")
+                bid_comment = st.text_input("comment", value="", key="bid_comment_input")
+                apply_bid = st.button("APPLY BID", key="apply_bid_btn")
 
                 if apply_bid:
                     if not picked_campaign_id:
@@ -1959,6 +1962,12 @@ if selected_tab == "Current campaigns":
                             if bid_sku_for_detail and picked_campaign_id:
                                 st.session_state.current_bid_key = f"{picked_campaign_id}:{bid_sku_for_detail}"
                                 st.session_state.current_bid_rub = float(bid_rub)
+                            st.session_state.bid_reason_input = "Выбери reason"
+                            st.session_state.bid_comment_input = ""
+                            if "test_essence_input" in st.session_state:
+                                st.session_state.test_essence_input = ""
+                            if "test_expectations_input" in st.session_state:
+                                st.session_state.test_expectations_input = ""
                         except Exception as e:
                             logger.exception("Apply bid failed")
                             st.error(f"Ошибка при обновлении bid: {e}")
