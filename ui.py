@@ -1141,12 +1141,12 @@ if selected_tab == "All campaigns":
         "campaign_id",
         "sku",
         "article",
-        "money_spent",
-        "revenue",
-        "drr",
         "views",
         "clicks",
         "click_price",
+        "money_spent",
+        "revenue",
+        "drr",
         "orders",
         "ordered",
         "cpm",
@@ -1160,6 +1160,8 @@ if selected_tab == "All campaigns":
     df_campaigns = df_campaigns[[c for c in ordered_campaign_cols if c in df_campaigns.columns] + [c for c in df_campaigns.columns if c not in ordered_campaign_cols]]
     df_campaigns_view = make_view_df(df_campaigns)
     metrics_campaigns = {
+        "money_spent": "lower",
+        "clicks": "higher",
         "cpm": "lower",
         "views": "higher",
         "revenue": "higher",
