@@ -10,7 +10,10 @@ from zoneinfo import ZoneInfo
 
 import requests
 
+from bid_changes import load_bid_changes
+from clients_ads import perf_token, get_campaign_stats_json
 from clients_seller import seller_finance_balance
+from clients_seller import seller_analytics_sku_day, seller_analytics_stocks
 from ui_helpers import load_company_configs, default_company_from_env
 
 
@@ -21,6 +24,8 @@ if not logger.handlers:
     handler = logging.FileHandler(LOG_PATH, encoding="utf-8")
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     logger.addHandler(handler)
+
+TEST_META_PREFIX = "__test_meta__:"
 
 
 def _load_env_file(path: str = ".env") -> None:
@@ -43,6 +48,281 @@ def _ceil_int(value) -> int:
         return int((float(value) + 0.9999999))
     except Exception:
         return 0
+
+
+def _parse_test_comment_payload(comment: str) -> dict | None:
+    text = str(comment or "").strip()
+    if not text.startswith(TEST_META_PREFIX):
+        return None
+    try:
+        raw = json.loads(text[len(TEST_META_PREFIX):])
+    except Exception:
+        return None
+    start_date = str(raw.get("start_date", raw.get("date_from", "")) or "").strip()
+    try:
+        target_clicks = int(float(str(raw.get("target_clicks", 0)).strip().replace(",", ".")))
+    except Exception:
+        target_clicks = 0
+    return {
+        "start_date": start_date,
+        "target_clicks": target_clicks,
+        "essence": str(raw.get("essence", "") or "").strip(),
+        "expectations": str(raw.get("expectations", "") or "").strip(),
+        "note": str(raw.get("note", "") or "").strip(),
+        "company": str(raw.get("company", "") or "").strip(),
+    }
+
+
+def _daterange_days(date_from_iso: str, date_to_iso: str) -> list[str]:
+    try:
+        d_from = date.fromisoformat(str(date_from_iso))
+        d_to = date.fromisoformat(str(date_to_iso))
+    except Exception:
+        return []
+    out: list[str] = []
+    d = d_from
+    while d <= d_to:
+        out.append(d.isoformat())
+        d += timedelta(days=1)
+    return out
+
+
+def _load_test_entries(*, company_name: str) -> list[dict]:
+    df = load_bid_changes()
+    if df is None or df.empty or "reason" not in df.columns:
+        return []
+    rows = df[df["reason"].astype(str) == "Test"].copy()
+    if rows.empty:
+        return []
+    out: list[dict] = []
+    for _, row in rows.iterrows():
+        meta = _parse_test_comment_payload(row.get("comment", ""))
+        if not meta:
+            continue
+        meta_company = str(meta.get("company", "") or "").strip()
+        if meta_company and meta_company != str(company_name):
+            continue
+        out.append(
+            {
+                "ts_iso": str(row.get("ts_iso", "") or ""),
+                "campaign_id": str(row.get("campaign_id", "") or ""),
+                "sku": str(row.get("sku", "") or ""),
+                **meta,
+            }
+        )
+    out.sort(key=lambda x: str(x.get("ts_iso", "")), reverse=True)
+    return out
+
+
+def _build_test_daily_rows(
+    *,
+    campaign_id: str,
+    sku: str,
+    date_from_iso: str,
+    date_to_iso: str,
+    seller_client_id: str,
+    seller_api_key: str,
+    perf_client_id: str,
+    perf_client_secret: str,
+) -> list[dict]:
+    days = _daterange_days(date_from_iso, date_to_iso)
+    if not days:
+        return []
+    _by_sku, _by_day, by_day_sku = seller_analytics_sku_day(
+        date_from_iso,
+        date_to_iso,
+        limit=1000,
+        client_id=seller_client_id,
+        api_key=seller_api_key,
+    )
+    token = perf_token(perf_client_id, perf_client_secret)
+    stats = get_campaign_stats_json(token, date_from_iso, date_to_iso, [str(campaign_id)])
+    rows_by_day: dict[str, dict] = {}
+    for r in (stats.get("rows", []) or []):
+        day_str = str(r.get("date") or r.get("day") or "")
+        if day_str:
+            rows_by_day[day_str] = r
+    out: list[dict] = []
+    for day_str in days:
+        r = rows_by_day.get(day_str, {}) or {}
+        views = int(round(float(r.get("views", 0) or 0)))
+        clicks = int(round(float(r.get("clicks", 0) or 0)))
+        money_spent = float(r.get("moneySpent", 0) or 0)
+        click_price_api = float(r.get("clickPrice", 0) or 0)
+        click_price = (money_spent / clicks) if clicks > 0 else click_price_api
+        revenue, units = by_day_sku.get((day_str, str(sku)), (0.0, 0))
+        revenue = float(revenue or 0)
+        units = int(units or 0)
+        ctr = (clicks / views * 100.0) if views else 0.0
+        cr = (units / clicks * 100.0) if clicks else 0.0
+        drr = (money_spent / revenue * 100.0) if revenue else 0.0
+        out.append(
+            {
+                "day": day_str,
+                "views": views,
+                "clicks": clicks,
+                "ctr": ctr,
+                "cr": cr,
+                "money_spent": money_spent,
+                "click_price": click_price,
+                "total_revenue": revenue,
+                "total_drr_pct": drr,
+                "ordered_units": units,
+            }
+        )
+    return out
+
+
+def _summarize_test_metrics(rows: list[dict]) -> dict[str, float]:
+    views = sum(float(r.get("views", 0) or 0) for r in rows)
+    clicks = sum(float(r.get("clicks", 0) or 0) for r in rows)
+    money_spent = sum(float(r.get("money_spent", 0) or 0) for r in rows)
+    revenue = sum(float(r.get("total_revenue", 0) or 0) for r in rows)
+    units = sum(float(r.get("ordered_units", 0) or 0) for r in rows)
+    return {
+        "views": views,
+        "clicks": clicks,
+        "ctr": (clicks / views * 100.0) if views else 0.0,
+        "cr": (units / clicks * 100.0) if clicks else 0.0,
+        "money_spent": money_spent,
+        "click_price": (money_spent / clicks) if clicks else 0.0,
+        "total_revenue": revenue,
+        "total_drr_pct": (money_spent / revenue * 100.0) if revenue else 0.0,
+    }
+
+
+def _evaluate_test_entry(
+    entry: dict,
+    *,
+    seller_client_id: str,
+    seller_api_key: str,
+    perf_client_id: str,
+    perf_client_secret: str,
+) -> dict:
+    start_date = str(entry.get("start_date", "") or "")
+    target_clicks = int(entry.get("target_clicks", 0) or 0)
+    live_rows = _build_test_daily_rows(
+        campaign_id=str(entry.get("campaign_id", "")),
+        sku=str(entry.get("sku", "")),
+        date_from_iso=start_date,
+        date_to_iso=date.today().isoformat(),
+        seller_client_id=seller_client_id,
+        seller_api_key=seller_api_key,
+        perf_client_id=perf_client_id,
+        perf_client_secret=perf_client_secret,
+    )
+    cum = 0
+    completion_day = ""
+    test_rows: list[dict] = []
+    for row in live_rows:
+        cum += int(row.get("clicks", 0) or 0)
+        test_rows.append(row)
+        if target_clicks > 0 and cum >= target_clicks and not completion_day:
+            completion_day = str(row.get("day", "") or "")
+            break
+    status = "completed" if completion_day else "active"
+    actual_clicks = sum(int(r.get("clicks", 0) or 0) for r in test_rows)
+    baseline_summary = _summarize_test_metrics([])
+    if status == "completed":
+        baseline_end = date.fromisoformat(start_date) - timedelta(days=1)
+        baseline_start = baseline_end - timedelta(days=180)
+        baseline_rows_all = _build_test_daily_rows(
+            campaign_id=str(entry.get("campaign_id", "")),
+            sku=str(entry.get("sku", "")),
+            date_from_iso=baseline_start.isoformat(),
+            date_to_iso=baseline_end.isoformat(),
+            seller_client_id=seller_client_id,
+            seller_api_key=seller_api_key,
+            perf_client_id=perf_client_id,
+            perf_client_secret=perf_client_secret,
+        )
+        baseline_rows_all = list(reversed(baseline_rows_all))
+        selected: list[dict] = []
+        cum_prev = 0
+        target_prev = max(actual_clicks, target_clicks)
+        for row in baseline_rows_all:
+            selected.append(row)
+            cum_prev += int(row.get("clicks", 0) or 0)
+            if target_prev > 0 and cum_prev >= target_prev:
+                break
+        baseline_summary = _summarize_test_metrics(list(reversed(selected)))
+    return {
+        "status": status,
+        "completion_day": completion_day,
+        "actual_clicks": actual_clicks,
+        "test_summary": _summarize_test_metrics(test_rows),
+        "baseline_summary": baseline_summary,
+    }
+
+
+def _load_article_map_for_skus(*, skus: list[str], seller_client_id: str, seller_api_key: str) -> dict[str, str]:
+    if not skus:
+        return {}
+    resp = seller_analytics_stocks(
+        skus=skus,
+        client_id=seller_client_id,
+        api_key=seller_api_key,
+    )
+    out: dict[str, str] = {}
+    for it in (resp.get("items", []) or []):
+        sku = str(it.get("sku", "") or "").strip()
+        if sku:
+            out[sku] = str(it.get("offer_id", "") or "").strip() or sku
+    return out
+
+
+def _fmt_int(value: float) -> str:
+    try:
+        return str(int(round(float(value))))
+    except Exception:
+        return "0"
+
+
+def _fmt_rub(value: float) -> str:
+    try:
+        return f"{int(round(float(value)))} ₽"
+    except Exception:
+        return "0 ₽"
+
+
+def _fmt_pct(value: float) -> str:
+    try:
+        return f"{float(value):.1f}%"
+    except Exception:
+        return "0.0%"
+
+
+def _build_test_result_message(*, article: str, entry: dict, evaluation: dict) -> str:
+    test_summary = evaluation.get("test_summary", {}) or {}
+    control_summary = evaluation.get("baseline_summary", {}) or {}
+    lines = [
+        f"Test completed: {article}",
+        f"Started: {entry.get('start_date', '')}",
+        f"Completed: {evaluation.get('completion_day', '')}",
+        f"Target clicks: {_fmt_int(entry.get('target_clicks', 0))}",
+        f"Actual clicks: {_fmt_int(evaluation.get('actual_clicks', 0))}",
+        "",
+        "Test:",
+        f"views: {_fmt_int(test_summary.get('views', 0))}",
+        f"clicks: {_fmt_int(test_summary.get('clicks', 0))}",
+        f"ctr: {_fmt_pct(test_summary.get('ctr', 0))}",
+        f"cr: {_fmt_pct(test_summary.get('cr', 0))}",
+        f"money_spent: {_fmt_rub(test_summary.get('money_spent', 0))}",
+        f"click_price: {_fmt_rub(test_summary.get('click_price', 0))}",
+        f"total_revenue: {_fmt_rub(test_summary.get('total_revenue', 0))}",
+        f"total_drr_pct: {_fmt_pct(test_summary.get('total_drr_pct', 0))}",
+        "",
+        "Control:",
+        f"views: {_fmt_int(control_summary.get('views', 0))}",
+        f"clicks: {_fmt_int(control_summary.get('clicks', 0))}",
+        f"ctr: {_fmt_pct(control_summary.get('ctr', 0))}",
+        f"cr: {_fmt_pct(control_summary.get('cr', 0))}",
+        f"money_spent: {_fmt_rub(control_summary.get('money_spent', 0))}",
+        f"click_price: {_fmt_rub(control_summary.get('click_price', 0))}",
+        f"total_revenue: {_fmt_rub(control_summary.get('total_revenue', 0))}",
+        f"total_drr_pct: {_fmt_pct(control_summary.get('total_drr_pct', 0))}",
+    ]
+    return "\n".join(lines)
 
 
 def _fetch_balance_day(
@@ -185,8 +465,10 @@ def main() -> int:
 
     seller_client_id = (creds.get("seller_client_id") or "").strip()
     seller_api_key = (creds.get("seller_api_key") or "").strip()
-    if not seller_client_id or not seller_api_key:
-        logger.error("Missing seller creds")
+    perf_client_id = (creds.get("perf_client_id") or "").strip()
+    perf_client_secret = (creds.get("perf_client_secret") or "").strip()
+    if not seller_client_id or not seller_api_key or not perf_client_id or not perf_client_secret:
+        logger.error("Missing seller/perf creds")
         return 2
 
     token = os.getenv("TG_BOT_TOKEN", "").strip()
@@ -228,6 +510,33 @@ def main() -> int:
     lines = [f"{k}: {row.get(k, '')}" for k in ordered_keys]
     text = "\n".join(lines)
     _send_telegram_message(token, chat_id, text)
+
+    try:
+        test_entries = _load_test_entries(company_name=str(company_name or ""))
+        completed_yesterday = []
+        for entry in test_entries:
+            eval_res = _evaluate_test_entry(
+                entry,
+                seller_client_id=seller_client_id,
+                seller_api_key=seller_api_key,
+                perf_client_id=perf_client_id,
+                perf_client_secret=perf_client_secret,
+            )
+            if str(eval_res.get("completion_day", "")) == yesterday:
+                completed_yesterday.append((entry, eval_res))
+        if completed_yesterday:
+            article_map = _load_article_map_for_skus(
+                skus=[str(entry.get("sku", "")) for entry, _ in completed_yesterday],
+                seller_client_id=seller_client_id,
+                seller_api_key=seller_api_key,
+            )
+            for entry, eval_res in completed_yesterday:
+                article = article_map.get(str(entry.get("sku", "")), str(entry.get("sku", "")))
+                msg = _build_test_result_message(article=article, entry=entry, evaluation=eval_res)
+                _send_telegram_message(token, chat_id, msg)
+    except Exception:
+        logger.exception("Failed to send completed test notifications")
+
     return 0
 
 
