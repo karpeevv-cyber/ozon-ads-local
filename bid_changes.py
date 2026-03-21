@@ -405,9 +405,9 @@ def format_changes_for_day_multiline(
     out: list[str] = []
     for _, r in rows.iterrows():
         line = _format_one_change(r)
-        c = str(r.get("comment", "")).strip()
+        c = _normalize_change_comment(r.get("comment", ""), str(r.get("reason", "")).strip())
         if c:
-            line = f"{line}; comment={c}"
+            line = f"{line} / {c}"
         out.append(line)
     return "\n".join(out)
 
@@ -484,9 +484,9 @@ def format_changes_for_week_multiline(
     out: list[str] = []
     for _, r in rows.iterrows():
         line = _format_one_change(r)
-        c = str(r.get("comment", "")).strip()
+        c = _normalize_change_comment(r.get("comment", ""), str(r.get("reason", "")).strip())
         if c:
-            line = f"{line}; comment={c}"
+            line = f"{line} / {c}"
         out.append(line)
     return "\n".join(out)
 
@@ -547,13 +547,34 @@ def _format_one_change(row) -> str:
     old_micro = _to_int_or_none(row.get("old_bid_micro"))
     new_micro = _to_int_or_none(row.get("new_bid_micro"))
     reason = str(row.get("reason", "")).strip()
-    return f"{d}: {_fmt_rub_value(old_micro)} -> {_fmt_rub_value(new_micro)}, reason={reason}"
+    return f"{d}: {_fmt_rub_value(old_micro)} -> {_fmt_rub_value(new_micro)} / {reason}"
 
 
 def _format_one_change_compact(row) -> str:
     old_micro = _to_int_or_none(row.get("old_bid_micro"))
     new_micro = _to_int_or_none(row.get("new_bid_micro"))
     return f"{_fmt_rub_value(old_micro)} -> {_fmt_rub_value(new_micro)}"
+
+
+def _normalize_change_comment(comment: str, reason: str) -> str:
+    text = str(comment or "").strip()
+    if not text:
+        return ""
+    prefixes = [
+        f"reason={reason};",
+        f"reason={reason}",
+        f"{reason};",
+        f"{reason}",
+    ]
+    lowered = text.lower()
+    for prefix in prefixes:
+        p = str(prefix).strip()
+        if not p:
+            continue
+        if lowered.startswith(p.lower()):
+            text = text[len(p):].strip(" ;,/|-")
+            lowered = text.lower()
+    return text.strip()
 
 
 def _use_gsheet_backend() -> bool:
