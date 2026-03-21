@@ -31,6 +31,7 @@ BID_LOG_COLUMNS = [
 ]
 
 CAMPAIGN_COMMENT_SKU = "__campaign_comment__"
+TEST_META_PREFIX = "__test_meta__:"
 
 
 @dataclass(frozen=True)
@@ -73,6 +74,107 @@ def micro_to_rub_value(micro: Optional[int]) -> Optional[float]:
         return float(micro) / 1_000_000
     except Exception:
         return None
+
+
+def build_test_comment_payload(
+    *,
+    date_from: str,
+    date_to: str,
+    essence: str,
+    expectations: str,
+    note: str = "",
+) -> str:
+    payload = {
+        "date_from": str(date_from).strip(),
+        "date_to": str(date_to).strip(),
+        "essence": str(essence or "").strip(),
+        "expectations": str(expectations or "").strip(),
+        "note": str(note or "").strip(),
+    }
+    return TEST_META_PREFIX + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def parse_test_comment_payload(comment: str) -> Optional[dict[str, str]]:
+    text = str(comment or "").strip()
+    if not text.startswith(TEST_META_PREFIX):
+        return None
+    try:
+        raw = json.loads(text[len(TEST_META_PREFIX):])
+    except Exception:
+        return None
+    return {
+        "date_from": str(raw.get("date_from", "") or "").strip(),
+        "date_to": str(raw.get("date_to", "") or "").strip(),
+        "essence": str(raw.get("essence", "") or "").strip(),
+        "expectations": str(raw.get("expectations", "") or "").strip(),
+        "note": str(raw.get("note", "") or "").strip(),
+    }
+
+
+def load_test_change_rows(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame(columns=["campaign_id", "sku", "ts_iso", "date_from", "date_to", "essence", "expectations", "note"])
+    out = df[df.get("reason", "").astype(str) == "Test"].copy()
+    if out.empty:
+        return pd.DataFrame(columns=["campaign_id", "sku", "ts_iso", "date_from", "date_to", "essence", "expectations", "note"])
+    meta = out["comment"].apply(parse_test_comment_payload)
+    out = out[meta.notna()].copy()
+    if out.empty:
+        return pd.DataFrame(columns=["campaign_id", "sku", "ts_iso", "date_from", "date_to", "essence", "expectations", "note"])
+    out["date_from"] = meta[meta.notna()].apply(lambda x: x.get("date_from", "")).values
+    out["date_to"] = meta[meta.notna()].apply(lambda x: x.get("date_to", "")).values
+    out["essence"] = meta[meta.notna()].apply(lambda x: x.get("essence", "")).values
+    out["expectations"] = meta[meta.notna()].apply(lambda x: x.get("expectations", "")).values
+    out["note"] = meta[meta.notna()].apply(lambda x: x.get("note", "")).values
+    return out
+
+
+def get_active_test_map(df: pd.DataFrame, *, on_day: date | None = None) -> dict[tuple[str, str], dict[str, str]]:
+    day_str = str((on_day or date.today()).isoformat())
+    rows = load_test_change_rows(df)
+    if rows.empty:
+        return {}
+    rows = rows[
+        (rows["date_from"].astype(str) <= day_str)
+        & (rows["date_to"].astype(str) >= day_str)
+    ].copy()
+    if rows.empty:
+        return {}
+    rows = rows.sort_values("ts_iso", ascending=False)
+    rows = rows.drop_duplicates(subset=["campaign_id", "sku"], keep="first")
+    out: dict[tuple[str, str], dict[str, str]] = {}
+    for _, r in rows.iterrows():
+        out[(str(r.get("campaign_id", "")), str(r.get("sku", "")))] = {
+            "date_from": str(r.get("date_from", "") or ""),
+            "date_to": str(r.get("date_to", "") or ""),
+            "essence": str(r.get("essence", "") or ""),
+            "expectations": str(r.get("expectations", "") or ""),
+            "note": str(r.get("note", "") or ""),
+            "ts_iso": str(r.get("ts_iso", "") or ""),
+        }
+    return out
+
+
+def get_latest_test_change(df: pd.DataFrame, *, campaign_id: str, sku: str) -> Optional[dict[str, str]]:
+    rows = load_test_change_rows(df)
+    if rows.empty:
+        return None
+    rows = rows[
+        (rows["campaign_id"].astype(str) == str(campaign_id))
+        & (rows["sku"].astype(str) == str(sku))
+    ].copy()
+    if rows.empty:
+        return None
+    rows = rows.sort_values("ts_iso", ascending=False)
+    r = rows.iloc[0]
+    return {
+        "date_from": str(r.get("date_from", "") or ""),
+        "date_to": str(r.get("date_to", "") or ""),
+        "essence": str(r.get("essence", "") or ""),
+        "expectations": str(r.get("expectations", "") or ""),
+        "note": str(r.get("note", "") or ""),
+        "ts_iso": str(r.get("ts_iso", "") or ""),
+    }
 
 
 def append_bid_change(
@@ -590,6 +692,20 @@ def _normalize_change_comment(comment: str, reason: str) -> str:
     text = str(comment or "").strip()
     if not text:
         return ""
+    test_meta = parse_test_comment_payload(text)
+    if test_meta is not None:
+        parts = []
+        date_from = test_meta.get("date_from", "")
+        date_to = test_meta.get("date_to", "")
+        if date_from or date_to:
+            parts.append(f"{date_from}..{date_to}".strip("."))
+        if test_meta.get("essence"):
+            parts.append(test_meta["essence"])
+        if test_meta.get("expectations"):
+            parts.append(test_meta["expectations"])
+        if test_meta.get("note"):
+            parts.append(test_meta["note"])
+        return " / ".join([p for p in parts if p])
     prefixes = [
         f"reason={reason};",
         f"reason={reason}",

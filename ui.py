@@ -32,6 +32,7 @@ from bid_ui_helpers import (
     add_bid_columns_weekly,
     load_bid_log_df,
 )
+from bid_changes import build_test_comment_payload, get_active_test_map, get_latest_test_change
 from ui_data import (
     fetch_running_campaigns_cached,
     fetch_ads_stats_by_campaign_cached,
@@ -1136,8 +1137,14 @@ if selected_tab == "All campaigns":
             campaign_id_col="campaign_id",
             sku_col="sku",
         )
+        active_test_map = get_active_test_map(bid_log_df_tab2)
+        df_campaigns["Test"] = df_campaigns.apply(
+            lambda r: "Да" if (str(r.get("campaign_id", "")), str(r.get("sku", ""))) in active_test_map else "",
+            axis=1,
+        )
     else:
         df_campaigns["Bid change"] = ""
+        df_campaigns["Test"] = ""
     df_campaigns = df_campaigns.rename(
         columns={
             "Изменение bid": "Bid change",
@@ -1168,6 +1175,7 @@ if selected_tab == "All campaigns":
         "ipo",
         "bid",
         "Bid change",
+        "Test",
         "comment",
         "comment_all",
     ]
@@ -1771,10 +1779,19 @@ if selected_tab == "Current campaigns":
                     bid_rub = st.number_input("Bid (в‚Ѕ)", min_value=0.0, step=0.5, key="bid_rub_input")
                     bid_reason = st.selectbox(
                         "reason",
-                        options=["Выбери reason", "Рост продаж", "Снижение остатков", "Снижение ДРР"],
+                        options=["Выбери reason", "Рост продаж", "Снижение остатков", "Снижение ДРР", "Test"],
                         index=0,
                         key="bid_reason_input",
                     )
+                    test_date_from = None
+                    test_date_to = None
+                    test_essence = ""
+                    test_expectations = ""
+                    if bid_reason == "Test":
+                        test_date_from = st.date_input("test_date_from", value=date.today(), key="test_date_from_input")
+                        test_date_to = st.date_input("test_date_to", value=date.today(), key="test_date_to_input")
+                        test_essence = st.text_input("test_essence", value="", key="test_essence_input")
+                        test_expectations = st.text_area("test_expectations", height=80, key="test_expectations_input")
                     bid_comment = st.text_input("comment", value="", key="bid_comment_input")
                     apply_bid = st.form_submit_button("APPLY BID")
 
@@ -1783,12 +1800,25 @@ if selected_tab == "Current campaigns":
                         st.error("Сначала выбери кампанию.")
                     elif bid_reason == "Выбери reason":
                         st.error("Укажи reason.")
+                    elif bid_reason == "Test" and (not test_essence.strip() or not test_expectations.strip()):
+                        st.error("Для Test заполни суть и ожидания.")
+                    elif bid_reason == "Test" and test_date_from and test_date_to and test_date_from > test_date_to:
+                        st.error("У Test дата начала не может быть позже даты окончания.")
                     else:
                         campaign_id_for_bid = picked_campaign_id
                         token = perf_token(perf_client_id, perf_client_secret)
 
                         try:
-                            full_comment = f"reason={bid_reason}; {bid_comment}".strip()
+                            if bid_reason == "Test":
+                                full_comment = build_test_comment_payload(
+                                    date_from=str(test_date_from),
+                                    date_to=str(test_date_to),
+                                    essence=test_essence,
+                                    expectations=test_expectations,
+                                    note=bid_comment,
+                                )
+                            else:
+                                full_comment = f"reason={bid_reason}; {bid_comment}".strip()
                             result = apply_bid_and_log(
                                 token=token,
                                 campaign_id=str(campaign_id_for_bid),
@@ -1914,6 +1944,34 @@ if selected_tab == "Current campaigns":
                     width="stretch",
                     hide_index=True,
                 )
+        st.markdown("### Test parameters")
+        latest_test = None
+        if bid_log_df is not None and bid_sku_for_detail and picked_campaign_id:
+            latest_test = get_latest_test_change(
+                bid_log_df,
+                campaign_id=str(picked_campaign_id),
+                sku=str(bid_sku_for_detail),
+            )
+        if not latest_test:
+            st.caption("No test parameters.")
+        else:
+            is_active_now = False
+            try:
+                today_iso = date.today().isoformat()
+                is_active_now = (
+                    str(latest_test.get("date_from", "")) <= today_iso <= str(latest_test.get("date_to", ""))
+                )
+            except Exception:
+                is_active_now = False
+            test_rows = [
+                {"parameter": "status", "value": "Active" if is_active_now else "Inactive"},
+                {"parameter": "period", "value": f"{latest_test.get('date_from', '')} .. {latest_test.get('date_to', '')}"},
+                {"parameter": "essence", "value": latest_test.get("essence", "")},
+                {"parameter": "expectations", "value": latest_test.get("expectations", "")},
+            ]
+            if latest_test.get("note"):
+                test_rows.append({"parameter": "note", "value": latest_test.get("note", "")})
+            st.dataframe(pd.DataFrame(test_rows), width="stretch", hide_index=True)
 if selected_tab == "Formulas":
     render_tab4()
 
