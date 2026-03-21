@@ -2278,6 +2278,18 @@ if selected_tab == "Tests":
     if tests_df.empty:
         st.caption("No tests.")
     else:
+        sku_offer_map_for_tests = {}
+        if seller_client_id and seller_api_key and "sku" in tests_df.columns:
+            test_skus = tuple(dict.fromkeys([str(v).strip() for v in tests_df["sku"].astype(str).tolist() if str(v).strip()]))
+            if test_skus:
+                try:
+                    sku_offer_map_for_tests = _load_sku_offer_map_for_articles(
+                        seller_client_id=seller_client_id,
+                        seller_api_key=seller_api_key,
+                        skus=test_skus,
+                    )
+                except Exception:
+                    sku_offer_map_for_tests = {}
         status_filter = st.selectbox("test_status", options=["active", "completed"], index=0, key="tests_status_filter")
         summary_rows = []
         for _, test_entry in tests_df.sort_values("ts_iso", ascending=False).iterrows():
@@ -2297,8 +2309,7 @@ if selected_tab == "Tests":
             summary_rows.append(
                 {
                     "started_at": str(test_entry.get("start_date", "")),
-                    "campaign_id": str(test_entry.get("campaign_id", "")),
-                    "sku": str(test_entry.get("sku", "")),
+                    "article": sku_offer_map_for_tests.get(str(test_entry.get("sku", "")), str(test_entry.get("sku", ""))),
                     "target_clicks": int(test_entry.get("target_clicks", 0) or 0),
                     "actual_clicks": int(eval_res.get("actual_clicks", 0) or 0),
                     "status": str(eval_res.get("status", "")),
@@ -2317,7 +2328,7 @@ if selected_tab == "Tests":
                 st.markdown("### Test results")
                 metric_order = ["views", "clicks", "ctr", "cr", "money_spent", "click_price", "total_revenue", "total_drr_pct"]
                 for row in summary_rows:
-                    st.markdown(f"#### {row['campaign_id']} / {row['sku']} / {row['started_at']}")
+                    st.markdown(f"#### {row['article']} / {row['started_at']}")
                     left, right = st.columns(2)
                     test_summary = row["_eval"].get("test_summary", {}) or {}
                     baseline_summary = row["_eval"].get("baseline_summary", {}) or {}
