@@ -474,8 +474,15 @@ st.session_state._last_params = current_params
 batch_size = 15
 include_products = True
 
-# Load UI cache on cold start (avoid re-GO after refresh)
-if "rows_csv" not in st.session_state:
+# Load UI cache when core loaded datasets are missing (avoid re-GO after refresh/tab reruns)
+_required_loaded_keys = (
+    "rows_csv",
+    "daily_rows",
+    "ads_daily_by_campaign",
+    "products_by_campaign_id",
+    "by_day_sku",
+)
+if any(k not in st.session_state for k in _required_loaded_keys):
     cached = normalize_ui_state_cache(load_ui_state_cache(UI_STATE_CACHE_PATH))
     if cached:
         cache_key = make_ui_state_cache_key(selected_company, str(date_from), str(date_to))
