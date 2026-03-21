@@ -8,7 +8,7 @@ from datetime import date, timedelta
 
 def default_window():
     today = date.today()
-    return today - timedelta(days=14), today
+    return today - timedelta(days=21), today
 
 
 # ---------------- Columns / formatting helpers ----------------
