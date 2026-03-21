@@ -1195,35 +1195,14 @@ if selected_tab == "All campaigns":
         styler = styler.apply(_bid_outside_econ, axis=None)
 
     campaigns_cfg = build_column_config(df_campaigns_view)
-    compact_small_cols = {
-        "campaign_id",
-        "sku",
-        "money_spent",
-        "revenue",
-        "drr",
-        "views",
-        "clicks",
-        "click_price",
-        "orders",
-        "ordered",
-        "cpm",
-        "ctr",
-        "cr",
-        "bid",
-    }
-    for col in compact_small_cols:
-        if col in df_campaigns_view.columns:
-            campaigns_cfg[col] = st.column_config.NumberColumn(col, width="small")
-    if "article" in df_campaigns_view.columns:
-        campaigns_cfg["article"] = st.column_config.TextColumn("article", width="medium")
+    if "orders" in df_campaigns_view.columns:
+        campaigns_cfg["orders"] = st.column_config.NumberColumn("orders", format="%.0f")
     if "Bid change" in df_campaigns_view.columns:
-        campaigns_cfg["Bid change"] = st.column_config.TextColumn("Bid change", width="medium")
+        campaigns_cfg["Bid change"] = st.column_config.TextColumn("Bid change", width="small")
     if "comment" in df_campaigns_view.columns:
         campaigns_cfg["comment"] = st.column_config.TextColumn("comment", width="small")
     if "comment_all" in df_campaigns_view.columns:
-        campaigns_cfg["comment_all"] = st.column_config.TextColumn("comment_all", width="medium")
-    if "orders" in df_campaigns_view.columns:
-        campaigns_cfg["orders"] = st.column_config.NumberColumn("orders", format="%.0f", width="small")
+        campaigns_cfg["comment_all"] = st.column_config.TextColumn("comment_all", width="small")
 
     st.dataframe(
         styler,
