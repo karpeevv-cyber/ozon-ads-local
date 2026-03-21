@@ -61,6 +61,7 @@ from ui_stocks_tab import render_stocks_tab
 from ui_storage_tab import render_storage_tab
 from ui_unit_economics_tab import render_unit_economics_tab, load_unit_economics_daily_summary
 from ui_unit_economics_products_tab import render_unit_economics_products_tab
+from ui_trends_tab import render_trends_tab
 
 # ---------------- UI ----------------
 
@@ -357,6 +358,35 @@ if data_company and selected_company and data_company != selected_company:
     rows_csv = None
     daily_rows = None
 
+tab_options = [
+    "Main",
+    "All campaigns",
+    "Current campaigns",
+    "Unit Economics",
+    "Unit Economics Products",
+    "Finance balance",
+    "Stocks",
+    "Storage",
+    "Search Trends",
+    "Formulas",
+]
+selected_tab = st.radio(
+    "Section",
+    options=tab_options,
+    horizontal=True,
+    label_visibility="collapsed",
+)
+
+if selected_tab == "Search Trends":
+    render_trends_tab(
+        date_from=date_from,
+        date_to=date_to,
+        seller_client_id=seller_client_id,
+        seller_api_key=seller_api_key,
+        company_name=selected_company,
+    )
+    st.stop()
+
 if not rows_csv:
     if st.session_state.get("last_error"):
         st.error(f"GO error: {st.session_state.get('last_error')}")
@@ -420,24 +450,6 @@ if not campaign_title_map:
     except Exception:
         campaign_title_map = {}
     st.session_state.campaign_title_map = campaign_title_map
-
-tab_options = [
-    "Main",
-    "All campaigns",
-    "Current campaigns",
-    "Unit Economics",
-    "Unit Economics Products",
-    "Finance balance",
-    "Stocks",
-    "Storage",
-    "Formulas",
-]
-selected_tab = st.radio(
-    "Section",
-    options=tab_options,
-    horizontal=True,
-    label_visibility="collapsed",
-)
 
 if selected_tab == "Main":
     st.subheader("Итоги по дням (за период)")
@@ -588,14 +600,9 @@ if selected_tab == "Main":
             "views",
             "clicks",
             "ordered_units",
-            "cpm",
             "ctr",
             "cr",
-            "rpc",
-            "vpo",
             "organic_pct",
-            "ebitda",
-            "ebitda_pct",
             "bid_changes_cnt",
             "comment",
         ]
@@ -603,14 +610,9 @@ if selected_tab == "Main":
         if "day" in df_daily.columns:
             df_daily["day"] = format_date_ddmmyyyy(df_daily["day"])
         metrics_daily_totals = {
-            "cpm": "lower",
             "total_drr_pct": "lower",
             "ctr": "higher",
             "cr": "higher",
-            "rpc": "higher",
-            "vpo": "lower",
-            "ebitda": "higher",
-            "ebitda_pct": "higher",
         }
         st.markdown("### Итоги по неделям (за период)")
         df_weekly_main_raw = campaign_weekly_aggregate(df_daily_raw, target_drr=target_drr)
@@ -647,8 +649,6 @@ if selected_tab == "Main":
                 "ctr",
                 "cr",
                 "organic_pct",
-                "ebitda",
-                "ebitda_pct",
                 "bid_changes_cnt",
                 "comment",
             ]
@@ -659,14 +659,16 @@ if selected_tab == "Main":
                 "total_drr_pct": "lower",
                 "ctr": "higher",
                 "cr": "higher",
-                "ebitda": "higher",
-                "ebitda_pct": "higher",
             }
             weekly_cfg = build_column_config(df_weekly_main)
             weekly_label_map = {
-                "ordered_units_per_day": "units_/_day",
-                "money_spent_per_day": "spent_/_day",
-                "total_revenue_per_day": "revenue_/_day",
+                "total_revenue": "revenue",
+                "ordered_units_per_day": "units/day",
+                "money_spent_per_day": "spent/day",
+                "total_revenue_per_day": "revenue/day",
+                "total_drr_pct": "drr",
+                "views_per_day": "views/day",
+                "clicks_per_day": "clicks/day",
             }
             excluded_progress_cols_weekly = {"comment", "bid_changes_cnt", "week", "days_in_period"}
             money_progress_cols = {
@@ -677,14 +679,12 @@ if selected_tab == "Main":
                 "click_price",
                 "bid",
                 "orders_money_ads",
-                "ebitda",
             }
             pct_progress_cols = {
                 "total_drr_pct",
                 "ctr",
                 "cr",
                 "organic_pct",
-                "ebitda_pct",
                 "total_drr",
                 "total_drr_after_chng",
                 "vor",
@@ -733,18 +733,17 @@ if selected_tab == "Main":
         st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
         daily_cfg = build_column_config(df_daily)
         excluded_progress_cols = {"comment", "bid_changes_cnt", "day"}
-        money_progress_cols = {"money_spent", "total_revenue", "rpc", "cpm", "click_price", "bid", "orders_money_ads", "ebitda"}
+        money_progress_cols = {"money_spent", "total_revenue", "click_price", "bid", "orders_money_ads"}
         pct_progress_cols = {
             "total_drr_pct",
             "ctr",
             "cr",
             "organic_pct",
-            "ebitda_pct",
             "total_drr",
             "total_drr_after_chng",
             "vor",
         }
-        one_decimal_cols = {"vpo"}
+        one_decimal_cols = set()
 
         for col in df_daily.columns:
             if col in excluded_progress_cols:
@@ -868,8 +867,21 @@ if selected_tab == "All campaigns":
     if use_local:
         base_df = df_campaigns.copy()
         base_df = base_df[base_df["campaign_id"] != "GRAND_TOTAL"].copy()
-        title_map = base_df.set_index("campaign_id")["title"].astype(str).to_dict()
         sku_map = base_df.set_index("campaign_id")["sku"].astype(str).to_dict()
+
+        def _article_for_items(items):
+            vals = []
+            for it in items or []:
+                val = str(it.get("offer_id") or "").strip()
+                if val:
+                    vals.append(val)
+            vals = list(dict.fromkeys(vals))
+            if not vals:
+                return ""
+            if len(vals) == 1:
+                return vals[0]
+            return "several"
+
         rows_filtered = []
         gt_money_spent = 0.0
         gt_views = 0
@@ -880,7 +892,8 @@ if selected_tab == "All campaigns":
 
         for cid in base_df["campaign_id"].astype(str).tolist():
             items = products_by_campaign_id.get(cid, []) or []
-            out_sku, out_title, out_bid, skus = campaign_display_fields(title_map.get(cid, ""), items)
+            out_sku, out_title, out_bid, skus = campaign_display_fields("", items)
+            article = _article_for_items(items)
 
             camp_daily = build_campaign_daily_rows_cached(
                 campaign_id=str(cid),
@@ -905,6 +918,7 @@ if selected_tab == "All campaigns":
             click_price = (spend / clicks) if clicks > 0 else 0.0
             ctr_pct = (clicks / views * 100.0) if views > 0 else 0.0
             cr_pct = (units / clicks * 100.0) if clicks > 0 else 0.0
+            cpm = (spend / views * 1000.0) if views > 0 else 0.0
             vor_pct = (units / views * 100.0) if views > 0 else 0.0
             vpo = (views / units) if units > 0 else 0.0
             total_drr_pct = (spend / revenue * 100.0) if revenue > 0 else 0.0
@@ -920,11 +934,12 @@ if selected_tab == "All campaigns":
                 {
                     "campaign_id": str(cid),
                     "sku": out_sku if out_sku else sku_map.get(cid, ""),
-                    "title": out_title,
+                    "article": article,
                     "money_spent": spend,
                     "views": views,
                     "clicks": clicks,
                     "click_price": click_price,
+                    "cpm": round(cpm, 0),
                     "orders_money_ads": orders_money_ads,
                     "total_revenue": revenue,
                     "ordered_units": units,
@@ -949,7 +964,7 @@ if selected_tab == "All campaigns":
                 {
                     "campaign_id": "GRAND_TOTAL",
                     "sku": "",
-                    "title": "",
+                    "article": "",
                     "money_spent": gt_money_spent,
                     "views": gt_views,
                     "clicks": gt_clicks,
@@ -968,7 +983,7 @@ if selected_tab == "All campaigns":
 
     st.subheader("Grand total (за период)")
     if not df_total.empty:
-        df_total_view = make_view_df(df_total.rename(columns={"total_drr_pct": "total_drr"}))
+        df_total_view = make_view_df(df_total.rename(columns={"total_drr_pct": "total_drr"})).drop(columns=["vor", "rpc", "vpo"], errors="ignore")
         st.dataframe(
             style_median_table(df_total_view, {}, band_pct=BAND_PCT),
             width="stretch",
@@ -978,7 +993,28 @@ if selected_tab == "All campaigns":
         st.warning("GRAND_TOTAL строка не найдена.")
 
     st.subheader("Кампании (за период)")
-    df_campaigns = df_campaigns.copy().drop(columns=["vor"], errors="ignore")
+    df_campaigns = df_campaigns.copy().drop(columns=["vor", "rpc", "vpo"], errors="ignore")
+    def _article_for_campaign_row(r):
+        cid = str(r.get("campaign_id"))
+        items = products_by_campaign_id.get(cid, []) or []
+        vals = []
+        for it in items:
+            val = str(it.get("offer_id") or "").strip()
+            if val:
+                vals.append(val)
+        vals = list(dict.fromkeys(vals))
+        if not vals:
+            return ""
+        if len(vals) == 1:
+            return vals[0]
+        return "several"
+
+    df_campaigns["article"] = df_campaigns.apply(_article_for_campaign_row, axis=1)
+    df_campaigns = df_campaigns.drop(columns=["title"], errors="ignore")
+    if "cpm" not in df_campaigns.columns and {"money_spent", "views"}.issubset(df_campaigns.columns):
+        _views = pd.to_numeric(df_campaigns["views"], errors="coerce").fillna(0.0)
+        _spent = pd.to_numeric(df_campaigns["money_spent"], errors="coerce").fillna(0.0)
+        df_campaigns["cpm"] = ((_spent / _views.replace(0, pd.NA)) * 1000.0).fillna(0.0).round(0)
     def _bid_for_row(r):
         cid = str(r.get("campaign_id"))
         items = products_by_campaign_id.get(cid, []) or []
@@ -1027,12 +1063,12 @@ if selected_tab == "All campaigns":
     df_campaigns = df_campaigns.rename(columns={"total_drr_pct": "total_drr"})
     df_campaigns_view = make_view_df(df_campaigns)
     metrics_campaigns = {
+        "cpm": "lower",
         "views": "higher",
         "total_revenue": "higher",
         "total_drr": "lower",
         "ctr": "higher",
         "cr": "higher",
-        "vpo": "lower",
     }
     styler = style_median_table(df_campaigns_view, metrics_campaigns, band_pct=BAND_PCT)
     if cpc_econ_bounds_map and "bid" in df_campaigns_view.columns and "campaign_id" in df_campaigns_view.columns:
@@ -1405,12 +1441,10 @@ if selected_tab == "Current campaigns":
         total_click_price = (total_money_spent / total_clicks) if total_clicks else 0.0
         total_ctr = (total_clicks / total_views * 100.0) if total_views else 0.0
         total_cr = (total_ordered_units / total_clicks * 100.0) if total_clicks else 0.0
-        total_vor = (total_ordered_units / total_views * 100.0) if total_views else 0.0
         total_cpm = (total_money_spent / total_views * 1000.0) if total_views else 0.0
         total_drr_pct = (total_money_spent / total_revenue * 100.0) if total_revenue else 0.0
         total_rpc = (total_revenue / total_clicks) if total_clicks else 0.0
         total_target_cpc = total_rpc * target_drr
-        total_vpo = (total_views / total_ordered_units) if total_ordered_units else 0.0
 
         _pf = format_date_ddmmyyyy(pd.Series([st.session_state.get('date_from', date_from)])).iloc[0]
         _pt = format_date_ddmmyyyy(pd.Series([st.session_state.get('date_to', date_to)])).iloc[0]
@@ -1424,20 +1458,17 @@ if selected_tab == "Current campaigns":
                     "clicks": total_clicks,
                     "ctr": round(total_ctr, 1),
                     "cr": round(total_cr, 1),
-                    "vor": round(total_vor, 1),
                     "money_spent": total_money_spent,
                     "click_price": total_click_price,
                     "cpm": round(total_cpm, 0),
-                    "rpc": round(total_rpc, 1),
                     "target_cpc": round(total_target_cpc, 1),
-                    "vpo": round(total_vpo, 1),
                     "total_revenue": total_revenue,
                     "ordered_units": total_ordered_units,
                     "total_drr_pct": round(total_drr_pct, 1),
                 }
             ]
         )
-        df_total_period = make_view_df(df_total_period_raw).drop(columns=["vor"], errors="ignore")
+        df_total_period = make_view_df(df_total_period_raw).drop(columns=["vor", "rpc", "vpo"], errors="ignore")
 
         metrics_weekly = {
             "cpm": "lower",
@@ -1446,8 +1477,6 @@ if selected_tab == "Current campaigns":
             "total_drr_pct": "lower",
             "ctr": "higher",
             "cr": "higher",
-            "rpc": "higher",
-            "vpo": "lower",
         }
 
         st.dataframe(
@@ -1511,7 +1540,7 @@ if selected_tab == "Current campaigns":
         if "week" in df_weekly_raw.columns:
             df_weekly_raw["week_dt"] = pd.to_datetime(df_weekly_raw["week"], errors="coerce")
             df_weekly_raw = df_weekly_raw.sort_values("week_dt", ascending=False).drop(columns=["week_dt"], errors="ignore")
-        df_weekly = make_view_df(df_weekly_raw).drop(columns=["vor"], errors="ignore")
+        df_weekly = make_view_df(df_weekly_raw).drop(columns=["vor", "rpc", "vpo"], errors="ignore")
         if "week" in df_weekly.columns:
             df_weekly["week"] = format_date_ddmmyyyy(df_weekly["week"])
 
@@ -1522,8 +1551,6 @@ if selected_tab == "Current campaigns":
             "total_drr_pct": "lower",
             "ctr": "higher",
             "cr": "higher",
-            "rpc": "higher",
-            "vpo": "lower",
         }
 
         st.dataframe(
@@ -1541,7 +1568,7 @@ if selected_tab == "Current campaigns":
             sku=bid_sku_for_detail,
         )
         df_camp_daily_raw_with_bids = df_camp_daily_raw_with_bids.drop(
-            columns=["campaign_id", "sku", "cpm", "rpc", "vpo", "target_cpc", "orders"],
+            columns=["campaign_id", "sku", "rpc", "vpo", "target_cpc", "orders"],
             errors="ignore",
         )
         if comments_df is not None and not comments_df.empty:
@@ -1579,7 +1606,7 @@ if selected_tab == "Current campaigns":
         if "day" in df_camp_daily_raw_with_bids.columns:
             df_camp_daily_raw_with_bids["day_dt"] = pd.to_datetime(df_camp_daily_raw_with_bids["day"], errors="coerce")
             df_camp_daily_raw_with_bids = df_camp_daily_raw_with_bids.sort_values("day_dt", ascending=False).drop(columns=["day_dt"], errors="ignore")
-        df_camp_daily = make_view_df(df_camp_daily_raw_with_bids).drop(columns=["vor"], errors="ignore")
+        df_camp_daily = make_view_df(df_camp_daily_raw_with_bids).drop(columns=["vor", "rpc", "vpo"], errors="ignore")
         if "day" in df_camp_daily.columns:
             df_camp_daily["day"] = format_date_ddmmyyyy(df_camp_daily["day"])
 
@@ -1590,8 +1617,6 @@ if selected_tab == "Current campaigns":
             "total_drr_pct": "lower",
             "ctr": "higher",
             "cr": "higher",
-            "rpc": "higher",
-            "vpo": "lower",
         }
 
         st.dataframe(
