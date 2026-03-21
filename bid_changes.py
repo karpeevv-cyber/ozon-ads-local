@@ -694,18 +694,7 @@ def _normalize_change_comment(comment: str, reason: str) -> str:
         return ""
     test_meta = parse_test_comment_payload(text)
     if test_meta is not None:
-        parts = []
-        date_from = test_meta.get("date_from", "")
-        date_to = test_meta.get("date_to", "")
-        if date_from or date_to:
-            parts.append(f"{date_from}..{date_to}".strip("."))
-        if test_meta.get("essence"):
-            parts.append(test_meta["essence"])
-        if test_meta.get("expectations"):
-            parts.append(test_meta["expectations"])
-        if test_meta.get("note"):
-            parts.append(test_meta["note"])
-        return " / ".join([p for p in parts if p])
+        return str(test_meta.get("note", "") or "").strip()
     prefixes = [
         f"reason={reason};",
         f"reason={reason}",
