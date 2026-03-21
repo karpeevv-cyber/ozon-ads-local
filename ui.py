@@ -618,8 +618,8 @@ if selected_tab == "Main":
         daily_cols = [
             "day",
             "total_revenue",
-            "money_spent",
             "total_drr_pct",
+            "money_spent",
             "views",
             "clicks",
             "ordered_units",
@@ -663,9 +663,9 @@ if selected_tab == "Main":
             weekly_cols = [
                 "week",
                 "total_revenue",
+                "total_drr_pct",
                 "total_revenue_per_day",
                 "money_spent_per_day",
-                "total_drr_pct",
                 "views_per_day",
                 "clicks_per_day",
                 "ordered_units_per_day",
@@ -1124,16 +1124,26 @@ if selected_tab == "All campaigns":
             sku_col="sku",
         )
     else:
-        df_campaigns["Изменение bid"] = ""
-    df_campaigns = df_campaigns.rename(columns={"total_drr_pct": "total_drr"})
-    ordered_campaign_cols = ["campaign_id", "sku", "article", "Изменение bid"]
+        df_campaigns["Bid change"] = ""
+    df_campaigns = df_campaigns.rename(
+        columns={
+            "Изменение bid": "Bid change",
+            "РР·РјРµРЅРµРЅРёРµ bid": "Bid change",
+            "orders_money_ads": "orders",
+            "total_revenue": "revenue",
+            "ordered_units": "ordered",
+            "total_drr": "drr",
+        }
+    )
+    df_campaigns = df_campaigns.rename(columns={"total_drr_pct": "drr"})
+    ordered_campaign_cols = ["campaign_id", "sku", "article", "Bid change", "revenue", "drr"]
     df_campaigns = df_campaigns[[c for c in ordered_campaign_cols if c in df_campaigns.columns] + [c for c in df_campaigns.columns if c not in ordered_campaign_cols]]
     df_campaigns_view = make_view_df(df_campaigns)
     metrics_campaigns = {
         "cpm": "lower",
         "views": "higher",
-        "total_revenue": "higher",
-        "total_drr": "lower",
+        "revenue": "higher",
+        "drr": "lower",
         "ctr": "higher",
         "cr": "higher",
     }
@@ -1378,7 +1388,7 @@ if selected_tab == "Current campaigns":
                 )
                 pivot_show.insert(
                     0,
-                    "Изменение bid",
+                    "Bid change",
                     [str(bid_change_map.get(idx, "") or "") for idx in pivot_show.index],
                 )
 
