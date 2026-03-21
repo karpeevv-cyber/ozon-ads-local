@@ -24,7 +24,7 @@ from ui_formatting import (
     format_date_ddmmyyyy,
 )
 from ui_styles import style_median_table, BAND_PCT
-from clients_seller import seller_product_list, seller_product_info_list
+from clients_seller import seller_analytics_stocks
 from bid_ui_helpers import (
     apply_bid_and_log,
     add_bid_columns_daily,
@@ -92,50 +92,18 @@ def _load_bid_log_cached():
 
 
 @st.cache_data(show_spinner=False, ttl=900)
-def _load_all_product_ids_for_articles(*, seller_client_id: str, seller_api_key: str) -> list[str]:
-    out: list[str] = []
-    last_id = ""
-    seen_last_ids: set[str] = set()
-    while True:
-        resp = seller_product_list(
-            last_id=last_id,
-            limit=1000,
-            visibility="ALL",
-            client_id=seller_client_id,
-            api_key=seller_api_key,
-        )
-        result = resp.get("result", {}) or {}
-        items = result.get("items", []) or []
-        if not items:
-            break
-        for it in items:
-            pid = it.get("product_id")
-            if pid is not None:
-                out.append(str(pid))
-        next_last_id = str(result.get("last_id", "")) if result.get("last_id") is not None else ""
-        if not next_last_id or next_last_id in seen_last_ids:
-            break
-        seen_last_ids.add(next_last_id)
-        last_id = next_last_id
-    return list(dict.fromkeys(out))
-
-
-@st.cache_data(show_spinner=False, ttl=900)
-def _load_sku_offer_map_for_articles(*, seller_client_id: str, seller_api_key: str) -> dict[str, str]:
-    product_ids = _load_all_product_ids_for_articles(
-        seller_client_id=seller_client_id,
-        seller_api_key=seller_api_key,
-    )
+def _load_sku_offer_map_for_articles(*, seller_client_id: str, seller_api_key: str, skus: tuple[str, ...]) -> dict[str, str]:
     out: dict[str, str] = {}
-    chunk = 1000
-    for i in range(0, len(product_ids), chunk):
-        batch = product_ids[i : i + chunk]
-        resp = seller_product_info_list(
-            product_ids=batch,
+    sku_values = [str(s).strip() for s in skus if str(s).strip().isdigit()]
+    chunk = 200
+    for i in range(0, len(sku_values), chunk):
+        batch = sku_values[i : i + chunk]
+        resp = seller_analytics_stocks(
+            skus=batch,
             client_id=seller_client_id,
             api_key=seller_api_key,
         )
-        items = resp.get("items", []) or (resp.get("result", {}) or {}).get("items", []) or []
+        items = resp.get("items", []) or []
         for it in items:
             sku = it.get("sku")
             if sku is None:
@@ -180,15 +148,6 @@ perf_client_id = (selected_creds.get("perf_client_id") or "").strip()
 perf_client_secret = (selected_creds.get("perf_client_secret") or "").strip()
 seller_client_id = (selected_creds.get("seller_client_id") or "").strip()
 seller_api_key = (selected_creds.get("seller_api_key") or "").strip()
-sku_offer_map_for_articles = {}
-if seller_client_id and seller_api_key:
-    try:
-        sku_offer_map_for_articles = _load_sku_offer_map_for_articles(
-            seller_client_id=seller_client_id,
-            seller_api_key=seller_api_key,
-        )
-    except Exception:
-        sku_offer_map_for_articles = {}
 
 prev_company = st.session_state.get("selected_company")
 if selected_company and prev_company != selected_company:
@@ -847,6 +806,25 @@ if selected_tab == "Main":
         st.warning("Нет данных по дням.")
 
 if selected_tab == "All campaigns":
+    sku_offer_map_for_articles = {}
+    if seller_client_id and seller_api_key and products_by_campaign_id:
+        all_skus_for_articles = []
+        for items in (products_by_campaign_id or {}).values():
+            for it in items or []:
+                sku_val = str(it.get("sku") or "").strip()
+                if sku_val:
+                    all_skus_for_articles.append(sku_val)
+        all_skus_for_articles = tuple(dict.fromkeys(all_skus_for_articles))
+        if all_skus_for_articles:
+            try:
+                sku_offer_map_for_articles = _load_sku_offer_map_for_articles(
+                    seller_client_id=seller_client_id,
+                    seller_api_key=seller_api_key,
+                    skus=all_skus_for_articles,
+                )
+            except Exception:
+                sku_offer_map_for_articles = {}
+
     try:
         loaded_from = date.fromisoformat(str(st.session_state.get("date_from", date_from)))
         loaded_to = date.fromisoformat(str(st.session_state.get("date_to", date_to)))
