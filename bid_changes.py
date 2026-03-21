@@ -289,7 +289,7 @@ def format_changes_for_day(
     if rows.empty:
         return ""
 
-    rows = rows.sort_values("ts_iso")
+    rows = rows.sort_values("ts_iso", ascending=False)
     parts: list[str] = []
     for _, r in rows.iterrows():
         parts.append(_format_one_change(r))
@@ -325,7 +325,7 @@ def format_changes_for_week(
     if rows.empty:
         return ""
 
-    rows = rows.sort_values("ts_iso")
+    rows = rows.sort_values("ts_iso", ascending=False)
     parts: list[str] = []
     for _, r in rows.iterrows():
         parts.append(_format_one_change(r))
@@ -347,7 +347,7 @@ def format_changes_for_day_with_comment(
     if rows.empty:
         return ("", "")
 
-    rows = rows.sort_values("ts_iso")
+    rows = rows.sort_values("ts_iso", ascending=False)
     parts: list[str] = []
     comments: list[str] = []
     for _, r in rows.iterrows():
@@ -377,7 +377,7 @@ def format_changes_for_day_with_comment_compact(
     if rows.empty:
         return ("", "")
 
-    rows = rows.sort_values("ts_iso")
+    rows = rows.sort_values("ts_iso", ascending=False)
     parts: list[str] = []
     comments: list[str] = []
     for _, r in rows.iterrows():
@@ -401,7 +401,7 @@ def format_changes_for_day_multiline(
     rows = rows[rows["date"].astype(str) == str(day_iso)]
     if rows.empty:
         return ""
-    rows = rows.sort_values("ts_iso")
+    rows = rows.sort_values("ts_iso", ascending=False)
     out: list[str] = []
     for _, r in rows.iterrows():
         line = _format_one_change(r)
@@ -441,7 +441,7 @@ def format_changes_for_week_with_comment(
     if rows.empty:
         return ("", "")
 
-    rows = rows.sort_values("ts_iso")
+    rows = rows.sort_values("ts_iso", ascending=False)
     parts: list[str] = []
     comments: list[str] = []
     for _, r in rows.iterrows():
@@ -480,7 +480,7 @@ def format_changes_for_week_multiline(
     rows = rows[rows["date"].apply(_in_week)]
     if rows.empty:
         return ""
-    rows = rows.sort_values("ts_iso")
+    rows = rows.sort_values("ts_iso", ascending=False)
     out: list[str] = []
     for _, r in rows.iterrows():
         line = _format_one_change(r)
@@ -510,7 +510,7 @@ def format_changes_for_range_multiline(
     if rows.empty:
         return ""
 
-    rows = rows.sort_values("ts_iso")
+    rows = rows.sort_values("ts_iso", ascending=False)
     out: list[str] = []
     for _, r in rows.iterrows():
         line = _format_one_change(r)
