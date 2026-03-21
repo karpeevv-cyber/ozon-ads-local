@@ -8,7 +8,8 @@ from datetime import date, timedelta
 
 def default_window():
     today = date.today()
-    return today - timedelta(days=21), today
+    start_of_current_week = today - timedelta(days=today.weekday())
+    return start_of_current_week - timedelta(weeks=3), today
 
 
 # ---------------- Columns / formatting helpers ----------------
