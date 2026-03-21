@@ -7,6 +7,7 @@ import altair as alt
 from datetime import date, timedelta
 import time
 import logging
+import json
 from pathlib import Path
 
 from clients_ads import (
@@ -32,7 +33,6 @@ from bid_ui_helpers import (
     add_bid_columns_weekly,
     load_bid_log_df,
 )
-from bid_changes import build_test_comment_payload, get_active_test_map, get_latest_test_change
 from ui_data import (
     fetch_running_campaigns_cached,
     fetch_ads_stats_by_campaign_cached,
@@ -81,6 +81,7 @@ st.title("Ozon Ads ? Report UI (MVP)")
 
 UI_STATE_CACHE_PATH = "ui_state_cache.pkl"
 COMMENTS_PATH = "campaign_comments.csv"
+TEST_META_PREFIX = "__test_meta__:"
 
 
 @st.cache_data(show_spinner=False, ttl=60)
@@ -112,6 +113,78 @@ def _load_sku_offer_map_for_articles(*, seller_client_id: str, seller_api_key: s
                 continue
             out[str(sku)] = str(it.get("offer_id") or "").strip()
     return out
+
+
+def _build_test_comment_payload(*, date_from: str, date_to: str, essence: str, expectations: str, note: str = "") -> str:
+    payload = {
+        "date_from": str(date_from).strip(),
+        "date_to": str(date_to).strip(),
+        "essence": str(essence or "").strip(),
+        "expectations": str(expectations or "").strip(),
+        "note": str(note or "").strip(),
+    }
+    return TEST_META_PREFIX + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def _parse_test_comment_payload(comment: str):
+    text = str(comment or "").strip()
+    if not text.startswith(TEST_META_PREFIX):
+        return None
+    try:
+        raw = json.loads(text[len(TEST_META_PREFIX):])
+    except Exception:
+        return None
+    return {
+        "date_from": str(raw.get("date_from", "") or "").strip(),
+        "date_to": str(raw.get("date_to", "") or "").strip(),
+        "essence": str(raw.get("essence", "") or "").strip(),
+        "expectations": str(raw.get("expectations", "") or "").strip(),
+        "note": str(raw.get("note", "") or "").strip(),
+    }
+
+
+def _get_active_test_map(df: pd.DataFrame, *, on_day: date | None = None) -> dict[tuple[str, str], dict[str, str]]:
+    if df is None or df.empty:
+        return {}
+    day_str = str((on_day or date.today()).isoformat())
+    rows = df[df["reason"].astype(str) == "Test"].copy() if "reason" in df.columns else pd.DataFrame()
+    if rows.empty:
+        return {}
+    rows["_test_meta"] = rows["comment"].apply(_parse_test_comment_payload)
+    rows = rows[rows["_test_meta"].notna()].copy()
+    if rows.empty:
+        return {}
+    rows["date_from"] = rows["_test_meta"].apply(lambda x: x.get("date_from", ""))
+    rows["date_to"] = rows["_test_meta"].apply(lambda x: x.get("date_to", ""))
+    rows = rows[(rows["date_from"].astype(str) <= day_str) & (rows["date_to"].astype(str) >= day_str)].copy()
+    if rows.empty:
+        return {}
+    rows = rows.sort_values("ts_iso", ascending=False).drop_duplicates(subset=["campaign_id", "sku"], keep="first")
+    out: dict[tuple[str, str], dict[str, str]] = {}
+    for _, r in rows.iterrows():
+        meta = r["_test_meta"] or {}
+        out[(str(r.get("campaign_id", "")), str(r.get("sku", "")))] = meta
+    return out
+
+
+def _get_latest_test_change(df: pd.DataFrame, *, campaign_id: str, sku: str):
+    if df is None or df.empty:
+        return None
+    rows = df[df["reason"].astype(str) == "Test"].copy() if "reason" in df.columns else pd.DataFrame()
+    if rows.empty:
+        return None
+    rows = rows[
+        (rows["campaign_id"].astype(str) == str(campaign_id))
+        & (rows["sku"].astype(str) == str(sku))
+    ].copy()
+    if rows.empty:
+        return None
+    rows["_test_meta"] = rows["comment"].apply(_parse_test_comment_payload)
+    rows = rows[rows["_test_meta"].notna()].copy()
+    if rows.empty:
+        return None
+    rows = rows.sort_values("ts_iso", ascending=False)
+    return rows.iloc[0]["_test_meta"]
 
 company_configs = load_company_configs(".env")
 if not company_configs:
@@ -1137,7 +1210,7 @@ if selected_tab == "All campaigns":
             campaign_id_col="campaign_id",
             sku_col="sku",
         )
-        active_test_map = get_active_test_map(bid_log_df_tab2)
+        active_test_map = _get_active_test_map(bid_log_df_tab2)
         df_campaigns["Test"] = df_campaigns.apply(
             lambda r: "Да" if (str(r.get("campaign_id", "")), str(r.get("sku", ""))) in active_test_map else "",
             axis=1,
@@ -1810,7 +1883,7 @@ if selected_tab == "Current campaigns":
 
                         try:
                             if bid_reason == "Test":
-                                full_comment = build_test_comment_payload(
+                                full_comment = _build_test_comment_payload(
                                     date_from=str(test_date_from),
                                     date_to=str(test_date_to),
                                     essence=test_essence,
@@ -1947,7 +2020,7 @@ if selected_tab == "Current campaigns":
         st.markdown("### Test parameters")
         latest_test = None
         if bid_log_df is not None and bid_sku_for_detail and picked_campaign_id:
-            latest_test = get_latest_test_change(
+            latest_test = _get_latest_test_change(
                 bid_log_df,
                 campaign_id=str(picked_campaign_id),
                 sku=str(bid_sku_for_detail),
