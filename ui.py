@@ -2260,6 +2260,7 @@ if selected_tab == "Current campaigns":
         st.markdown("### Test parameters")
         latest_test = None
         latest_test_eval = None
+        test_entries_for_detail = pd.DataFrame()
         if bid_log_df is not None and bid_sku_for_detail and picked_campaign_id:
             test_entries_for_detail = _list_test_entries(bid_log_df)
             if not test_entries_for_detail.empty and "company" in test_entries_for_detail.columns:
@@ -2301,6 +2302,29 @@ if selected_tab == "Current campaigns":
             if latest_test.get("note"):
                 test_rows.append({"parameter": "note", "value": latest_test.get("note", "")})
             st.dataframe(pd.DataFrame(test_rows), width="stretch", hide_index=True)
+            if not test_entries_for_detail.empty:
+                history_rows = []
+                for _, test_row in test_entries_for_detail.sort_values("ts_iso", ascending=False).iterrows():
+                    eval_res = _evaluate_test_entry(
+                        entry=test_row,
+                        seller_client_id=seller_client_id,
+                        seller_api_key=seller_api_key,
+                        perf_client_id=perf_client_id,
+                        perf_client_secret=perf_client_secret,
+                    )
+                    history_rows.append(
+                        {
+                            "started_at": str(test_row.get("start_date", "") or ""),
+                            "target_clicks": int(test_row.get("target_clicks", 0) or 0),
+                            "status": str(eval_res.get("status", "")).capitalize(),
+                            "completion_day": str(eval_res.get("completion_day", "") or ""),
+                            "essence": str(test_row.get("essence", "") or ""),
+                            "expectations": str(test_row.get("expectations", "") or ""),
+                            "note": str(test_row.get("note", "") or ""),
+                        }
+                    )
+                st.markdown("### Test history")
+                st.dataframe(pd.DataFrame(history_rows), width="stretch", hide_index=True)
 if selected_tab == "Tests":
     st.subheader("Tests")
     bid_log_df_tests = st.session_state.get("bid_log_df")
