@@ -1962,12 +1962,6 @@ if selected_tab == "Current campaigns":
                             if bid_sku_for_detail and picked_campaign_id:
                                 st.session_state.current_bid_key = f"{picked_campaign_id}:{bid_sku_for_detail}"
                                 st.session_state.current_bid_rub = float(bid_rub)
-                            st.session_state.bid_reason_input = "Выбери reason"
-                            st.session_state.bid_comment_input = ""
-                            if "test_essence_input" in st.session_state:
-                                st.session_state.test_essence_input = ""
-                            if "test_expectations_input" in st.session_state:
-                                st.session_state.test_expectations_input = ""
                         except Exception as e:
                             logger.exception("Apply bid failed")
                             st.error(f"Ошибка при обновлении bid: {e}")
