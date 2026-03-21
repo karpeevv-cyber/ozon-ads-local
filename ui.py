@@ -2329,17 +2329,21 @@ if selected_tab == "Tests":
                 metric_order = ["views", "clicks", "ctr", "cr", "money_spent", "click_price", "total_revenue", "total_drr_pct"]
                 for row in summary_rows:
                     st.markdown(f"#### {row['article']} / {row['started_at']}")
-                    left, right = st.columns(2)
                     test_summary = row["_eval"].get("test_summary", {}) or {}
                     baseline_summary = row["_eval"].get("baseline_summary", {}) or {}
-                    with left:
-                        st.caption("Test period")
-                        df_test_metrics = make_view_df(pd.DataFrame([test_summary])[metric_order])
-                        st.dataframe(df_test_metrics, width="stretch", hide_index=True, column_config=build_column_config(df_test_metrics))
-                    with right:
-                        st.caption("Previous same-click window")
-                        df_prev_metrics = make_view_df(pd.DataFrame([baseline_summary])[metric_order])
-                        st.dataframe(df_prev_metrics, width="stretch", hide_index=True, column_config=build_column_config(df_prev_metrics))
+                    df_compare = pd.DataFrame(
+                        [
+                            {"period": "test", **{k: test_summary.get(k, 0) for k in metric_order}},
+                            {"period": "control", **{k: baseline_summary.get(k, 0) for k in metric_order}},
+                        ]
+                    )
+                    df_compare_view = make_view_df(df_compare)
+                    st.dataframe(
+                        df_compare_view,
+                        width="stretch",
+                        hide_index=True,
+                        column_config=build_column_config(df_compare_view),
+                    )
 
 if selected_tab == "Formulas":
     render_tab4()
