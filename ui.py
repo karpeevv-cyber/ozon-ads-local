@@ -1971,6 +1971,21 @@ if selected_tab == "Current campaigns":
             campaign_id=str(picked_campaign_id),
             sku=bid_sku_for_detail,
         )
+        if bid_sku_for_detail:
+            article_for_detail = ""
+            if seller_client_id and seller_api_key:
+                try:
+                    article_for_detail = _load_sku_offer_map_for_articles(
+                        seller_client_id=seller_client_id,
+                        seller_api_key=seller_api_key,
+                        skus=(str(bid_sku_for_detail),),
+                    ).get(str(bid_sku_for_detail), "")
+                except Exception:
+                    article_for_detail = ""
+            if not article_for_detail:
+                article_for_detail = str(bid_sku_for_detail)
+            df_camp_daily_raw_with_bids["article"] = article_for_detail
+            df_camp_daily_raw_with_bids = df_camp_daily_raw_with_bids.drop(columns=["title"], errors="ignore")
         df_camp_daily_raw_with_bids = df_camp_daily_raw_with_bids.drop(
             columns=["campaign_id", "sku", "rpc", "vpo", "target_cpc", "orders"],
             errors="ignore",
