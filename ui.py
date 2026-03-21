@@ -1840,6 +1840,15 @@ if selected_tab == "Current campaigns":
         with col_bid:
             st.subheader("Управление ставками (ручной тест)")
 
+            if st.session_state.pop("_reset_bid_form", False):
+                st.session_state.bid_rub_input = 0.0
+                st.session_state.bid_reason_input = "Выбери reason"
+                st.session_state.bid_comment_input = ""
+                st.session_state.test_date_from_input = date.today()
+                st.session_state.test_date_to_input = date.today()
+                st.session_state.test_essence_input = ""
+                st.session_state.test_expectations_input = ""
+
             if "bid_rub_input" not in st.session_state:
                 st.session_state.bid_rub_input = 0.0
 
@@ -1962,6 +1971,8 @@ if selected_tab == "Current campaigns":
                             if bid_sku_for_detail and picked_campaign_id:
                                 st.session_state.current_bid_key = f"{picked_campaign_id}:{bid_sku_for_detail}"
                                 st.session_state.current_bid_rub = float(bid_rub)
+                            st.session_state["_reset_bid_form"] = True
+                            st.rerun()
                         except Exception as e:
                             logger.exception("Apply bid failed")
                             st.error(f"Ошибка при обновлении bid: {e}")
