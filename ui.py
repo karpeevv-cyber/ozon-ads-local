@@ -2257,9 +2257,6 @@ if selected_tab == "Current campaigns":
                     width="stretch",
                     hide_index=True,
                 )
-        st.markdown("### Test parameters")
-        latest_test = None
-        latest_test_eval = None
         test_entries_for_detail = pd.DataFrame()
         if bid_log_df is not None and bid_sku_for_detail and picked_campaign_id:
             test_entries_for_detail = _list_test_entries(bid_log_df)
@@ -2271,60 +2268,31 @@ if selected_tab == "Current campaigns":
                 (test_entries_for_detail["campaign_id"].astype(str) == str(picked_campaign_id))
                 & (test_entries_for_detail["sku"].astype(str) == str(bid_sku_for_detail))
             ].copy()
-            if not test_entries_for_detail.empty:
-                latest_test_row = test_entries_for_detail.sort_values("ts_iso", ascending=False).iloc[0]
-                latest_test = {
-                    "start_date": str(latest_test_row.get("start_date", "") or ""),
-                    "target_clicks": int(latest_test_row.get("target_clicks", 0) or 0),
-                    "essence": str(latest_test_row.get("essence", "") or ""),
-                    "expectations": str(latest_test_row.get("expectations", "") or ""),
-                    "note": str(latest_test_row.get("note", "") or ""),
-                }
-                latest_test_eval = _evaluate_test_entry(
-                    entry=latest_test_row,
+        if test_entries_for_detail.empty:
+            st.caption("No test history.")
+        else:
+            history_rows = []
+            for _, test_row in test_entries_for_detail.sort_values("ts_iso", ascending=False).iterrows():
+                eval_res = _evaluate_test_entry(
+                    entry=test_row,
                     seller_client_id=seller_client_id,
                     seller_api_key=seller_api_key,
                     perf_client_id=perf_client_id,
                     perf_client_secret=perf_client_secret,
                 )
-        if not latest_test:
-            st.caption("No test parameters.")
-        else:
-            test_rows = [
-                {"parameter": "status", "value": str((latest_test_eval or {}).get("status", "active")).capitalize()},
-                {"parameter": "start_date", "value": latest_test.get("start_date", "")},
-                {"parameter": "target_clicks", "value": latest_test.get("target_clicks", 0)},
-                {"parameter": "essence", "value": latest_test.get("essence", "")},
-                {"parameter": "expectations", "value": latest_test.get("expectations", "")},
-            ]
-            if (latest_test_eval or {}).get("completion_day"):
-                test_rows.append({"parameter": "completion_day", "value": latest_test_eval.get("completion_day", "")})
-            if latest_test.get("note"):
-                test_rows.append({"parameter": "note", "value": latest_test.get("note", "")})
-            st.dataframe(pd.DataFrame(test_rows), width="stretch", hide_index=True)
-            if not test_entries_for_detail.empty:
-                history_rows = []
-                for _, test_row in test_entries_for_detail.sort_values("ts_iso", ascending=False).iterrows():
-                    eval_res = _evaluate_test_entry(
-                        entry=test_row,
-                        seller_client_id=seller_client_id,
-                        seller_api_key=seller_api_key,
-                        perf_client_id=perf_client_id,
-                        perf_client_secret=perf_client_secret,
-                    )
-                    history_rows.append(
-                        {
-                            "started_at": str(test_row.get("start_date", "") or ""),
-                            "target_clicks": int(test_row.get("target_clicks", 0) or 0),
-                            "status": str(eval_res.get("status", "")).capitalize(),
-                            "completion_day": str(eval_res.get("completion_day", "") or ""),
-                            "essence": str(test_row.get("essence", "") or ""),
-                            "expectations": str(test_row.get("expectations", "") or ""),
-                            "note": str(test_row.get("note", "") or ""),
-                        }
-                    )
-                st.markdown("### Test history")
-                st.dataframe(pd.DataFrame(history_rows), width="stretch", hide_index=True)
+                history_rows.append(
+                    {
+                        "started_at": str(test_row.get("start_date", "") or ""),
+                        "target_clicks": int(test_row.get("target_clicks", 0) or 0),
+                        "status": str(eval_res.get("status", "")).capitalize(),
+                        "completion_day": str(eval_res.get("completion_day", "") or ""),
+                        "essence": str(test_row.get("essence", "") or ""),
+                        "expectations": str(test_row.get("expectations", "") or ""),
+                        "note": str(test_row.get("note", "") or ""),
+                    }
+                )
+            st.markdown("### Test history")
+            st.dataframe(pd.DataFrame(history_rows), width="stretch", hide_index=True)
 if selected_tab == "Tests":
     st.subheader("Tests")
     bid_log_df_tests = st.session_state.get("bid_log_df")
