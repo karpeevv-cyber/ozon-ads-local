@@ -297,6 +297,7 @@ def _build_test_result_message(*, article: str, entry: dict, evaluation: dict) -
     control_summary = evaluation.get("baseline_summary", {}) or {}
     lines = [
         f"Test completed: {article}",
+        f"Essence: {entry.get('essence', '')}",
         f"Started: {entry.get('start_date', '')}",
         f"Completed: {evaluation.get('completion_day', '')}",
         f"Target clicks: {_fmt_int(entry.get('target_clicks', 0))}",
