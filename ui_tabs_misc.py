@@ -13,7 +13,7 @@ def render_tab4() -> None:
 - `CPC (click_price) = money_spent / clicks`
 - `CPM = money_spent / views * 1000`
 - `CR = ordered_units / clicks * 100`
-- `IPO = views / orders`
+- `IPO = views / ordered_units`
 - `VOR = ordered_units / views * 100`
 - `VPO = views / ordered_units`
 - `DRR% (total_drr_pct) = money_spent / total_revenue * 100`

@@ -975,7 +975,7 @@ if selected_tab == "All campaigns":
             cpm = (spend / views * 1000.0) if views > 0 else 0.0
             vor_pct = (units / views * 100.0) if views > 0 else 0.0
             vpo = (views / units) if units > 0 else 0.0
-            ipo = (views / orders) if orders > 0 else 0.0
+            ipo = (views / units) if units > 0 else 0.0
             total_drr_pct = (spend / revenue * 100.0) if revenue > 0 else 0.0
 
             gt_money_spent += spend
@@ -1011,7 +1011,7 @@ if selected_tab == "All campaigns":
         gt_drr_pct = (gt_money_spent / gt_revenue * 100.0) if gt_revenue > 0 else 0.0
         gt_ctr = (gt_clicks / gt_views * 100.0) if gt_views > 0 else 0.0
         gt_cr = (gt_units / gt_clicks * 100.0) if gt_clicks > 0 else 0.0
-        gt_ipo = (gt_views / gt_orders) if gt_orders > 0 else 0.0
+        gt_ipo = (gt_views / gt_units) if gt_units > 0 else 0.0
         gt_vor = (gt_units / gt_views * 100.0) if gt_views > 0 else 0.0
         gt_vpo = (gt_views / gt_units) if gt_units > 0 else 0.0
 
@@ -1569,7 +1569,7 @@ if selected_tab == "Current campaigns":
         total_drr_pct = (total_money_spent / total_revenue * 100.0) if total_revenue else 0.0
         total_rpc = (total_revenue / total_clicks) if total_clicks else 0.0
         total_target_cpc = total_rpc * target_drr
-        total_ipo = (total_views / total_orders) if total_orders else 0.0
+        total_ipo = (total_views / total_ordered_units) if total_ordered_units else 0.0
 
         _pf = format_date_ddmmyyyy(pd.Series([st.session_state.get('date_from', date_from)])).iloc[0]
         _pt = format_date_ddmmyyyy(pd.Series([st.session_state.get('date_to', date_to)])).iloc[0]

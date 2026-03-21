@@ -231,7 +231,7 @@ def build_campaign_daily_rows_cached(
         rpc = (total_revenue / clicks) if clicks > 0 else 0.0
         target_cpc = rpc * target_drr
         vpo = (views / total_units) if total_units > 0 else 0.0
-        ipo = (views / orders) if orders > 0 else 0.0
+        ipo = (views / total_units) if total_units > 0 else 0.0
 
         out.append(
             {
@@ -370,7 +370,7 @@ def build_campaign_daily_rows(
         rpc = (total_revenue / clicks) if clicks > 0 else 0.0
         target_cpc = rpc * target_drr
         vpo = (views / total_units) if total_units > 0 else 0.0
-        ipo = (views / orders) if orders > 0 else 0.0
+        ipo = (views / total_units) if total_units > 0 else 0.0
 
         out.append(
             {
@@ -462,7 +462,7 @@ def campaign_weekly_aggregate(df_camp_daily_raw: pd.DataFrame, target_drr: float
     agg["vpo"] = agg.apply(
         lambda r: (r["views"] / r["ordered_units"]) if r["ordered_units"] else 0.0, axis=1
     )
-    agg["ipo"] = agg.apply(lambda r: (r["views"] / r["orders"]) if r["orders"] else 0.0, axis=1)
+    agg["ipo"] = agg.apply(lambda r: (r["views"] / r["ordered_units"]) if r["ordered_units"] else 0.0, axis=1)
     agg["organic_pct"] = agg.apply(
         lambda r: (100.0 - (r["orders_money_ads"] / r["total_revenue"] * 100.0)) if r["total_revenue"] else 0.0,
         axis=1,
