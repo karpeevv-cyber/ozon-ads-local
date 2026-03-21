@@ -115,13 +115,14 @@ def _load_sku_offer_map_for_articles(*, seller_client_id: str, seller_api_key: s
     return out
 
 
-def _build_test_comment_payload(*, date_from: str, date_to: str, essence: str, expectations: str, note: str = "") -> str:
+def _build_test_comment_payload(*, start_date: str, target_clicks: int, essence: str, expectations: str, note: str = "", company: str = "") -> str:
     payload = {
-        "date_from": str(date_from).strip(),
-        "date_to": str(date_to).strip(),
+        "start_date": str(start_date).strip(),
+        "target_clicks": int(target_clicks),
         "essence": str(essence or "").strip(),
         "expectations": str(expectations or "").strip(),
         "note": str(note or "").strip(),
+        "company": str(company or "").strip(),
     }
     return TEST_META_PREFIX + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
@@ -134,37 +135,26 @@ def _parse_test_comment_payload(comment: str):
         raw = json.loads(text[len(TEST_META_PREFIX):])
     except Exception:
         return None
+    start_date = str(raw.get("start_date", raw.get("date_from", "")) or "").strip()
+    target_clicks_raw = raw.get("target_clicks", 0)
+    try:
+        target_clicks = int(float(str(target_clicks_raw).strip().replace(",", ".")))
+    except Exception:
+        target_clicks = 0
     return {
-        "date_from": str(raw.get("date_from", "") or "").strip(),
-        "date_to": str(raw.get("date_to", "") or "").strip(),
+        "start_date": start_date,
+        "target_clicks": target_clicks,
         "essence": str(raw.get("essence", "") or "").strip(),
         "expectations": str(raw.get("expectations", "") or "").strip(),
         "note": str(raw.get("note", "") or "").strip(),
+        "company": str(raw.get("company", "") or "").strip(),
     }
 
 
 def _get_active_test_map(df: pd.DataFrame, *, on_day: date | None = None) -> dict[tuple[str, str], dict[str, str]]:
     if df is None or df.empty:
         return {}
-    day_str = str((on_day or date.today()).isoformat())
-    rows = df[df["reason"].astype(str) == "Test"].copy() if "reason" in df.columns else pd.DataFrame()
-    if rows.empty:
-        return {}
-    rows["_test_meta"] = rows["comment"].apply(_parse_test_comment_payload)
-    rows = rows[rows["_test_meta"].notna()].copy()
-    if rows.empty:
-        return {}
-    rows["date_from"] = rows["_test_meta"].apply(lambda x: x.get("date_from", ""))
-    rows["date_to"] = rows["_test_meta"].apply(lambda x: x.get("date_to", ""))
-    rows = rows[(rows["date_from"].astype(str) <= day_str) & (rows["date_to"].astype(str) >= day_str)].copy()
-    if rows.empty:
-        return {}
-    rows = rows.sort_values("ts_iso", ascending=False).drop_duplicates(subset=["campaign_id", "sku"], keep="first")
-    out: dict[tuple[str, str], dict[str, str]] = {}
-    for _, r in rows.iterrows():
-        meta = r["_test_meta"] or {}
-        out[(str(r.get("campaign_id", "")), str(r.get("sku", "")))] = meta
-    return out
+    return {}
 
 
 def _get_latest_test_change(df: pd.DataFrame, *, campaign_id: str, sku: str):
@@ -185,6 +175,190 @@ def _get_latest_test_change(df: pd.DataFrame, *, campaign_id: str, sku: str):
         return None
     rows = rows.sort_values("ts_iso", ascending=False)
     return rows.iloc[0]["_test_meta"]
+
+
+def _list_test_entries(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty or "reason" not in df.columns:
+        return pd.DataFrame(columns=["ts_iso", "date", "campaign_id", "sku", "start_date", "target_clicks", "essence", "expectations", "note"])
+    rows = df[df["reason"].astype(str) == "Test"].copy()
+    if rows.empty:
+        return pd.DataFrame(columns=["ts_iso", "date", "campaign_id", "sku", "start_date", "target_clicks", "essence", "expectations", "note"])
+    rows["_test_meta"] = rows["comment"].apply(_parse_test_comment_payload)
+    rows = rows[rows["_test_meta"].notna()].copy()
+    if rows.empty:
+        return pd.DataFrame(columns=["ts_iso", "date", "campaign_id", "sku", "start_date", "target_clicks", "essence", "expectations", "note"])
+    rows["start_date"] = rows["_test_meta"].apply(lambda x: x.get("start_date", ""))
+    rows["target_clicks"] = rows["_test_meta"].apply(lambda x: int(x.get("target_clicks", 0) or 0))
+    rows["essence"] = rows["_test_meta"].apply(lambda x: x.get("essence", ""))
+    rows["expectations"] = rows["_test_meta"].apply(lambda x: x.get("expectations", ""))
+    rows["note"] = rows["_test_meta"].apply(lambda x: x.get("note", ""))
+    rows["company"] = rows["_test_meta"].apply(lambda x: x.get("company", ""))
+    return rows[["ts_iso", "date", "campaign_id", "sku", "company", "start_date", "target_clicks", "essence", "expectations", "note"]].copy()
+
+
+def _daterange_days(date_from_iso: str, date_to_iso: str) -> list[str]:
+    try:
+        d_from = date.fromisoformat(str(date_from_iso))
+        d_to = date.fromisoformat(str(date_to_iso))
+    except Exception:
+        return []
+    out: list[str] = []
+    d = d_from
+    while d <= d_to:
+        out.append(d.isoformat())
+        d += timedelta(days=1)
+    return out
+
+
+def _build_test_daily_rows(*, campaign_id: str, sku: str, date_from_iso: str, date_to_iso: str, seller_client_id: str, seller_api_key: str, perf_client_id: str, perf_client_secret: str) -> pd.DataFrame:
+    days = _daterange_days(date_from_iso, date_to_iso)
+    if not days:
+        return pd.DataFrame(columns=["day", "views", "clicks", "ctr", "cr", "money_spent", "click_price", "total_revenue", "total_drr_pct", "ordered_units"])
+    _by_sku, _by_day, by_day_sku = seller_analytics_sku_day_cached(
+        date_from_iso,
+        date_to_iso,
+        limit=1000,
+        seller_client_id=seller_client_id,
+        seller_api_key=seller_api_key,
+    )
+    _daily, ads_daily_by_campaign = fetch_ads_daily_totals_cached(
+        perf_client_id,
+        perf_client_secret,
+        date_from_iso,
+        date_to_iso,
+        [str(campaign_id)],
+        10,
+        return_by_campaign=True,
+    )
+    rows: list[dict] = []
+    for day_str in days:
+        stats = ads_daily_by_campaign.get((day_str, str(campaign_id)), {}) or {}
+        views = int(stats.get("views", 0) or 0)
+        clicks = int(stats.get("clicks", 0) or 0)
+        money_spent = float(stats.get("money_spent", 0.0) or 0.0)
+        click_price = float(stats.get("click_price", 0.0) or 0.0)
+        revenue, units = by_day_sku.get((day_str, str(sku)), (0.0, 0))
+        ctr = (clicks / views * 100.0) if views else 0.0
+        cr = (int(units) / clicks * 100.0) if clicks else 0.0
+        drr = (money_spent / float(revenue) * 100.0) if float(revenue) else 0.0
+        rows.append(
+            {
+                "day": day_str,
+                "views": views,
+                "clicks": clicks,
+                "ctr": ctr,
+                "cr": cr,
+                "money_spent": money_spent,
+                "click_price": click_price,
+                "total_revenue": float(revenue),
+                "total_drr_pct": drr,
+                "ordered_units": int(units),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _summarize_test_metrics(df: pd.DataFrame) -> dict[str, float]:
+    if df is None or df.empty:
+        return {
+            "views": 0.0,
+            "clicks": 0.0,
+            "ctr": 0.0,
+            "cr": 0.0,
+            "money_spent": 0.0,
+            "click_price": 0.0,
+            "total_revenue": 0.0,
+            "total_drr_pct": 0.0,
+        }
+    views = float(pd.to_numeric(df.get("views", 0), errors="coerce").fillna(0).sum())
+    clicks = float(pd.to_numeric(df.get("clicks", 0), errors="coerce").fillna(0).sum())
+    money_spent = float(pd.to_numeric(df.get("money_spent", 0), errors="coerce").fillna(0).sum())
+    revenue = float(pd.to_numeric(df.get("total_revenue", 0), errors="coerce").fillna(0).sum())
+    units = float(pd.to_numeric(df.get("ordered_units", 0), errors="coerce").fillna(0).sum())
+    return {
+        "views": views,
+        "clicks": clicks,
+        "ctr": (clicks / views * 100.0) if views else 0.0,
+        "cr": (units / clicks * 100.0) if clicks else 0.0,
+        "money_spent": money_spent,
+        "click_price": (money_spent / clicks) if clicks else 0.0,
+        "total_revenue": revenue,
+        "total_drr_pct": (money_spent / revenue * 100.0) if revenue else 0.0,
+    }
+
+
+def _evaluate_test_entry(*, entry: pd.Series, seller_client_id: str, seller_api_key: str, perf_client_id: str, perf_client_secret: str) -> dict:
+    start_date = str(entry.get("start_date", "") or "").strip()
+    if not start_date:
+        start_date = str(entry.get("date", "") or "").strip()
+    target_clicks = int(entry.get("target_clicks", 0) or 0)
+    campaign_id = str(entry.get("campaign_id", "") or "").strip()
+    sku = str(entry.get("sku", "") or "").strip()
+    today_iso = date.today().isoformat()
+    live_df = _build_test_daily_rows(
+        campaign_id=campaign_id,
+        sku=sku,
+        date_from_iso=start_date,
+        date_to_iso=today_iso,
+        seller_client_id=seller_client_id,
+        seller_api_key=seller_api_key,
+        perf_client_id=perf_client_id,
+        perf_client_secret=perf_client_secret,
+    )
+    if live_df.empty:
+        return {
+            "status": "active",
+            "completion_day": "",
+            "test_summary": _summarize_test_metrics(live_df),
+            "baseline_summary": _summarize_test_metrics(pd.DataFrame()),
+            "actual_clicks": 0,
+        }
+    live_df = live_df.sort_values("day").reset_index(drop=True)
+    live_df["cum_clicks"] = pd.to_numeric(live_df["clicks"], errors="coerce").fillna(0).cumsum()
+    completion_day = ""
+    if target_clicks > 0:
+        reached = live_df[live_df["cum_clicks"] >= target_clicks]
+        if not reached.empty:
+            completion_day = str(reached.iloc[0]["day"])
+    status = "completed" if completion_day else "active"
+    test_rows = live_df if not completion_day else live_df[live_df["day"].astype(str) <= completion_day].copy()
+    actual_clicks = int(pd.to_numeric(test_rows.get("clicks", 0), errors="coerce").fillna(0).sum())
+    test_summary = _summarize_test_metrics(test_rows)
+    baseline_summary = _summarize_test_metrics(pd.DataFrame())
+    if status == "completed":
+        try:
+            baseline_end = date.fromisoformat(start_date) - timedelta(days=1)
+            baseline_start = baseline_end - timedelta(days=180)
+            baseline_df = _build_test_daily_rows(
+                campaign_id=campaign_id,
+                sku=sku,
+                date_from_iso=baseline_start.isoformat(),
+                date_to_iso=baseline_end.isoformat(),
+                seller_client_id=seller_client_id,
+                seller_api_key=seller_api_key,
+                perf_client_id=perf_client_id,
+                perf_client_secret=perf_client_secret,
+            )
+            if not baseline_df.empty:
+                baseline_df = baseline_df.sort_values("day", ascending=False).reset_index(drop=True)
+                baseline_df["cum_clicks"] = pd.to_numeric(baseline_df["clicks"], errors="coerce").fillna(0).cumsum()
+                target_baseline_clicks = max(actual_clicks, target_clicks)
+                reached_prev = baseline_df[baseline_df["cum_clicks"] >= target_baseline_clicks]
+                if not reached_prev.empty:
+                    last_idx = int(reached_prev.index[0])
+                    baseline_rows = baseline_df.iloc[: last_idx + 1].copy()
+                else:
+                    baseline_rows = baseline_df.copy()
+                baseline_summary = _summarize_test_metrics(baseline_rows)
+        except Exception:
+            baseline_summary = _summarize_test_metrics(pd.DataFrame())
+    return {
+        "status": status,
+        "completion_day": completion_day,
+        "test_summary": test_summary,
+        "baseline_summary": baseline_summary,
+        "actual_clicks": actual_clicks,
+    }
 
 company_configs = load_company_configs(".env")
 if not company_configs:
@@ -462,6 +636,7 @@ tab_options = [
     "Main",
     "All campaigns",
     "Current campaigns",
+    "Tests",
     "Unit Economics",
     "Unit Economics Products",
     "Finance balance",
@@ -1210,7 +1385,27 @@ if selected_tab == "All campaigns":
             campaign_id_col="campaign_id",
             sku_col="sku",
         )
-        active_test_map = _get_active_test_map(bid_log_df_tab2)
+        active_test_map = {}
+        test_entries = _list_test_entries(bid_log_df_tab2)
+        if not test_entries.empty and "company" in test_entries.columns:
+            test_entries = test_entries[
+                test_entries["company"].astype(str).isin(["", str(selected_company)])
+            ].copy()
+        if not test_entries.empty:
+            latest_entries = test_entries.sort_values("ts_iso", ascending=False).drop_duplicates(subset=["campaign_id", "sku"], keep="first")
+            for _, test_entry in latest_entries.iterrows():
+                try:
+                    eval_res = _evaluate_test_entry(
+                        entry=test_entry,
+                        seller_client_id=seller_client_id,
+                        seller_api_key=seller_api_key,
+                        perf_client_id=perf_client_id,
+                        perf_client_secret=perf_client_secret,
+                    )
+                    if eval_res.get("status") == "active":
+                        active_test_map[(str(test_entry.get("campaign_id", "")), str(test_entry.get("sku", "")))] = eval_res
+                except Exception:
+                    continue
         df_campaigns["Test"] = df_campaigns.apply(
             lambda r: "Да" if (str(r.get("campaign_id", "")), str(r.get("sku", ""))) in active_test_map else "",
             axis=1,
@@ -1844,8 +2039,7 @@ if selected_tab == "Current campaigns":
                 st.session_state.bid_rub_input = 0.0
                 st.session_state.bid_reason_input = "Выбери reason"
                 st.session_state.bid_comment_input = ""
-                st.session_state.test_date_from_input = date.today()
-                st.session_state.test_date_to_input = date.today()
+                st.session_state.test_target_clicks_input = 0
                 st.session_state.test_essence_input = ""
                 st.session_state.test_expectations_input = ""
 
@@ -1865,16 +2059,12 @@ if selected_tab == "Current campaigns":
                     key="bid_reason_input",
                 )
                 test_date_from = None
-                test_date_to = None
+                test_target_clicks = 0
                 test_essence = ""
                 test_expectations = ""
                 if bid_reason == "Test":
-                    if "test_date_from_input" not in st.session_state:
-                        st.session_state.test_date_from_input = date.today()
-                    if "test_date_to_input" not in st.session_state:
-                        st.session_state.test_date_to_input = date.today()
-                    test_date_from = st.date_input("test_date_from", key="test_date_from_input")
-                    test_date_to = st.date_input("test_date_to", key="test_date_to_input")
+                    test_date_from = date.today()
+                    test_target_clicks = st.number_input("target_clicks", min_value=1, step=1, key="test_target_clicks_input")
                     test_essence = st.text_input("test_essence", value="", key="test_essence_input")
                     test_expectations = st.text_area("test_expectations", height=80, key="test_expectations_input")
                 bid_comment = st.text_input("comment", value="", key="bid_comment_input")
@@ -1887,8 +2077,8 @@ if selected_tab == "Current campaigns":
                         st.error("Укажи reason.")
                     elif bid_reason == "Test" and (not test_essence.strip() or not test_expectations.strip()):
                         st.error("Для Test заполни суть и ожидания.")
-                    elif bid_reason == "Test" and test_date_from and test_date_to and test_date_from > test_date_to:
-                        st.error("У Test дата начала не может быть позже даты окончания.")
+                    elif bid_reason == "Test" and int(test_target_clicks or 0) <= 0:
+                        st.error("Для Test укажи target_clicks > 0.")
                     else:
                         campaign_id_for_bid = picked_campaign_id
                         token = perf_token(perf_client_id, perf_client_secret)
@@ -1896,11 +2086,12 @@ if selected_tab == "Current campaigns":
                         try:
                             if bid_reason == "Test":
                                 full_comment = _build_test_comment_payload(
-                                    date_from=str(test_date_from),
-                                    date_to=str(test_date_to),
+                                    start_date=str(test_date_from),
+                                    target_clicks=int(test_target_clicks),
                                     essence=test_essence,
                                     expectations=test_expectations,
                                     note=bid_comment,
+                                    company=selected_company,
                                 )
                             else:
                                 full_comment = f"reason={bid_reason}; {bid_comment}".strip()
@@ -2033,32 +2224,112 @@ if selected_tab == "Current campaigns":
                 )
         st.markdown("### Test parameters")
         latest_test = None
+        latest_test_eval = None
         if bid_log_df is not None and bid_sku_for_detail and picked_campaign_id:
-            latest_test = _get_latest_test_change(
-                bid_log_df,
-                campaign_id=str(picked_campaign_id),
-                sku=str(bid_sku_for_detail),
-            )
+            test_entries_for_detail = _list_test_entries(bid_log_df)
+            if not test_entries_for_detail.empty and "company" in test_entries_for_detail.columns:
+                test_entries_for_detail = test_entries_for_detail[
+                    test_entries_for_detail["company"].astype(str).isin(["", str(selected_company)])
+                ].copy()
+            test_entries_for_detail = test_entries_for_detail[
+                (test_entries_for_detail["campaign_id"].astype(str) == str(picked_campaign_id))
+                & (test_entries_for_detail["sku"].astype(str) == str(bid_sku_for_detail))
+            ].copy()
+            if not test_entries_for_detail.empty:
+                latest_test_row = test_entries_for_detail.sort_values("ts_iso", ascending=False).iloc[0]
+                latest_test = {
+                    "start_date": str(latest_test_row.get("start_date", "") or ""),
+                    "target_clicks": int(latest_test_row.get("target_clicks", 0) or 0),
+                    "essence": str(latest_test_row.get("essence", "") or ""),
+                    "expectations": str(latest_test_row.get("expectations", "") or ""),
+                    "note": str(latest_test_row.get("note", "") or ""),
+                }
+                latest_test_eval = _evaluate_test_entry(
+                    entry=latest_test_row,
+                    seller_client_id=seller_client_id,
+                    seller_api_key=seller_api_key,
+                    perf_client_id=perf_client_id,
+                    perf_client_secret=perf_client_secret,
+                )
         if not latest_test:
             st.caption("No test parameters.")
         else:
-            is_active_now = False
-            try:
-                today_iso = date.today().isoformat()
-                is_active_now = (
-                    str(latest_test.get("date_from", "")) <= today_iso <= str(latest_test.get("date_to", ""))
-                )
-            except Exception:
-                is_active_now = False
             test_rows = [
-                {"parameter": "status", "value": "Active" if is_active_now else "Inactive"},
-                {"parameter": "period", "value": f"{latest_test.get('date_from', '')} .. {latest_test.get('date_to', '')}"},
+                {"parameter": "status", "value": str((latest_test_eval or {}).get("status", "active")).capitalize()},
+                {"parameter": "start_date", "value": latest_test.get("start_date", "")},
+                {"parameter": "target_clicks", "value": latest_test.get("target_clicks", 0)},
                 {"parameter": "essence", "value": latest_test.get("essence", "")},
                 {"parameter": "expectations", "value": latest_test.get("expectations", "")},
             ]
+            if (latest_test_eval or {}).get("completion_day"):
+                test_rows.append({"parameter": "completion_day", "value": latest_test_eval.get("completion_day", "")})
             if latest_test.get("note"):
                 test_rows.append({"parameter": "note", "value": latest_test.get("note", "")})
             st.dataframe(pd.DataFrame(test_rows), width="stretch", hide_index=True)
+if selected_tab == "Tests":
+    st.subheader("Tests")
+    bid_log_df_tests = st.session_state.get("bid_log_df")
+    if bid_log_df_tests is None:
+        bid_log_df_tests = _load_bid_log_cached()
+        st.session_state.bid_log_df = bid_log_df_tests
+    tests_df = _list_test_entries(bid_log_df_tests)
+    if not tests_df.empty and "company" in tests_df.columns:
+        tests_df = tests_df[tests_df["company"].astype(str).isin(["", str(selected_company)])].copy()
+    if tests_df.empty:
+        st.caption("No tests.")
+    else:
+        status_filter = st.selectbox("test_status", options=["active", "completed"], index=0, key="tests_status_filter")
+        summary_rows = []
+        for _, test_entry in tests_df.sort_values("ts_iso", ascending=False).iterrows():
+            try:
+                eval_res = _evaluate_test_entry(
+                    entry=test_entry,
+                    seller_client_id=seller_client_id,
+                    seller_api_key=seller_api_key,
+                    perf_client_id=perf_client_id,
+                    perf_client_secret=perf_client_secret,
+                )
+            except Exception as e:
+                logger.exception("Test evaluation failed")
+                eval_res = {"status": "active", "completion_day": "", "test_summary": {}, "baseline_summary": {}, "actual_clicks": 0, "error": str(e)}
+            if eval_res.get("status") != status_filter:
+                continue
+            summary_rows.append(
+                {
+                    "started_at": str(test_entry.get("start_date", "")),
+                    "campaign_id": str(test_entry.get("campaign_id", "")),
+                    "sku": str(test_entry.get("sku", "")),
+                    "target_clicks": int(test_entry.get("target_clicks", 0) or 0),
+                    "actual_clicks": int(eval_res.get("actual_clicks", 0) or 0),
+                    "status": str(eval_res.get("status", "")),
+                    "completion_day": str(eval_res.get("completion_day", "")),
+                    "essence": str(test_entry.get("essence", "")),
+                    "_entry": test_entry.to_dict(),
+                    "_eval": eval_res,
+                }
+            )
+        if not summary_rows:
+            st.caption("No tests for selected status.")
+        else:
+            df_tests_summary = pd.DataFrame([{k: v for k, v in r.items() if not k.startswith("_")} for r in summary_rows])
+            st.dataframe(df_tests_summary, width="stretch", hide_index=True)
+            if status_filter == "completed":
+                st.markdown("### Test results")
+                metric_order = ["views", "clicks", "ctr", "cr", "money_spent", "click_price", "total_revenue", "total_drr_pct"]
+                for row in summary_rows:
+                    st.markdown(f"#### {row['campaign_id']} / {row['sku']} / {row['started_at']}")
+                    left, right = st.columns(2)
+                    test_summary = row["_eval"].get("test_summary", {}) or {}
+                    baseline_summary = row["_eval"].get("baseline_summary", {}) or {}
+                    with left:
+                        st.caption("Test period")
+                        df_test_metrics = make_view_df(pd.DataFrame([test_summary])[metric_order])
+                        st.dataframe(df_test_metrics, width="stretch", hide_index=True, column_config=build_column_config(df_test_metrics))
+                    with right:
+                        st.caption("Previous same-click window")
+                        df_prev_metrics = make_view_df(pd.DataFrame([baseline_summary])[metric_order])
+                        st.dataframe(df_prev_metrics, width="stretch", hide_index=True, column_config=build_column_config(df_prev_metrics))
+
 if selected_tab == "Formulas":
     render_tab4()
 
