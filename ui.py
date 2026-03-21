@@ -872,7 +872,7 @@ if selected_tab == "All campaigns":
         def _article_for_items(items):
             vals = []
             for it in items or []:
-                val = str(it.get("offer_id") or "").strip()
+                val = str(it.get("offer_id") or it.get("title") or "").strip()
                 if val:
                     vals.append(val)
             vals = list(dict.fromkeys(vals))
@@ -999,7 +999,7 @@ if selected_tab == "All campaigns":
         items = products_by_campaign_id.get(cid, []) or []
         vals = []
         for it in items:
-            val = str(it.get("offer_id") or "").strip()
+            val = str(it.get("offer_id") or it.get("title") or "").strip()
             if val:
                 vals.append(val)
         vals = list(dict.fromkeys(vals))
