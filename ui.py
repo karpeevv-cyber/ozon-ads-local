@@ -2290,7 +2290,7 @@ if selected_tab == "Tests":
                     )
                 except Exception:
                     sku_offer_map_for_tests = {}
-        status_filter = st.selectbox("test_status", options=["active", "completed"], index=0, key="tests_status_filter")
+        status_filter = st.selectbox("test_status", options=["ALL", "active", "completed"], index=0, key="tests_status_filter")
         summary_rows = []
         for _, test_entry in tests_df.sort_values("ts_iso", ascending=False).iterrows():
             try:
@@ -2304,7 +2304,7 @@ if selected_tab == "Tests":
             except Exception as e:
                 logger.exception("Test evaluation failed")
                 eval_res = {"status": "active", "completion_day": "", "test_summary": {}, "baseline_summary": {}, "actual_clicks": 0, "error": str(e)}
-            if eval_res.get("status") != status_filter:
+            if status_filter != "ALL" and eval_res.get("status") != status_filter:
                 continue
             summary_rows.append(
                 {
