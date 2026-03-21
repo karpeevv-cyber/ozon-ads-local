@@ -125,8 +125,8 @@ def _load_unit_costs(sheet_id: str, gid: str) -> pd.DataFrame:
 
     data = raw.iloc[2:].copy()
     data.columns = [_normalize_header(x) for x in raw.iloc[1].tolist()]
-    sku_col = "sku" if "sku" in data.columns else data.columns[0]
-    data["sku"] = data[sku_col].astype(str).str.strip()
+    # Some sheets have blank or duplicate headers; taking by column name can return a DataFrame.
+    data["sku"] = data.iloc[:, 0].astype(str).str.strip()
     data = data[data["sku"].str.fullmatch(r"\d+")].copy()
     if data.empty:
         return pd.DataFrame(columns=["sku", "sheet_name", "tea_cost", "package_cost", "label_cost", "packing_cost"])
@@ -138,7 +138,10 @@ def _load_unit_costs(sheet_id: str, gid: str) -> pd.DataFrame:
     def pick(*names: str) -> pd.Series:
         for name in names:
             if name in data.columns:
-                return data[name]
+                found = data[name]
+                if isinstance(found, pd.DataFrame):
+                    return found.iloc[:, 0]
+                return found
         return empty_series
 
     return pd.DataFrame(
