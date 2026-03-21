@@ -27,6 +27,7 @@ from ui_styles import style_median_table, BAND_PCT
 from clients_seller import seller_analytics_stocks
 from bid_ui_helpers import (
     apply_bid_and_log,
+    add_bid_column_period,
     add_bid_columns_daily,
     add_bid_columns_weekly,
     load_bid_log_df,
@@ -1107,8 +1108,25 @@ if selected_tab == "All campaigns":
         all_comment = ""
     df_campaigns["comment"] = df_campaigns["campaign_id"].astype(str).map(last_comment_map).fillna("")
     df_campaigns["comment_all"] = all_comment if all_comment else ""
+    bid_log_df_tab2 = st.session_state.get("bid_log_df")
+    if bid_log_df_tab2 is None:
+        bid_log_df_tab2 = _load_bid_log_cached()
+        st.session_state.bid_log_df = bid_log_df_tab2
+    if bid_log_df_tab2 is not None and not bid_log_df_tab2.empty:
+        period_from = str(local_from if use_local else st.session_state.get("date_from", date_from))
+        period_to = str(local_to if use_local else st.session_state.get("date_to", date_to))
+        df_campaigns = add_bid_column_period(
+            df_campaigns,
+            bid_log_df=bid_log_df_tab2,
+            date_from=period_from,
+            date_to=period_to,
+            campaign_id_col="campaign_id",
+            sku_col="sku",
+        )
+    else:
+        df_campaigns["Изменение bid"] = ""
     df_campaigns = df_campaigns.rename(columns={"total_drr_pct": "total_drr"})
-    ordered_campaign_cols = ["campaign_id", "sku", "article"]
+    ordered_campaign_cols = ["campaign_id", "sku", "article", "Изменение bid"]
     df_campaigns = df_campaigns[[c for c in ordered_campaign_cols if c in df_campaigns.columns] + [c for c in df_campaigns.columns if c not in ordered_campaign_cols]]
     df_campaigns_view = make_view_df(df_campaigns)
     metrics_campaigns = {

@@ -9,6 +9,7 @@ import pandas as pd
 from bid_changes import (
     append_bid_change,
     format_changes_for_day_multiline,
+    format_changes_for_range_multiline,
     format_changes_for_week_multiline,
     load_bid_changes,
     rub_to_micro,
@@ -159,4 +160,36 @@ def add_bid_columns_weekly(
     else:
         out[out_change_col] = ""
 
+    return out
+
+
+def add_bid_column_period(
+    df: pd.DataFrame,
+    *,
+    bid_log_df: pd.DataFrame,
+    date_from: str,
+    date_to: str,
+    campaign_id_col: str = "campaign_id",
+    sku_col: str = "sku",
+    out_change_col: str = "РР·РјРµРЅРµРЅРёРµ bid",
+) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df
+
+    out = df.copy()
+
+    def _fmt(row) -> str:
+        campaign_id = str(row.get(campaign_id_col, "")).strip()
+        sku = str(row.get(sku_col, "")).strip()
+        if not campaign_id or not sku or sku in {"", "None", "several", "вЂ”"}:
+            return ""
+        return format_changes_for_range_multiline(
+            bid_log_df,
+            campaign_id=campaign_id,
+            sku=sku,
+            date_from=str(date_from),
+            date_to=str(date_to),
+        )
+
+    out[out_change_col] = out.apply(_fmt, axis=1)
     return out

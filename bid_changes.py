@@ -491,6 +491,36 @@ def format_changes_for_week_multiline(
     return "\n".join(out)
 
 
+def format_changes_for_range_multiline(
+    df: pd.DataFrame,
+    *,
+    campaign_id: str,
+    sku: str,
+    date_from: str,
+    date_to: str,
+) -> str:
+    rows = _filter_rows(df, campaign_id=campaign_id, sku=sku)
+    if rows.empty:
+        return ""
+
+    rows = rows[
+        (rows["date"].astype(str) >= str(date_from))
+        & (rows["date"].astype(str) <= str(date_to))
+    ]
+    if rows.empty:
+        return ""
+
+    rows = rows.sort_values("ts_iso")
+    out: list[str] = []
+    for _, r in rows.iterrows():
+        line = _format_one_change(r)
+        c = _normalize_change_comment(r.get("comment", ""), str(r.get("reason", "")).strip())
+        if c:
+            line = f"{line} / {c}"
+        out.append(line)
+    return "\n".join(out)
+
+
 # ---------------- internal helpers ----------------
 
 def _to_int_or_none(x) -> Optional[int]:
