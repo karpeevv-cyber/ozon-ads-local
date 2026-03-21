@@ -8,8 +8,8 @@ import pandas as pd
 
 from bid_changes import (
     append_bid_change,
-    format_changes_for_day_with_comment_compact,
-    format_changes_for_week_with_comment,
+    format_changes_for_day_multiline,
+    format_changes_for_week_multiline,
     load_bid_changes,
     rub_to_micro,
 )
@@ -94,15 +94,6 @@ def load_bid_log_df(log_path: str = "bid_changes.csv") -> pd.DataFrame:
     return load_bid_changes(path=log_path)
 
 
-def _merge_change_and_comment(change_text: str, comment_text: str) -> str:
-    change = str(change_text or "").strip()
-    comment = str(comment_text or "").strip()
-    if change and comment:
-        return f"{change}; comment={comment}"
-    return change or ""
-
-
-
 def add_bid_columns_daily(
     df_daily: pd.DataFrame,
     *,
@@ -121,8 +112,8 @@ def add_bid_columns_daily(
 
     def _fmt(d):
         if not sku:
-            return ("", "")
-        return format_changes_for_day_with_comment_compact(
+            return ""
+        return format_changes_for_day_multiline(
             bid_log_df,
             campaign_id=campaign_id,
             sku=sku,
@@ -130,8 +121,7 @@ def add_bid_columns_daily(
         )
 
     if day_col in out.columns:
-        formatted = out[day_col].astype(str).apply(_fmt)
-        out[out_change_col] = formatted.apply(lambda t: _merge_change_and_comment(t[0], t[1]))
+        out[out_change_col] = out[day_col].astype(str).apply(_fmt)
     else:
         out[out_change_col] = ""
 
@@ -156,8 +146,8 @@ def add_bid_columns_weekly(
 
     def _fmt(w):
         if not sku:
-            return ("", "")
-        return format_changes_for_week_with_comment(
+            return ""
+        return format_changes_for_week_multiline(
             bid_log_df,
             campaign_id=campaign_id,
             sku=sku,
@@ -165,8 +155,7 @@ def add_bid_columns_weekly(
         )
 
     if week_col in out.columns:
-        formatted = out[week_col].astype(str).apply(_fmt)
-        out[out_change_col] = formatted.apply(lambda t: _merge_change_and_comment(t[0], t[1]))
+        out[out_change_col] = out[week_col].astype(str).apply(_fmt)
     else:
         out[out_change_col] = ""
 

@@ -388,6 +388,30 @@ def format_changes_for_day_with_comment_compact(
     return ("; ".join(parts), "; ".join(comments))
 
 
+def format_changes_for_day_multiline(
+    df: pd.DataFrame,
+    *,
+    campaign_id: str,
+    sku: str,
+    day_iso: str,
+) -> str:
+    rows = _filter_rows(df, campaign_id=campaign_id, sku=sku)
+    if rows.empty:
+        return ""
+    rows = rows[rows["date"].astype(str) == str(day_iso)]
+    if rows.empty:
+        return ""
+    rows = rows.sort_values("ts_iso")
+    out: list[str] = []
+    for _, r in rows.iterrows():
+        line = _format_one_change(r)
+        c = str(r.get("comment", "")).strip()
+        if c:
+            line = f"{line}; comment={c}"
+        out.append(line)
+    return "\n".join(out)
+
+
 def format_changes_for_week_with_comment(
     df: pd.DataFrame,
     *,
@@ -426,6 +450,45 @@ def format_changes_for_week_with_comment(
         if c:
             comments.append(f"{r.get('date','')}: {c}")
     return ("; ".join(parts), "; ".join(comments))
+
+
+def format_changes_for_week_multiline(
+    df: pd.DataFrame,
+    *,
+    campaign_id: str,
+    sku: str,
+    week_start_iso: str,
+) -> str:
+    rows = _filter_rows(df, campaign_id=campaign_id, sku=sku)
+    if rows.empty:
+        return ""
+
+    try:
+        ws = date.fromisoformat(str(week_start_iso))
+    except Exception:
+        return ""
+
+    we = ws.toordinal() + 6
+
+    def _in_week(d: str) -> bool:
+        try:
+            di = date.fromisoformat(str(d)).toordinal()
+            return ws.toordinal() <= di <= we
+        except Exception:
+            return False
+
+    rows = rows[rows["date"].apply(_in_week)]
+    if rows.empty:
+        return ""
+    rows = rows.sort_values("ts_iso")
+    out: list[str] = []
+    for _, r in rows.iterrows():
+        line = _format_one_change(r)
+        c = str(r.get("comment", "")).strip()
+        if c:
+            line = f"{line}; comment={c}"
+        out.append(line)
+    return "\n".join(out)
 
 
 # ---------------- internal helpers ----------------
