@@ -1137,7 +1137,7 @@ if selected_tab == "All campaigns":
     )
     df_campaigns = df_campaigns.rename(columns={"total_drr_pct": "drr"})
     df_campaigns = df_campaigns.drop(columns=["cpc_econ_range"], errors="ignore")
-    ordered_campaign_cols = ["campaign_id", "sku", "article", "bid", "Bid change", "revenue", "drr"]
+    ordered_campaign_cols = ["campaign_id", "sku", "article", "cr", "bid", "Bid change", "revenue", "drr"]
     df_campaigns = df_campaigns[[c for c in ordered_campaign_cols if c in df_campaigns.columns] + [c for c in df_campaigns.columns if c not in ordered_campaign_cols]]
     df_campaigns_view = make_view_df(df_campaigns)
     metrics_campaigns = {
@@ -1175,11 +1175,15 @@ if selected_tab == "All campaigns":
             return styled
         styler = styler.apply(_bid_outside_econ, axis=None)
 
+    campaigns_cfg = build_column_config(df_campaigns_view)
+    if "orders" in df_campaigns_view.columns:
+        campaigns_cfg["orders"] = st.column_config.NumberColumn("orders", format="%.0f")
+
     st.dataframe(
         styler,
         width="stretch",
         hide_index=True,
-        column_config=build_column_config(df_campaigns_view),
+        column_config=campaigns_cfg,
     )
 
 if selected_tab == "Current campaigns":
