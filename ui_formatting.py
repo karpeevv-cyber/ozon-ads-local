@@ -26,6 +26,7 @@ NUMERIC_COLS = [
     "rpc",
     "target_cpc",
     "vpo",
+    "ipo",
     "total_revenue",
     "total_revenue_per_day",
     "ordered_units",
@@ -111,6 +112,8 @@ def build_column_config(df: pd.DataFrame) -> dict:
 
     if "vpo" in df.columns:
         cfg["vpo"] = st.column_config.NumberColumn("vpo", format="%.1f")
+    if "ipo" in df.columns:
+        cfg["ipo"] = st.column_config.NumberColumn("ipo", format="%.0f")
 
     if "strategy_updated_at" in df.columns:
         cfg["strategy_updated_at"] = st.column_config.TextColumn("дата последнего изменения стратегии")

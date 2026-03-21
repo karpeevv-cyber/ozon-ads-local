@@ -969,6 +969,7 @@ if selected_tab == "All campaigns":
             cpm = (spend / views * 1000.0) if views > 0 else 0.0
             vor_pct = (units / views * 100.0) if views > 0 else 0.0
             vpo = (views / units) if units > 0 else 0.0
+            ipo = (views / orders) if orders > 0 else 0.0
             total_drr_pct = (spend / revenue * 100.0) if revenue > 0 else 0.0
 
             gt_money_spent += spend
@@ -994,6 +995,7 @@ if selected_tab == "All campaigns":
                     "total_drr_pct": round(total_drr_pct, 2),
                     "ctr": round(ctr_pct, 1),
                     "cr": round(cr_pct, 1),
+                    "ipo": round(ipo, 0),
                     "vor": round(vor_pct, 1),
                     "vpo": round(vpo, 1),
                 }
@@ -1003,6 +1005,7 @@ if selected_tab == "All campaigns":
         gt_drr_pct = (gt_money_spent / gt_revenue * 100.0) if gt_revenue > 0 else 0.0
         gt_ctr = (gt_clicks / gt_views * 100.0) if gt_views > 0 else 0.0
         gt_cr = (gt_units / gt_clicks * 100.0) if gt_clicks > 0 else 0.0
+        gt_ipo = (gt_views / gt_orders) if gt_orders > 0 else 0.0
         gt_vor = (gt_units / gt_views * 100.0) if gt_views > 0 else 0.0
         gt_vpo = (gt_views / gt_units) if gt_units > 0 else 0.0
 
@@ -1023,6 +1026,7 @@ if selected_tab == "All campaigns":
                     "total_drr_pct": round(gt_drr_pct, 2),
                     "ctr": round(gt_ctr, 1),
                     "cr": round(gt_cr, 1),
+                    "ipo": round(gt_ipo, 0),
                     "vor": round(gt_vor, 1),
                     "vpo": round(gt_vpo, 1),
                 }
@@ -1155,6 +1159,7 @@ if selected_tab == "All campaigns":
         "cpm",
         "ctr",
         "cr",
+        "ipo",
         "bid",
         "Bid change",
         "comment",
@@ -1171,6 +1176,7 @@ if selected_tab == "All campaigns":
         "drr": "lower",
         "ctr": "higher",
         "cr": "higher",
+        "ipo": "lower",
     }
     styler = style_median_table(df_campaigns_view, metrics_campaigns, band_pct=BAND_PCT)
     if cpc_econ_bounds_map and "bid" in df_campaigns_view.columns and "campaign_id" in df_campaigns_view.columns:
@@ -1557,6 +1563,7 @@ if selected_tab == "Current campaigns":
         total_drr_pct = (total_money_spent / total_revenue * 100.0) if total_revenue else 0.0
         total_rpc = (total_revenue / total_clicks) if total_clicks else 0.0
         total_target_cpc = total_rpc * target_drr
+        total_ipo = (total_views / total_orders) if total_orders else 0.0
 
         _pf = format_date_ddmmyyyy(pd.Series([st.session_state.get('date_from', date_from)])).iloc[0]
         _pt = format_date_ddmmyyyy(pd.Series([st.session_state.get('date_to', date_to)])).iloc[0]
@@ -1570,6 +1577,7 @@ if selected_tab == "Current campaigns":
                     "clicks": total_clicks,
                     "ctr": round(total_ctr, 1),
                     "cr": round(total_cr, 1),
+                    "ipo": round(total_ipo, 0),
                     "money_spent": total_money_spent,
                     "click_price": total_click_price,
                     "cpm": round(total_cpm, 0),
@@ -1589,6 +1597,7 @@ if selected_tab == "Current campaigns":
             "total_drr_pct": "lower",
             "ctr": "higher",
             "cr": "higher",
+            "ipo": "lower",
         }
 
         st.dataframe(
@@ -1663,6 +1672,7 @@ if selected_tab == "Current campaigns":
             "total_drr_pct": "lower",
             "ctr": "higher",
             "cr": "higher",
+            "ipo": "lower",
         }
 
         st.dataframe(
@@ -1729,6 +1739,7 @@ if selected_tab == "Current campaigns":
             "total_drr_pct": "lower",
             "ctr": "higher",
             "cr": "higher",
+            "ipo": "lower",
         }
 
         st.dataframe(
