@@ -667,6 +667,8 @@ if selected_tab == "Main":
                 "week",
                 "total_revenue",
                 "total_drr_pct",
+                "ebitda",
+                "ebitda_pct",
                 "total_revenue_per_day",
                 "money_spent_per_day",
                 "views_per_day",
@@ -683,6 +685,8 @@ if selected_tab == "Main":
                 df_weekly_main["week"] = format_date_ddmmyyyy(df_weekly_main["week"])
             metrics_weekly_main = {
                 "total_drr_pct": "lower",
+                "ebitda": "higher",
+                "ebitda_pct": "higher",
                 "ctr": "higher",
                 "cr": "higher",
             }
@@ -705,12 +709,14 @@ if selected_tab == "Main":
                 "click_price",
                 "bid",
                 "orders_money_ads",
+                "ebitda",
             }
             pct_progress_cols = {
                 "total_drr_pct",
                 "ctr",
                 "cr",
                 "organic_pct",
+                "ebitda_pct",
                 "total_drr",
                 "total_drr_after_chng",
                 "vor",
