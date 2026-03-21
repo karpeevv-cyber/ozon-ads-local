@@ -2028,6 +2028,26 @@ if selected_tab == "Current campaigns":
         df_camp_daily = make_view_df(df_camp_daily_raw_with_bids).drop(columns=["vor", "rpc", "vpo"], errors="ignore")
         if "day" in df_camp_daily.columns:
             df_camp_daily["day"] = format_date_ddmmyyyy(df_camp_daily["day"])
+        daily_detail_cols = [
+            "day",
+            "article",
+            "money_spent",
+            "views",
+            "clicks",
+            "click_price",
+            "orders_money_ads",
+            "cpm",
+            "total_revenue",
+            "ordered_units",
+            "total_drr_pct",
+            "ctr",
+            "cr",
+            "ipo",
+            "Bid change",
+            "comment",
+            "comment_all",
+        ]
+        df_camp_daily = df_camp_daily[[c for c in daily_detail_cols if c in df_camp_daily.columns]]
 
         metrics_daily = {
             "cpm": "lower",
