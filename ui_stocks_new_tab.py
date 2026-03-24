@@ -338,17 +338,16 @@ def render_stocks_new_tab(
     candidate_mask = candidate_mask & eligible_city_mask
 
     review_state = st.session_state.get(review_state_key, {}) or {}
-    candidate_rows: list[dict] = []
+    review_rows: list[dict] = []
     for article in df_pivot.index:
         for city in df_pivot.columns:
-            if not bool(candidate_mask.at[article, city]):
-                continue
             key = _cell_review_key(article=str(article), city=str(city))
             total_now = float(total_with_transit.at[article, city])
             target_now = float(target_value.at[article, city])
             saved = review_state.get(key, {}) or {}
             suggested_order = max(0, int(round(target_now - total_now)))
-            candidate_rows.append(
+            default_approve = bool(suggested_order > 0 and candidate_mask.at[article, city])
+            review_rows.append(
                 {
                     "review_key": key,
                     "article": str(article),
@@ -362,10 +361,11 @@ def render_stocks_new_tab(
                     "target_value": int(round(target_now)),
                     "suggested_order": suggested_order,
                     "order_qty": max(0, int(saved.get("order_qty", suggested_order) or 0)),
-                    "approve": bool(saved.get("approve", True)),
+                    "approve": bool(saved.get("approve", default_approve)),
+                    "is_candidate": bool(candidate_mask.at[article, city]),
                 }
             )
-    df_candidates = pd.DataFrame(candidate_rows)
+    df_candidates = pd.DataFrame(review_rows)
 
     grade_color_map = {
         "DEFICIT": "#83FFB3",
@@ -421,7 +421,7 @@ def render_stocks_new_tab(
     metric_cols = st.columns(4)
     metric_cols[0].metric("Articles", len(df_display.index))
     metric_cols[1].metric("Cities", len(df_display.columns))
-    metric_cols[2].metric("Candidates", len(df_candidates))
+    metric_cols[2].metric("Candidates", 0 if df_candidates.empty else int(df_candidates["is_candidate"].sum()))
     metric_cols[3].metric(
         "Approved",
         0 if df_candidates.empty else int(df_candidates["approve"].sum()),
@@ -472,11 +472,13 @@ def render_stocks_new_tab(
 
     review_filter = st.selectbox(
         "Review filter",
-        ["ALL", "APPROVED", "UNCHECKED"],
+        ["ALL", "CANDIDATES", "APPROVED", "UNCHECKED"],
         index=0,
         key=f"{settings_key}:review_filter",
     )
-    if review_filter == "APPROVED":
+    if review_filter == "CANDIDATES":
+        df_candidates = df_candidates[df_candidates["is_candidate"] == True].copy()
+    elif review_filter == "APPROVED":
         df_candidates = df_candidates[df_candidates["approve"] == True].copy()
     elif review_filter == "UNCHECKED":
         df_candidates = df_candidates[df_candidates["approve"] == False].copy()
@@ -489,6 +491,7 @@ def render_stocks_new_tab(
         "in_transit",
         "suggested_order",
         "order_qty",
+        "is_candidate",
         "approve",
     ]
     with st.form(key=f"{settings_key}:review_form"):
@@ -504,6 +507,7 @@ def render_stocks_new_tab(
                 "need60",
                 "in_transit",
                 "suggested_order",
+                "is_candidate",
             ],
             column_config={
                 "review_key": None,
@@ -514,10 +518,14 @@ def render_stocks_new_tab(
                     step=1,
                     default=0,
                 ),
+                "is_candidate": st.column_config.CheckboxColumn(
+                    "candidate",
+                    disabled=True,
+                ),
                 "approve": st.column_config.CheckboxColumn(
                     "approve",
-                    help="Leave checked to accept ordering for this article and city.",
-                    default=True,
+                    help="Checked means you accept ordering for this article and city.",
+                    default=False,
                 ),
             },
             key=f"{settings_key}:review_editor",
