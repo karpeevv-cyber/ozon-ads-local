@@ -327,7 +327,13 @@ def render_stocks_new_tab(
     review_state_key = f"stocks:new:review:{seller_client_id}"
     if review_state_key not in st.session_state:
         st.session_state[review_state_key] = _load_review_state(seller_client_id=str(seller_client_id))
-    refresh_stocks = st.button("Refresh stocks", key=f"{settings_key}:refresh")
+    action_cols = st.columns(2)
+    refresh_stocks = action_cols[0].button("Refresh stocks", key=f"{settings_key}:refresh")
+    reset_approvals = action_cols[1].button("Reset approvals", key=f"{settings_key}:reset_approvals")
+    if reset_approvals:
+        st.session_state[review_state_key] = {}
+        _save_review_state(seller_client_id=str(seller_client_id), state={})
+        st.rerun()
     arrivals_text_map, article_city_shipments, shipments_ts = _ensure_stocks_shipments_cache(
         seller_client_id=str(seller_client_id),
         seller_api_key=str(seller_api_key),
