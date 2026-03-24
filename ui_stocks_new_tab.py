@@ -24,7 +24,7 @@ def _review_state_path(*, seller_client_id: str) -> Path:
     return Path(f"stocks_review_state_{seller_client_id}.pkl")
 
 
-def _load_review_state(*, seller_client_id: str) -> dict[str, bool]:
+def _load_review_state(*, seller_client_id: str) -> dict[str, dict[str, int | bool]]:
     path = _review_state_path(seller_client_id=seller_client_id)
     if not path.exists():
         return {}
@@ -33,24 +33,37 @@ def _load_review_state(*, seller_client_id: str) -> dict[str, bool]:
             payload = pickle.load(f) or {}
     except Exception:
         return {}
-    out: dict[str, bool] = {}
+    out: dict[str, dict[str, int | bool]] = {}
     for key, value in payload.items():
+        if isinstance(value, dict):
+            approve = bool(value.get("approve", True))
+            try:
+                order_qty = max(0, int(value.get("order_qty", 0)))
+            except Exception:
+                order_qty = 0
+            out[str(key)] = {"approve": approve, "order_qty": order_qty}
+            continue
         if isinstance(value, bool):
-            out[str(key)] = value
+            out[str(key)] = {"approve": value, "order_qty": 0}
             continue
         status = str(value or "").strip().lower()
         if status in {"pending", "approved"}:
-            out[str(key)] = True
+            out[str(key)] = {"approve": True, "order_qty": 0}
         elif status == "rejected":
-            out[str(key)] = False
+            out[str(key)] = {"approve": False, "order_qty": 0}
     return out
 
 
-def _save_review_state(*, seller_client_id: str, state: dict[str, bool]) -> None:
+def _save_review_state(*, seller_client_id: str, state: dict[str, dict[str, int | bool]]) -> None:
     path = _review_state_path(seller_client_id=seller_client_id)
     payload = {}
     for key, value in state.items():
-        payload[str(key)] = bool(value)
+        approve = bool((value or {}).get("approve", True))
+        try:
+            order_qty = max(0, int((value or {}).get("order_qty", 0)))
+        except Exception:
+            order_qty = 0
+        payload[str(key)] = {"approve": approve, "order_qty": order_qty}
     try:
         with path.open("wb") as f:
             pickle.dump(payload, f)
@@ -333,6 +346,8 @@ def render_stocks_new_tab(
             key = _cell_review_key(article=str(article), city=str(city))
             total_now = float(total_with_transit.at[article, city])
             target_now = float(target_value.at[article, city])
+            saved = review_state.get(key, {}) or {}
+            suggested_order = max(0, int(round(target_now - total_now)))
             candidate_rows.append(
                 {
                     "review_key": key,
@@ -345,9 +360,10 @@ def render_stocks_new_tab(
                     "total_with_transit": int(round(total_now)),
                     "trigger_value": int(round(float(trigger_value.at[article, city]))),
                     "target_value": int(round(target_now)),
-                    "suggested_order": max(0, int(round(target_now - total_now))),
+                    "suggested_order": suggested_order,
+                    "order_qty": max(0, int(saved.get("order_qty", suggested_order) or 0)),
                     "rule_type": "Need60" if _is_moscow_or_spb(str(city)) else "Regional threshold",
-                    "approve": bool(review_state.get(key, True)),
+                    "approve": bool(saved.get("approve", True)),
                 }
             )
     df_candidates = pd.DataFrame(candidate_rows)
@@ -369,7 +385,7 @@ def render_stocks_new_tab(
                 color = grade_color_map.get(grade, "")
                 if review_mode and bool(candidate_mask.at[article, city]):
                     key = _cell_review_key(article=str(article), city=str(city))
-                    approved = bool(review_state.get(key, True))
+                    approved = bool((review_state.get(key, {}) or {}).get("approve", True))
                     color = status_map.get(approved, color)
                     styles.at[article, city] = f"background-color: {color}; font-weight: 700"
                 elif color:
@@ -382,7 +398,7 @@ def render_stocks_new_tab(
         transit_val = int(round(float(transit.at[article, city])))
         if review_mode and bool(candidate_mask.at[article, city]):
             key = _cell_review_key(article=str(article), city=str(city))
-            approved = bool(review_state.get(key, True))
+            approved = bool((review_state.get(key, {}) or {}).get("approve", True))
             prefix = "+" if approved else "x"
             return f"{prefix} {base} | {ads60} | {transit_val}"
         return f"{base} | {ads60} | {transit_val}"
@@ -441,6 +457,7 @@ def render_stocks_new_tab(
         "need60",
         "in_transit",
         "suggested_order",
+        "order_qty",
         "rule_type",
         "approve",
     ]
@@ -461,6 +478,13 @@ def render_stocks_new_tab(
             ],
             column_config={
                 "review_key": None,
+                "order_qty": st.column_config.NumberColumn(
+                    "order_qty",
+                    help="Your final order quantity for this article and city.",
+                    min_value=0,
+                    step=1,
+                    default=0,
+                ),
                 "approve": st.column_config.CheckboxColumn(
                     "approve",
                     help="Leave checked to accept ordering for this article and city.",
@@ -478,9 +502,14 @@ def render_stocks_new_tab(
             key = str(row.get("review_key") or "")
             if not key:
                 continue
-            new_value = bool(row.get("approve", True))
-            if bool(updated_state.get(key, True)) != new_value:
-                updated_state[key] = new_value
+            new_approve = bool(row.get("approve", True))
+            try:
+                new_order_qty = max(0, int(row.get("order_qty", 0) or 0))
+            except Exception:
+                new_order_qty = 0
+            prev = updated_state.get(key, {}) or {}
+            if bool(prev.get("approve", True)) != new_approve or int(prev.get("order_qty", 0) or 0) != new_order_qty:
+                updated_state[key] = {"approve": new_approve, "order_qty": new_order_qty}
                 changed = True
         if changed:
             st.session_state[review_state_key] = updated_state
