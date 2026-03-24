@@ -392,25 +392,17 @@ def render_stocks_tab(
                     shortage_mask[col] = total_with_transit[col] <= rule_value[col]
                 else:
                     shortage_mask[col] = total_with_transit[col] <= float(ui_settings.get("regional_order_min", 2))
-            eligible_columns = [
-                col for col in df_pivot.columns
-                if bool((total_with_transit[col] > 10).any() or (transit[col] > 0).any())
-            ]
-            df_pivot = df_pivot.reindex(columns=eligible_columns)
-            df_ads = df_ads.reindex(columns=eligible_columns)
-            df_transit = df_transit.reindex(columns=eligible_columns)
-            grade_map = grade_map.reindex(columns=eligible_columns)
-            stock = stock.reindex(columns=eligible_columns)
-            transit = transit.reindex(columns=eligible_columns)
-            total_with_transit = total_with_transit.reindex(columns=eligible_columns)
-            rule_value = rule_value.reindex(columns=eligible_columns)
-            shortage_mask = shortage_mask.reindex(columns=eligible_columns)
-            df_pivot = df_pivot.where(shortage_mask)
-            df_ads = df_ads.where(shortage_mask)
-            df_transit = df_transit.where(shortage_mask)
-            grade_map = grade_map.where(shortage_mask)
-            if shortage_mask.any(axis=1).any():
-                df_pivot = df_pivot[shortage_mask.any(axis=1)]
+            eligible_city_mask = pd.DataFrame(False, index=df_pivot.index, columns=df_pivot.columns)
+            for col in eligible_city_mask.columns:
+                city_is_eligible = bool((total_with_transit[col] > 10).any() or (transit[col] > 0).any())
+                eligible_city_mask[col] = city_is_eligible
+            visible_mask = shortage_mask & eligible_city_mask
+            df_pivot = df_pivot.where(visible_mask)
+            df_ads = df_ads.where(visible_mask)
+            df_transit = df_transit.where(visible_mask)
+            grade_map = grade_map.where(visible_mask)
+            if visible_mask.any(axis=1).any():
+                df_pivot = df_pivot[visible_mask.any(axis=1)]
                 df_ads = df_ads.reindex_like(df_pivot)
                 df_transit = df_transit.reindex_like(df_pivot)
                 grade_map = grade_map.reindex_like(df_pivot)
@@ -469,7 +461,7 @@ def render_stocks_tab(
         for r in df_display.index:
             for c in df_display.columns:
                 if only_shortages and pd.isna(df_display.at[r, c]):
-                    df_display.at[r, c] = "вЂ”"
+                    df_display.at[r, c] = "-"
                 else:
                     df_display.at[r, c] = _format_cell(df_display.at[r, c], r, c)
 
