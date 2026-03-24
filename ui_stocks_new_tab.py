@@ -555,4 +555,11 @@ def render_stocks_new_tab(
 
     if not df_orders.empty:
         st.markdown("### Saved Orders")
+        st.download_button(
+            "Download Saved Orders CSV",
+            data=df_orders.to_csv(index=True).encode("utf-8-sig"),
+            file_name=f"saved_orders_{seller_client_id}.csv",
+            mime="text/csv",
+            key=f"{settings_key}:download_saved_orders",
+        )
         st.dataframe(df_orders_display, width="stretch")
