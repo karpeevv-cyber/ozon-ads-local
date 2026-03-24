@@ -431,8 +431,8 @@ def render_stocks_new_tab(
     ].copy() if not df_candidates.empty else pd.DataFrame()
     df_orders = (
         approved_orders.pivot_table(
-            index="city",
-            columns="article",
+            index="article",
+            columns="city",
             values="order_qty",
             aggfunc="sum",
             fill_value=0,
