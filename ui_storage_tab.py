@@ -549,6 +549,32 @@ def _load_bundle_items(
     return out
 
 
+def _bundle_items_cache_path(seller_client_id: str) -> Path:
+    return Path(f"storage_bundle_items_cache_{seller_client_id}.pkl")
+
+
+def _load_bundle_items_cache(seller_client_id: str) -> dict[tuple[str, str, str], list[dict]]:
+    path = _bundle_items_cache_path(seller_client_id)
+    if not path.exists():
+        return {}
+    try:
+        with path.open("rb") as f:
+            payload = pickle.load(f) or {}
+        if isinstance(payload, dict):
+            return payload
+    except Exception:
+        pass
+    return {}
+
+
+def _save_bundle_items_cache(seller_client_id: str, cache: dict[tuple[str, str, str], list[dict]]) -> None:
+    try:
+        with _bundle_items_cache_path(seller_client_id).open("wb") as f:
+            pickle.dump(cache, f)
+    except Exception:
+        pass
+
+
 def _arrival_dt_for_order(order: dict, supply: dict) -> datetime | None:
     arr = _to_dt((supply.get("storage_warehouse") or {}).get("arrival_date"))
     if arr is not None:
@@ -566,6 +592,8 @@ def _build_lots_by_city_article(
     seller_api_key: str,
 ) -> dict[tuple[str, str], list[dict]]:
     lots: dict[tuple[str, str], list[dict]] = {}
+    bundle_items_cache = _load_bundle_items_cache(seller_client_id)
+    bundle_items_cache_changed = False
     for oid, order in orders_by_id.items():
         dropoff = order.get("drop_off_warehouse") or {}
         dropoff_id = str(dropoff.get("warehouse_id") or "")
@@ -587,13 +615,18 @@ def _build_lots_by_city_article(
             arrival_dt = _arrival_dt_for_order(order, supply)
             if arrival_dt is None:
                 continue
-            items = _load_bundle_items(
-                bundle_id=bundle_id,
-                dropoff_warehouse_id=dropoff_id,
-                storage_warehouse_id=storage_id,
-                seller_client_id=seller_client_id,
-                seller_api_key=seller_api_key,
-            )
+            bundle_cache_key = (bundle_id, dropoff_id, storage_id)
+            items = bundle_items_cache.get(bundle_cache_key)
+            if items is None:
+                items = _load_bundle_items(
+                    bundle_id=bundle_id,
+                    dropoff_warehouse_id=dropoff_id,
+                    storage_warehouse_id=storage_id,
+                    seller_client_id=seller_client_id,
+                    seller_api_key=seller_api_key,
+                )
+                bundle_items_cache[bundle_cache_key] = items
+                bundle_items_cache_changed = True
             for it in items:
                 article = str(it.get("offer_id") or "").strip()
                 if not article:
@@ -617,6 +650,8 @@ def _build_lots_by_city_article(
                 lots.setdefault(key, []).append(lot)
     for key in lots:
         lots[key].sort(key=lambda x: x["arrival_dt"])
+    if bundle_items_cache_changed:
+        _save_bundle_items_cache(seller_client_id, bundle_items_cache)
     return lots
 
 
