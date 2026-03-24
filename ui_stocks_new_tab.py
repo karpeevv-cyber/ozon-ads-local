@@ -376,10 +376,7 @@ def render_stocks_new_tab(
     trigger_value = need60.copy()
     target_value = need60.copy()
     candidate_mask = pd.DataFrame(False, index=df_pivot.index, columns=df_pivot.columns)
-    eligible_city_mask = pd.DataFrame(False, index=df_pivot.index, columns=df_pivot.columns)
     for col in candidate_mask.columns:
-        city_is_eligible = bool((total_with_transit[col] > 10).any() or (transit[col] > 0).any())
-        eligible_city_mask[col] = city_is_eligible
         if _is_moscow_or_spb(str(col)):
             candidate_mask[col] = total_with_transit[col] <= need60[col]
             trigger_value[col] = need60[col]
@@ -388,7 +385,6 @@ def render_stocks_new_tab(
             candidate_mask[col] = total_with_transit[col] <= float(ui_settings.get("regional_order_min", 2))
             trigger_value[col] = float(ui_settings.get("regional_order_min", 2))
             target_value[col] = float(ui_settings.get("regional_order_target", 5))
-    candidate_mask = candidate_mask & eligible_city_mask
 
     review_state = st.session_state.get(review_state_key, {}) or {}
     review_rows: list[dict] = []
