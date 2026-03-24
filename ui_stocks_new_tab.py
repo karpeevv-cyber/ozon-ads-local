@@ -429,16 +429,17 @@ def render_stocks_new_tab(
     approved_orders = df_candidates[
         (df_candidates["approve"] == True) & (df_candidates["order_qty"] > 0)
     ].copy() if not df_candidates.empty else pd.DataFrame()
-    if not approved_orders.empty:
-        df_orders = approved_orders.pivot_table(
+    df_orders = (
+        approved_orders.pivot_table(
             index="city",
             columns="article",
             values="order_qty",
             aggfunc="sum",
             fill_value=0,
         ).sort_index()
-        st.markdown("### Saved Orders")
-        st.dataframe(df_orders, width="stretch")
+        if not approved_orders.empty
+        else pd.DataFrame()
+    )
 
     row_h = 35
     header_h = 38
@@ -528,3 +529,7 @@ def render_stocks_new_tab(
             st.session_state[review_state_key] = updated_state
             _save_review_state(seller_client_id=str(seller_client_id), state=updated_state)
             st.rerun()
+
+    if not df_orders.empty:
+        st.markdown("### Saved Orders")
+        st.dataframe(df_orders, width="stretch")
