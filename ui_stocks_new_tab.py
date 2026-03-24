@@ -362,13 +362,12 @@ def render_stocks_new_tab(
                     "target_value": int(round(target_now)),
                     "suggested_order": suggested_order,
                     "order_qty": max(0, int(saved.get("order_qty", suggested_order) or 0)),
-                    "rule_type": "Need60" if _is_moscow_or_spb(str(city)) else "Regional threshold",
                     "approve": bool(saved.get("approve", True)),
                 }
             )
     df_candidates = pd.DataFrame(candidate_rows)
 
-    status_map = {True: "#B7E1CD", False: "#D9D9D9"}
+    status_map = {True: "#F9B24B"}
     grade_color_map = {
         "DEFICIT": "#83FFB3",
         "POPULAR": "#D5FFE5",
@@ -386,8 +385,11 @@ def render_stocks_new_tab(
                 if review_mode and bool(candidate_mask.at[article, city]):
                     key = _cell_review_key(article=str(article), city=str(city))
                     approved = bool((review_state.get(key, {}) or {}).get("approve", True))
-                    color = status_map.get(approved, color)
-                    styles.at[article, city] = f"background-color: {color}; font-weight: 700"
+                    if approved:
+                        color = status_map.get(True, color)
+                        styles.at[article, city] = f"background-color: {color}; font-weight: 700"
+                    elif color:
+                        styles.at[article, city] = f"background-color: {color}"
                 elif color:
                     styles.at[article, city] = f"background-color: {color}"
         return styles
@@ -399,14 +401,13 @@ def render_stocks_new_tab(
         if review_mode and bool(candidate_mask.at[article, city]):
             key = _cell_review_key(article=str(article), city=str(city))
             approved = bool((review_state.get(key, {}) or {}).get("approve", True))
-            prefix = "+" if approved else "x"
-            return f"{prefix} {base} | {ads60} | {transit_val}"
+            if approved:
+                return f"! {base} | {ads60} | {transit_val}"
         return f"{base} | {ads60} | {transit_val}"
 
     st.markdown(
         "**Legend:** "
-        "Approved candidate = green. "
-        "Rejected = gray. "
+        "Approved candidate = orange. "
         "Regular turnover colors stay for the rest."
     )
     st.caption("Cell format: Stock/Need60/InTransit")
@@ -424,6 +425,20 @@ def render_stocks_new_tab(
         "Approved",
         0 if df_candidates.empty else int(df_candidates["approve"].sum()),
     )
+
+    approved_orders = df_candidates[
+        (df_candidates["approve"] == True) & (df_candidates["order_qty"] > 0)
+    ].copy() if not df_candidates.empty else pd.DataFrame()
+    if not approved_orders.empty:
+        df_orders = approved_orders.pivot_table(
+            index="city",
+            columns="article",
+            values="order_qty",
+            aggfunc="sum",
+            fill_value=0,
+        ).sort_index()
+        st.markdown("### Saved Orders")
+        st.dataframe(df_orders, width="stretch")
 
     row_h = 35
     header_h = 38
@@ -458,7 +473,6 @@ def render_stocks_new_tab(
         "in_transit",
         "suggested_order",
         "order_qty",
-        "rule_type",
         "approve",
     ]
     with st.form(key=f"{settings_key}:review_form"):
@@ -474,7 +488,6 @@ def render_stocks_new_tab(
                 "need60",
                 "in_transit",
                 "suggested_order",
-                "rule_type",
             ],
             column_config={
                 "review_key": None,
@@ -514,4 +527,4 @@ def render_stocks_new_tab(
         if changed:
             st.session_state[review_state_key] = updated_state
             _save_review_state(seller_client_id=str(seller_client_id), state=updated_state)
-            st.success("Approvals saved.")
+            st.rerun()
