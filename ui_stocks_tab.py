@@ -401,12 +401,6 @@ def render_stocks_tab(
             df_ads = df_ads.where(visible_mask)
             df_transit = df_transit.where(visible_mask)
             grade_map = grade_map.where(visible_mask)
-            if visible_mask.any(axis=1).any():
-                df_pivot = df_pivot[visible_mask.any(axis=1)]
-                df_ads = df_ads.reindex_like(df_pivot)
-                df_transit = df_transit.reindex_like(df_pivot)
-                grade_map = grade_map.reindex_like(df_pivot)
-                rule_value = rule_value.reindex_like(df_pivot)
 
         color_map = {
             "DEFICIT": "#83FFB3",   # green
