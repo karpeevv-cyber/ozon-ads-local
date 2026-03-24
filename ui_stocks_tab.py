@@ -442,10 +442,7 @@ def render_stocks_tab(
             "Pink = 120+ days. "
             "Red = no sales."
         )
-        st.caption(
-            "Cell format: Stock/Rule/InTransit. "
-            "Rule = Need60 for Moscow/SPB, target for other cities."
-        )
+        st.caption("Cell format: Stock/Need60/InTransit")
         df_pivot = df_pivot.round(0)
         def _format_cell(val, r, c):
             try:
@@ -453,15 +450,20 @@ def render_stocks_tab(
             except Exception:
                 base = 0
             try:
-                limit_val = int(round(float(rule_value.at[r, c])))
+                ads_val = df_ads.at[r, c]
+                ads60 = float(ads_val) * 60.0
+                days = transit_days_map.get(str(c).strip().lower(), 0)
+                if days:
+                    ads60 = ads60 * (1.0 + (days / 60.0))
+                ads60 = int(round(ads60))
             except Exception:
-                limit_val = 0
+                ads60 = 0
             try:
                 transit_val = df_transit.at[r, c]
                 transit = int(round(float(transit_val)))
             except Exception:
                 transit = 0
-            return f"{base} | {limit_val} | {transit}"
+            return f"{base} | {ads60} | {transit}"
 
         df_display = df_pivot.copy().astype(object)
         for r in df_display.index:
