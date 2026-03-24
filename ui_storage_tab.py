@@ -620,6 +620,35 @@ def _build_lots_by_city_article(
     return lots
 
 
+def _find_storage_cache_files(seller_client_id: str, preferred_version: str) -> list[Path]:
+    exact = Path(f"storage_cache_{preferred_version}_{seller_client_id}.pkl")
+    other = sorted(
+        Path(".").glob(f"storage_cache_v*_{seller_client_id}.pkl"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    out: list[Path] = []
+    if exact.exists():
+        out.append(exact)
+    for path in other:
+        if path not in out:
+            out.append(path)
+    return out
+
+
+def _load_storage_cache_payload(seller_client_id: str, preferred_version: str) -> tuple[dict, datetime | None, Path | None]:
+    for cache_file in _find_storage_cache_files(seller_client_id, preferred_version):
+        try:
+            with cache_file.open("rb") as f:
+                payload = pickle.load(f) or {}
+        except Exception:
+            continue
+        data = payload.get("data", {}) or {}
+        ts = payload.get("ts")
+        return data, ts, cache_file
+    return {}, None, None
+
+
 def render_storage_tab(
     *,
     seller_client_id: str | None,
@@ -638,18 +667,17 @@ def render_storage_tab(
     cache_key = f"storage:{cache_version}:{seller_client_id}"
     ts_key = f"{cache_key}:ts"
     cache_file = Path(f"storage_cache_{cache_version}_{seller_client_id}.pkl")
+    source_key = f"{cache_key}:source"
 
     refresh = st.button("Refresh storage", key=f"{cache_key}:refresh")
-    if cache_key not in st.session_state and cache_file.exists():
-        try:
-            with cache_file.open("rb") as f:
-                payload = pickle.load(f) or {}
-            st.session_state[cache_key] = payload.get("data", {})
-            st.session_state[ts_key] = payload.get("ts")
-        except Exception:
-            pass
+    if cache_key not in st.session_state:
+        data, ts, source_path = _load_storage_cache_payload(seller_client_id, cache_version)
+        if data:
+            st.session_state[cache_key] = data
+            st.session_state[ts_key] = ts
+            st.session_state[source_key] = str(source_path) if source_path is not None else ""
 
-    if refresh or cache_key not in st.session_state:
+    if refresh:
         with st.spinner("Loading stocks and supply orders..."):
             stock_map, sku_count, stock_city_labels, sales_rate_map = _load_stock_by_city_article(
                 seller_client_id=seller_client_id,
@@ -784,6 +812,7 @@ def render_storage_tab(
             }
             st.session_state[cache_key] = data
             st.session_state[ts_key] = now
+            st.session_state[source_key] = str(cache_file)
             try:
                 with cache_file.open("wb") as f:
                     pickle.dump({"data": data, "ts": now}, f)
@@ -792,13 +821,16 @@ def render_storage_tab(
 
     payload = st.session_state.get(cache_key, {}) or {}
     ts = st.session_state.get(ts_key)
+    cache_source = str(st.session_state.get(source_key, "") or "")
     if ts:
         st.caption(f"As of: {ts.strftime('%d.%m.%Y %H:%M')}")
+    if cache_source and Path(cache_source).name != cache_file.name:
+        st.caption(f"Loaded from cache: {Path(cache_source).name}")
     st.caption("FIFO logic: sales consume oldest lots first; fee starts 120 days after lot arrival.")
 
     lot_rows = payload.get("lot_rows", []) or []
     if not lot_rows:
-        st.info("No data. Press Refresh storage.")
+        st.info("Storage cache is empty. Press Refresh storage to rebuild it.")
         return
 
     st.caption(

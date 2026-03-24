@@ -15,6 +15,64 @@ from clients_seller import (
 )
 
 
+def _load_stocks_settings(*, seller_client_id: str) -> dict[str, int]:
+    defaults = {
+        "regional_order_min": 2,
+        "regional_order_target": 5,
+    }
+    settings_file = Path(f"stocks_settings_{seller_client_id}.pkl")
+    if not settings_file.exists():
+        return defaults.copy()
+    try:
+        with settings_file.open("rb") as f:
+            payload = pickle.load(f) or {}
+    except Exception:
+        return defaults.copy()
+    out = defaults.copy()
+    for key in out:
+        try:
+            out[key] = int(payload.get(key, out[key]))
+        except Exception:
+            pass
+    return out
+
+
+def _stocks_settings_path(*, seller_client_id: str) -> Path:
+    return Path(f"stocks_settings_{seller_client_id}.pkl")
+
+
+def _save_stocks_settings(*, seller_client_id: str, settings: dict[str, int]) -> None:
+    settings_file = _stocks_settings_path(seller_client_id=seller_client_id)
+    payload = {}
+    for key, value in settings.items():
+        try:
+            payload[key] = int(value)
+        except Exception:
+            continue
+    try:
+        with settings_file.open("wb") as f:
+            pickle.dump(payload, f)
+    except Exception:
+        pass
+
+
+def _is_moscow_or_spb(cluster_name: str) -> bool:
+    txt = str(cluster_name or "").strip().lower()
+    return any(
+        token in txt
+        for token in (
+            "москва",
+            "moscow",
+            "санкт-петербург",
+            "санкт петербург",
+            "петербург",
+            "spb",
+            "saint petersburg",
+            "st petersburg",
+        )
+    )
+
+
 def _load_all_product_ids(
     *,
     seller_client_id: str,
@@ -92,6 +150,13 @@ def render_stocks_tab(
     if not seller_client_id or not seller_api_key:
         st.warning("Seller creds are missing for selected company.")
         return
+
+    settings = _load_stocks_settings(seller_client_id=str(seller_client_id))
+    if not _stocks_settings_path(seller_client_id=str(seller_client_id)).exists():
+        _save_stocks_settings(seller_client_id=str(seller_client_id), settings=settings)
+    settings_key = f"stocks:settings:{seller_client_id}"
+    if settings_key not in st.session_state:
+        st.session_state[settings_key] = settings.copy()
 
     cache_version = "v2"
     cache_key = f"stocks:{cache_version}:{seller_client_id}"
@@ -213,8 +278,34 @@ def render_stocks_tab(
     df["article"] = df["article"].fillna("").astype(str)
     if "sku" in df.columns:
         df.loc[df["article"].str.strip() == "", "article"] = df["sku"].astype(str)
+    ui_settings = st.session_state.get(settings_key, {}).copy()
+    settings_cols = st.columns(2)
+    regional_order_min = int(
+        settings_cols[0].number_input(
+            "Non-Moscow/SPB lower threshold",
+            min_value=0,
+            step=1,
+            value=int(ui_settings.get("regional_order_min", 2)),
+            key=f"{settings_key}:regional_order_min",
+        )
+    )
+    regional_order_target = int(
+        settings_cols[1].number_input(
+            "Non-Moscow/SPB target",
+            min_value=0,
+            step=1,
+            value=max(int(ui_settings.get("regional_order_target", 5)), regional_order_min),
+            key=f"{settings_key}:regional_order_target",
+        )
+    )
+    ui_settings["regional_order_min"] = regional_order_min
+    ui_settings["regional_order_target"] = max(regional_order_target, regional_order_min)
+    if ui_settings != st.session_state.get(settings_key, {}):
+        st.session_state[settings_key] = ui_settings.copy()
+        _save_stocks_settings(seller_client_id=str(seller_client_id), settings=ui_settings)
+
     position_filter = st.selectbox("Position filter", ["ALL", "CORE", "ADDITIONAL"], index=0)
-    only_shortages = st.checkbox("Only positions with shortage vs 60-day need", value=False)
+    only_shortages = st.checkbox("Only positions with shortage*", value=False)
     if position_filter != "ALL" and "offer_id" in df.columns:
         is_additional = df["offer_id"].astype(str).str.upper().str.contains("AURA", na=False)
         if position_filter == "ADDITIONAL":
@@ -283,15 +374,37 @@ def render_stocks_tab(
         df_ads = df_ads.loc[:, ~df_ads.columns.duplicated()]
         df_transit = df_transit.loc[:, ~df_transit.columns.duplicated()]
         grade_map = grade_map.loc[:, ~grade_map.columns.duplicated()]
+        stock = df_pivot.fillna(0)
+        transit = df_transit.fillna(0)
+        total_with_transit = stock + transit
+        rule_value = df_ads.fillna(0) * 60.0
+        for col in rule_value.columns:
+            days = transit_days_map.get(str(col).strip().lower(), 0)
+            if days:
+                rule_value[col] = rule_value[col] * (1.0 + (days / 60.0))
+            if not _is_moscow_or_spb(str(col)):
+                rule_value[col] = float(ui_settings.get("regional_order_target", 5))
 
         if only_shortages:
-            need60 = df_ads.fillna(0) * 60.0
-            for col in need60.columns:
-                days = transit_days_map.get(str(col).strip().lower(), 0)
-                if days:
-                    need60[col] = need60[col] * (1.0 + (days / 60.0))
-            stock = df_pivot.fillna(0)
-            shortage_mask = (stock < need60) | (stock <= 2)
+            shortage_mask = pd.DataFrame(False, index=df_pivot.index, columns=df_pivot.columns)
+            for col in shortage_mask.columns:
+                if _is_moscow_or_spb(str(col)):
+                    shortage_mask[col] = total_with_transit[col] <= rule_value[col]
+                else:
+                    shortage_mask[col] = total_with_transit[col] <= float(ui_settings.get("regional_order_min", 2))
+            eligible_columns = [
+                col for col in df_pivot.columns
+                if bool((total_with_transit[col] > 10).any() or (transit[col] > 0).any())
+            ]
+            df_pivot = df_pivot.reindex(columns=eligible_columns)
+            df_ads = df_ads.reindex(columns=eligible_columns)
+            df_transit = df_transit.reindex(columns=eligible_columns)
+            grade_map = grade_map.reindex(columns=eligible_columns)
+            stock = stock.reindex(columns=eligible_columns)
+            transit = transit.reindex(columns=eligible_columns)
+            total_with_transit = total_with_transit.reindex(columns=eligible_columns)
+            rule_value = rule_value.reindex(columns=eligible_columns)
+            shortage_mask = shortage_mask.reindex(columns=eligible_columns)
             df_pivot = df_pivot.where(shortage_mask)
             df_ads = df_ads.where(shortage_mask)
             df_transit = df_transit.where(shortage_mask)
@@ -301,6 +414,7 @@ def render_stocks_tab(
                 df_ads = df_ads.reindex_like(df_pivot)
                 df_transit = df_transit.reindex_like(df_pivot)
                 grade_map = grade_map.reindex_like(df_pivot)
+                rule_value = rule_value.reindex_like(df_pivot)
 
         color_map = {
             "DEFICIT": "#83FFB3",   # green
@@ -328,7 +442,10 @@ def render_stocks_tab(
             "Pink = 120+ days. "
             "Red = no sales."
         )
-        st.caption("Cell format: Stock/Need60/InTransit")
+        st.caption(
+            "Cell format: Stock/Rule/InTransit. "
+            "Rule = Need60 for Moscow/SPB, target for other cities."
+        )
         df_pivot = df_pivot.round(0)
         def _format_cell(val, r, c):
             try:
@@ -336,20 +453,15 @@ def render_stocks_tab(
             except Exception:
                 base = 0
             try:
-                ads_val = df_ads.at[r, c]
-                ads60 = float(ads_val) * 60.0
-                days = transit_days_map.get(str(c).strip().lower(), 0)
-                if days:
-                    ads60 = ads60 * (1.0 + (days / 60.0))
-                ads60 = int(round(ads60))
+                limit_val = int(round(float(rule_value.at[r, c])))
             except Exception:
-                ads60 = 0
+                limit_val = 0
             try:
                 transit_val = df_transit.at[r, c]
                 transit = int(round(float(transit_val)))
             except Exception:
                 transit = 0
-            return f"{base} | {ads60} | {transit}"
+            return f"{base} | {limit_val} | {transit}"
 
         df_display = df_pivot.copy().astype(object)
         for r in df_display.index:
