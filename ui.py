@@ -60,7 +60,6 @@ from ui_helpers import (
 )
 from ui_tabs_misc import render_tab4
 from ui_finance_tab import render_finance_tab
-from ui_stocks_tab import render_stocks_tab
 from ui_stocks_new_tab import render_stocks_new_tab
 from ui_storage_tab import render_storage_tab
 from ui_unit_economics_tab import render_unit_economics_tab, load_unit_economics_daily_summary
@@ -649,7 +648,6 @@ tab_options = [
     "Unit Economics Products",
     "Finance balance",
     "Stocks",
-    "Stocks New",
     "Storage",
     "Search Trends",
     "Formulas",
@@ -2406,9 +2404,6 @@ if selected_tab == "Unit Economics Products":
     )
 
 if selected_tab == "Stocks":
-    render_stocks_tab(seller_client_id=seller_client_id, seller_api_key=seller_api_key)
-
-if selected_tab == "Stocks New":
     render_stocks_new_tab(seller_client_id=seller_client_id, seller_api_key=seller_api_key)
 
 if selected_tab == "Storage":
