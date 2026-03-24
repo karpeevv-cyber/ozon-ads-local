@@ -458,7 +458,7 @@ def render_stocks_new_tab(
 
     row_h = 35
     header_h = 38
-    table_h = min(1200, header_h + (len(df_display) + 3) * row_h)
+    table_h = header_h + (len(df_display) + 3) * row_h
     st.dataframe(
         df_display.style.apply(_style_matrix, axis=None),
         width="stretch",
