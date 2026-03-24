@@ -480,6 +480,28 @@ def render_stocks_new_tab(
         )
 
     review_state = st.session_state.get(review_state_key, {}) or {}
+    normalized_review_state: dict[str, dict[str, int | bool]] = {}
+    review_state_changed = False
+    for article in df_pivot.index:
+        for city in df_pivot.columns:
+            key = _cell_review_key(article=str(article), city=str(city))
+            saved = review_state.get(key, {}) or {}
+            approve = bool(saved.get("approve", False))
+            try:
+                order_qty = max(0, int(saved.get("order_qty", 0) or 0))
+            except Exception:
+                order_qty = 0
+            if not bool(candidate_mask.at[article, city]) and approve:
+                approve = False
+                review_state_changed = True
+            normalized_review_state[key] = {"approve": approve, "order_qty": order_qty}
+    if review_state_changed or normalized_review_state.keys() != review_state.keys():
+        review_state = normalized_review_state
+        st.session_state[review_state_key] = review_state
+        _save_review_state(seller_client_id=str(seller_client_id), state=review_state)
+    else:
+        review_state = normalized_review_state
+
     review_rows: list[dict] = []
     for article in df_pivot.index:
         for city in df_pivot.columns:
