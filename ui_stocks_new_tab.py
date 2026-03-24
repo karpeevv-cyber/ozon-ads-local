@@ -47,16 +47,17 @@ def _load_review_state(*, seller_client_id: str) -> dict[str, dict[str, int | bo
                 order_qty = max(0, int(value.get("order_qty", 0)))
             except Exception:
                 order_qty = 0
-            out[str(key)] = {"approve": approve, "order_qty": order_qty}
+            manual = bool(value.get("manual", False))
+            out[str(key)] = {"approve": approve, "order_qty": order_qty, "manual": manual}
             continue
         if isinstance(value, bool):
-            out[str(key)] = {"approve": value, "order_qty": 0}
+            out[str(key)] = {"approve": value, "order_qty": 0, "manual": True}
             continue
         status = str(value or "").strip().lower()
         if status in {"pending", "approved"}:
-            out[str(key)] = {"approve": True, "order_qty": 0}
+            out[str(key)] = {"approve": True, "order_qty": 0, "manual": True}
         elif status == "rejected":
-            out[str(key)] = {"approve": False, "order_qty": 0}
+            out[str(key)] = {"approve": False, "order_qty": 0, "manual": True}
     return out
 
 
@@ -69,7 +70,8 @@ def _save_review_state(*, seller_client_id: str, state: dict[str, dict[str, int 
             order_qty = max(0, int((value or {}).get("order_qty", 0)))
         except Exception:
             order_qty = 0
-        payload[str(key)] = {"approve": approve, "order_qty": order_qty}
+        manual = bool((value or {}).get("manual", False))
+        payload[str(key)] = {"approve": approve, "order_qty": order_qty, "manual": manual}
     try:
         with path.open("wb") as f:
             pickle.dump(payload, f)
@@ -486,15 +488,28 @@ def render_stocks_new_tab(
         for city in df_pivot.columns:
             key = _cell_review_key(article=str(article), city=str(city))
             saved = review_state.get(key, {}) or {}
-            approve = bool(saved.get("approve", False))
+            is_candidate = bool(candidate_mask.at[article, city])
+            total_now = float(total_with_transit.at[article, city])
+            target_now = float(target_value.at[article, city])
+            suggested_order = max(0, int(round(target_now - total_now)))
+            default_approve = bool(suggested_order > 0 and is_candidate)
+            manual = bool(saved.get("manual", False))
+            approve = bool(saved.get("approve", default_approve))
             try:
-                order_qty = max(0, int(saved.get("order_qty", 0) or 0))
+                order_qty = max(0, int(saved.get("order_qty", suggested_order) or 0))
             except Exception:
-                order_qty = 0
-            if not bool(candidate_mask.at[article, city]) and approve:
+                order_qty = suggested_order
+            original_state = {"approve": approve, "order_qty": order_qty, "manual": manual}
+            if not is_candidate:
                 approve = False
+                manual = False
+            elif not manual:
+                approve = default_approve
+                order_qty = suggested_order
+            new_state = {"approve": approve, "order_qty": order_qty, "manual": manual}
+            if new_state != original_state:
                 review_state_changed = True
-            normalized_review_state[key] = {"approve": approve, "order_qty": order_qty}
+            normalized_review_state[key] = new_state
     if review_state_changed or normalized_review_state.keys() != review_state.keys():
         review_state = normalized_review_state
         st.session_state[review_state_key] = review_state
@@ -714,14 +729,31 @@ def render_stocks_new_tab(
             key = str(row.get("review_key") or "")
             if not key:
                 continue
+            is_candidate = bool(row.get("is_candidate", False))
+            default_approve = bool(is_candidate and int(row.get("suggested_order", 0) or 0) > 0)
             new_approve = bool(row.get("approve", True))
             try:
                 new_order_qty = max(0, int(row.get("order_qty", 0) or 0))
             except Exception:
                 new_order_qty = 0
+            try:
+                suggested_order = max(0, int(row.get("suggested_order", 0) or 0))
+            except Exception:
+                suggested_order = 0
+            manual = bool(is_candidate and (new_approve != default_approve or new_order_qty != suggested_order))
+            next_state = {
+                "approve": new_approve if is_candidate else False,
+                "order_qty": new_order_qty,
+                "manual": manual,
+            }
             prev = updated_state.get(key, {}) or {}
-            if bool(prev.get("approve", True)) != new_approve or int(prev.get("order_qty", 0) or 0) != new_order_qty:
-                updated_state[key] = {"approve": new_approve, "order_qty": new_order_qty}
+            prev_state = {
+                "approve": bool(prev.get("approve", default_approve)),
+                "order_qty": int(prev.get("order_qty", suggested_order) or 0),
+                "manual": bool(prev.get("manual", False)),
+            }
+            if prev_state != next_state:
+                updated_state[key] = next_state
                 changed = True
         if changed:
             st.session_state[review_state_key] = updated_state
