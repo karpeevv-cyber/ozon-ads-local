@@ -207,6 +207,21 @@ def _load_arrivals_text_map(*, seller_client_id: str) -> dict[tuple[str, str], s
     return out
 
 
+def _lookup_arrivals_text(*, arrivals_text_map: dict[tuple[str, str], str], article: str, city: str) -> str:
+    article_key = str(article or "").strip()
+    city_raw = str(city or "").strip()
+    candidates = [
+        city_raw,
+        city_raw.upper(),
+        _norm_city(city_raw),
+    ]
+    for city_key in candidates:
+        text = arrivals_text_map.get((article_key, str(city_key).strip()), "")
+        if text:
+            return text
+    return ""
+
+
 def render_stocks_new_tab(
     *,
     seller_client_id: str | None,
@@ -399,7 +414,11 @@ def render_stocks_new_tab(
                     "target_value": int(round(target_now)),
                     "suggested_order": suggested_order,
                     "order_qty": max(0, int(saved.get("order_qty", suggested_order) or 0)),
-                    "arrivals": arrivals_text_map.get((str(article), _norm_city(str(city))), ""),
+                    "arrivals": _lookup_arrivals_text(
+                        arrivals_text_map=arrivals_text_map,
+                        article=str(article),
+                        city=str(city),
+                    ),
                     "approve": bool(saved.get("approve", default_approve)),
                     "is_candidate": bool(candidate_mask.at[article, city]),
                 }
@@ -558,6 +577,10 @@ def render_stocks_new_tab(
                     min_value=0,
                     step=1,
                     default=0,
+                ),
+                "arrivals": st.column_config.TextColumn(
+                    "arrivals",
+                    width="medium",
                 ),
                 "is_candidate": st.column_config.CheckboxColumn(
                     "candidate",
