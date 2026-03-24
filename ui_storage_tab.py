@@ -702,9 +702,9 @@ def _build_lots_for_order(
     for supply in supplies:
         if not isinstance(supply, dict):
             continue
-            storage = supply.get("storage_warehouse") or {}
-            storage_id = str(storage.get("warehouse_id") or "")
-            storage_name = str(storage.get("name") or "").strip()
+        storage = supply.get("storage_warehouse") or {}
+        storage_id = str(storage.get("warehouse_id") or "")
+        storage_name = str(storage.get("name") or "").strip()
         city = storage_name or storage_id or "UNKNOWN"
         city_key = _norm_city(city)
         bundle_id = str(supply.get("bundle_id") or "").strip()
