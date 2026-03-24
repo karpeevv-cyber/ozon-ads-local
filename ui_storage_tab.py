@@ -451,6 +451,19 @@ def _load_completed_order_ids(
     seller_client_id: str,
     seller_api_key: str,
 ) -> list[str]:
+    all_states = [
+        "DATA_FILLING",
+        "READY_TO_SUPPLY",
+        "ACCEPTED_AT_SUPPLY_WAREHOUSE",
+        "IN_TRANSIT",
+        "ACCEPTANCE_AT_STORAGE_WAREHOUSE",
+        "REPORTS_CONFIRMATION_AWAITING",
+        "REPORT_REJECTED",
+        "COMPLETED",
+        "REJECTED_AT_SUPPLY_WAREHOUSE",
+        "CANCELLED",
+        "OVERDUE",
+    ]
     out: list[str] = []
     last_id = ""
     seen_last_ids: set[str] = set()
@@ -460,7 +473,7 @@ def _load_completed_order_ids(
         if pages > 2000:
             break
         resp = seller_supply_order_list(
-            filter={"states": ["COMPLETED"]},
+            filter={"states": all_states},
             last_id=last_id,
             limit=100,
             sort_by="ORDER_CREATION",
@@ -689,12 +702,9 @@ def _build_lots_for_order(
     for supply in supplies:
         if not isinstance(supply, dict):
             continue
-        state = str(supply.get("state") or "").strip().upper()
-        if state and state != "COMPLETED":
-            continue
-        storage = supply.get("storage_warehouse") or {}
-        storage_id = str(storage.get("warehouse_id") or "")
-        storage_name = str(storage.get("name") or "").strip()
+            storage = supply.get("storage_warehouse") or {}
+            storage_id = str(storage.get("warehouse_id") or "")
+            storage_name = str(storage.get("name") or "").strip()
         city = storage_name or storage_id or "UNKNOWN"
         city_key = _norm_city(city)
         bundle_id = str(supply.get("bundle_id") or "").strip()
