@@ -367,7 +367,6 @@ def render_stocks_new_tab(
             )
     df_candidates = pd.DataFrame(candidate_rows)
 
-    status_map = {True: "#F9B24B"}
     grade_color_map = {
         "DEFICIT": "#83FFB3",
         "POPULAR": "#D5FFE5",
@@ -386,8 +385,10 @@ def render_stocks_new_tab(
                     key = _cell_review_key(article=str(article), city=str(city))
                     approved = bool((review_state.get(key, {}) or {}).get("approve", True))
                     if approved:
-                        color = status_map.get(True, color)
-                        styles.at[article, city] = f"background-color: {color}; font-weight: 700"
+                        if color:
+                            styles.at[article, city] = f"background-color: {color}; font-weight: 700"
+                        else:
+                            styles.at[article, city] = "font-weight: 700"
                     elif color:
                         styles.at[article, city] = f"background-color: {color}"
                 elif color:
@@ -407,8 +408,8 @@ def render_stocks_new_tab(
 
     st.markdown(
         "**Legend:** "
-        "Approved candidate = orange. "
-        "Regular turnover colors stay for the rest."
+        "Approved candidate = bold text. "
+        "Regular turnover colors stay unchanged."
     )
     st.caption("Cell format: Stock/Need60/InTransit")
 
