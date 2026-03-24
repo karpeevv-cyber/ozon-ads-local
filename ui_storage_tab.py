@@ -575,6 +575,95 @@ def _save_bundle_items_cache(seller_client_id: str, cache: dict[tuple[str, str, 
         pass
 
 
+def _order_lots_cache_path(seller_client_id: str) -> Path:
+    return Path(f"storage_order_lots_cache_{seller_client_id}.pkl")
+
+
+def _load_order_lots_cache(seller_client_id: str) -> dict[str, dict]:
+    path = _order_lots_cache_path(seller_client_id)
+    if not path.exists():
+        return {}
+    try:
+        with path.open("rb") as f:
+            payload = pickle.load(f) or {}
+        if isinstance(payload, dict):
+            return payload
+    except Exception:
+        pass
+    return {}
+
+
+def _save_order_lots_cache(seller_client_id: str, cache: dict[str, dict]) -> None:
+    try:
+        with _order_lots_cache_path(seller_client_id).open("wb") as f:
+            pickle.dump(cache, f)
+    except Exception:
+        pass
+
+
+def _bootstrap_order_lots_cache_from_storage_cache(seller_client_id: str) -> dict[str, dict]:
+    payload, _ts, _source = _load_storage_cache_payload(seller_client_id, "v12")
+    lot_rows = payload.get("lot_rows", []) if isinstance(payload, dict) else []
+    if not lot_rows:
+        return {}
+    out: dict[str, dict] = {}
+    for row in lot_rows:
+        if not isinstance(row, dict):
+            continue
+        oid = str(row.get("order_id") or "").strip()
+        article = str(row.get("article") or "").strip()
+        arrival_date = str(row.get("arrival_date") or "").strip()
+        if not oid or not article or not arrival_date:
+            continue
+        try:
+            arrival_dt = datetime.fromisoformat(arrival_date)
+        except Exception:
+            continue
+        lot = {
+            "city": str(row.get("shipment_city", "") or row.get("storage_warehouse_name", "")).strip(),
+            "city_key": str(row.get("city_key", "")).strip(),
+            "storage_warehouse_name": str(row.get("storage_warehouse_name", "")).strip(),
+            "storage_warehouse_id": str(row.get("storage_warehouse_id", "")).strip(),
+            "article": article,
+            "order_id": oid,
+            "order_number": str(row.get("order_number", "")).strip(),
+            "bundle_id": str(row.get("bundle_id", "")).strip(),
+            "arrival_dt": arrival_dt,
+            "qty": _to_float(row.get("shipped_qty", 0)),
+        }
+        out.setdefault(oid, {"signature": None, "lots": []})
+        out[oid]["lots"].append(lot)
+    return out
+
+
+def _order_signature(order: dict) -> tuple:
+    dropoff = order.get("drop_off_warehouse") or {}
+    supplies = order.get("supplies", []) or []
+    normalized_supplies: list[tuple] = []
+    for supply in supplies:
+        if not isinstance(supply, dict):
+            continue
+        storage = supply.get("storage_warehouse") or {}
+        normalized_supplies.append(
+            (
+                str(supply.get("bundle_id") or "").strip(),
+                str(supply.get("state") or "").strip().upper(),
+                str(storage.get("warehouse_id") or "").strip(),
+                str(storage.get("name") or "").strip(),
+                str(storage.get("arrival_date") or "").strip(),
+            )
+        )
+    normalized_supplies.sort()
+    return (
+        str(order.get("order_id") or "").strip(),
+        str(order.get("order_number") or "").strip(),
+        str(order.get("created_date") or "").strip(),
+        str(order.get("state_updated_date") or "").strip(),
+        str(dropoff.get("warehouse_id") or "").strip(),
+        tuple(normalized_supplies),
+    )
+
+
 def _arrival_dt_for_order(order: dict, supply: dict) -> datetime | None:
     arr = _to_dt((supply.get("storage_warehouse") or {}).get("arrival_date"))
     if arr is not None:
@@ -585,57 +674,55 @@ def _arrival_dt_for_order(order: dict, supply: dict) -> datetime | None:
     return _to_dt(order.get("created_date"))
 
 
-def _build_lots_by_city_article(
+def _build_lots_for_order(
     *,
-    orders_by_id: dict[str, dict],
+    oid: str,
+    order: dict,
     seller_client_id: str,
     seller_api_key: str,
-) -> dict[tuple[str, str], list[dict]]:
-    lots: dict[tuple[str, str], list[dict]] = {}
-    bundle_items_cache = _load_bundle_items_cache(seller_client_id)
-    bundle_items_cache_changed = False
-    for oid, order in orders_by_id.items():
-        dropoff = order.get("drop_off_warehouse") or {}
-        dropoff_id = str(dropoff.get("warehouse_id") or "")
-        supplies = order.get("supplies", []) or []
-        for supply in supplies:
-            if not isinstance(supply, dict):
+    bundle_items_cache: dict[tuple[str, str, str], list[dict]],
+) -> list[dict]:
+    out: list[dict] = []
+    dropoff = order.get("drop_off_warehouse") or {}
+    dropoff_id = str(dropoff.get("warehouse_id") or "")
+    supplies = order.get("supplies", []) or []
+    for supply in supplies:
+        if not isinstance(supply, dict):
+            continue
+        state = str(supply.get("state") or "").strip().upper()
+        if state and state != "COMPLETED":
+            continue
+        storage = supply.get("storage_warehouse") or {}
+        storage_id = str(storage.get("warehouse_id") or "")
+        storage_name = str(storage.get("name") or "").strip()
+        city = storage_name or storage_id or "UNKNOWN"
+        city_key = _norm_city(city)
+        bundle_id = str(supply.get("bundle_id") or "").strip()
+        if not bundle_id or not dropoff_id or not storage_id:
+            continue
+        arrival_dt = _arrival_dt_for_order(order, supply)
+        if arrival_dt is None:
+            continue
+        bundle_cache_key = (bundle_id, dropoff_id, storage_id)
+        items = bundle_items_cache.get(bundle_cache_key)
+        if items is None:
+            items = _load_bundle_items(
+                bundle_id=bundle_id,
+                dropoff_warehouse_id=dropoff_id,
+                storage_warehouse_id=storage_id,
+                seller_client_id=seller_client_id,
+                seller_api_key=seller_api_key,
+            )
+            bundle_items_cache[bundle_cache_key] = items
+        for it in items:
+            article = str(it.get("offer_id") or "").strip()
+            if not article:
                 continue
-            state = str(supply.get("state") or "").strip().upper()
-            if state and state != "COMPLETED":
+            qty = _to_float(it.get("quantity", 0))
+            if qty <= 0:
                 continue
-            storage = supply.get("storage_warehouse") or {}
-            storage_id = str(storage.get("warehouse_id") or "")
-            storage_name = str(storage.get("name") or "").strip()
-            city = storage_name or storage_id or "UNKNOWN"
-            city_key = _norm_city(city)
-            bundle_id = str(supply.get("bundle_id") or "").strip()
-            if not bundle_id or not dropoff_id or not storage_id:
-                continue
-            arrival_dt = _arrival_dt_for_order(order, supply)
-            if arrival_dt is None:
-                continue
-            bundle_cache_key = (bundle_id, dropoff_id, storage_id)
-            items = bundle_items_cache.get(bundle_cache_key)
-            if items is None:
-                items = _load_bundle_items(
-                    bundle_id=bundle_id,
-                    dropoff_warehouse_id=dropoff_id,
-                    storage_warehouse_id=storage_id,
-                    seller_client_id=seller_client_id,
-                    seller_api_key=seller_api_key,
-                )
-                bundle_items_cache[bundle_cache_key] = items
-                bundle_items_cache_changed = True
-            for it in items:
-                article = str(it.get("offer_id") or "").strip()
-                if not article:
-                    continue
-                qty = _to_float(it.get("quantity", 0))
-                if qty <= 0:
-                    continue
-                key = (city_key, article)
-                lot = {
+            out.append(
+                {
                     "city": city,
                     "city_key": city_key,
                     "storage_warehouse_name": storage_name or city,
@@ -647,11 +734,54 @@ def _build_lots_by_city_article(
                     "arrival_dt": arrival_dt,
                     "qty": qty,
                 }
-                lots.setdefault(key, []).append(lot)
+            )
+    return out
+
+
+def _build_lots_by_city_article(
+    *,
+    orders_by_id: dict[str, dict],
+    seller_client_id: str,
+    seller_api_key: str,
+) -> dict[tuple[str, str], list[dict]]:
+    lots: dict[tuple[str, str], list[dict]] = {}
+    bundle_items_cache = _load_bundle_items_cache(seller_client_id)
+    order_lots_cache = _load_order_lots_cache(seller_client_id)
+    if not order_lots_cache:
+        order_lots_cache = _bootstrap_order_lots_cache_from_storage_cache(seller_client_id)
+    bundle_items_cache_changed = False
+    order_lots_cache_changed = False
+    active_order_ids = {str(oid) for oid in orders_by_id.keys()}
+    for oid, order in orders_by_id.items():
+        sig = _order_signature(order)
+        cached = order_lots_cache.get(str(oid)) or {}
+        cached_lots = cached.get("lots", []) or []
+        if cached.get("signature") == sig and cached_lots:
+            order_lots = cached_lots
+        else:
+            order_lots = _build_lots_for_order(
+                oid=str(oid),
+                order=order,
+                seller_client_id=seller_client_id,
+                seller_api_key=seller_api_key,
+                bundle_items_cache=bundle_items_cache,
+            )
+            order_lots_cache[str(oid)] = {"signature": sig, "lots": order_lots}
+            order_lots_cache_changed = True
+            bundle_items_cache_changed = True
+        for lot in order_lots:
+            key = (str(lot.get("city_key") or ""), str(lot.get("article") or ""))
+            lots.setdefault(key, []).append(lot)
+    stale_order_ids = [oid for oid in list(order_lots_cache.keys()) if oid not in active_order_ids]
+    for oid in stale_order_ids:
+        order_lots_cache.pop(oid, None)
+        order_lots_cache_changed = True
     for key in lots:
         lots[key].sort(key=lambda x: x["arrival_dt"])
     if bundle_items_cache_changed:
         _save_bundle_items_cache(seller_client_id, bundle_items_cache)
+    if order_lots_cache_changed:
+        _save_order_lots_cache(seller_client_id, order_lots_cache)
     return lots
 
 
