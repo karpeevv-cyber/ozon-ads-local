@@ -428,6 +428,15 @@ if selected_company and prev_company != selected_company:
     st.session_state.cache_loaded = False
 
 def _resolve_sidebar_date_defaults(company_name: str | None) -> tuple[date, date]:
+    cached = normalize_ui_state_cache(load_ui_state_cache(UI_STATE_CACHE_PATH))
+    cached_company = str(cached.get("selected_company") or "").strip()
+    cached_from = str(cached.get("date_from") or "").strip()
+    cached_to = str(cached.get("date_to") or "").strip()
+    if str(company_name or "").strip() == cached_company and cached_from and cached_to:
+        try:
+            return date.fromisoformat(cached_from), date.fromisoformat(cached_to)
+        except Exception:
+            pass
     return default_window()
 
 
