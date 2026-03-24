@@ -24,7 +24,7 @@ def _review_state_path(*, seller_client_id: str) -> Path:
     return Path(f"stocks_review_state_{seller_client_id}.pkl")
 
 
-def _load_review_state(*, seller_client_id: str) -> dict[str, str]:
+def _load_review_state(*, seller_client_id: str) -> dict[str, bool]:
     path = _review_state_path(seller_client_id=seller_client_id)
     if not path.exists():
         return {}
@@ -33,21 +33,24 @@ def _load_review_state(*, seller_client_id: str) -> dict[str, str]:
             payload = pickle.load(f) or {}
     except Exception:
         return {}
-    out: dict[str, str] = {}
+    out: dict[str, bool] = {}
     for key, value in payload.items():
+        if isinstance(value, bool):
+            out[str(key)] = value
+            continue
         status = str(value or "").strip().lower()
-        if status in {"pending", "approved", "rejected"}:
-            out[str(key)] = status
+        if status in {"pending", "approved"}:
+            out[str(key)] = True
+        elif status == "rejected":
+            out[str(key)] = False
     return out
 
 
-def _save_review_state(*, seller_client_id: str, state: dict[str, str]) -> None:
+def _save_review_state(*, seller_client_id: str, state: dict[str, bool]) -> None:
     path = _review_state_path(seller_client_id=seller_client_id)
     payload = {}
     for key, value in state.items():
-        status = str(value or "").strip().lower()
-        if status in {"pending", "approved", "rejected"}:
-            payload[str(key)] = status
+        payload[str(key)] = bool(value)
     try:
         with path.open("wb") as f:
             pickle.dump(payload, f)
@@ -344,12 +347,12 @@ def render_stocks_new_tab(
                     "target_value": int(round(target_now)),
                     "suggested_order": max(0, int(round(target_now - total_now))),
                     "rule_type": "Need60" if _is_moscow_or_spb(str(city)) else "Regional threshold",
-                    "status": review_state.get(key, "pending").capitalize(),
+                    "approve": bool(review_state.get(key, True)),
                 }
             )
     df_candidates = pd.DataFrame(candidate_rows)
 
-    status_map = {"Pending": "#FFE699", "Approved": "#B7E1CD", "Rejected": "#D9D9D9"}
+    status_map = {True: "#B7E1CD", False: "#D9D9D9"}
     grade_color_map = {
         "DEFICIT": "#83FFB3",
         "POPULAR": "#D5FFE5",
@@ -366,8 +369,8 @@ def render_stocks_new_tab(
                 color = grade_color_map.get(grade, "")
                 if review_mode and bool(candidate_mask.at[article, city]):
                     key = _cell_review_key(article=str(article), city=str(city))
-                    status = review_state.get(key, "pending").capitalize()
-                    color = status_map.get(status, color)
+                    approved = bool(review_state.get(key, True))
+                    color = status_map.get(approved, color)
                     styles.at[article, city] = f"background-color: {color}; font-weight: 700"
                 elif color:
                     styles.at[article, city] = f"background-color: {color}"
@@ -379,15 +382,14 @@ def render_stocks_new_tab(
         transit_val = int(round(float(transit.at[article, city])))
         if review_mode and bool(candidate_mask.at[article, city]):
             key = _cell_review_key(article=str(article), city=str(city))
-            status = review_state.get(key, "pending")
-            prefix = {"pending": "!", "approved": "+", "rejected": "x"}.get(status, "!")
+            approved = bool(review_state.get(key, True))
+            prefix = "+" if approved else "x"
             return f"{prefix} {base} | {ads60} | {transit_val}"
         return f"{base} | {ads60} | {transit_val}"
 
     st.markdown(
         "**Legend:** "
-        "Pending candidate = yellow. "
-        "Approved = green. "
+        "Approved candidate = green. "
         "Rejected = gray. "
         "Regular turnover colors stay for the rest."
     )
@@ -404,7 +406,7 @@ def render_stocks_new_tab(
     metric_cols[2].metric("Candidates", len(df_candidates))
     metric_cols[3].metric(
         "Approved",
-        0 if df_candidates.empty else int((df_candidates["status"] == "Approved").sum()),
+        0 if df_candidates.empty else int(df_candidates["approve"].sum()),
     )
 
     row_h = 35
@@ -422,13 +424,15 @@ def render_stocks_new_tab(
         return
 
     review_filter = st.selectbox(
-        "Review status filter",
-        ["ALL", "PENDING", "APPROVED", "REJECTED"],
+        "Review filter",
+        ["ALL", "APPROVED", "UNCHECKED"],
         index=0,
         key=f"{settings_key}:review_filter",
     )
-    if review_filter != "ALL":
-        df_candidates = df_candidates[df_candidates["status"].str.upper() == review_filter].copy()
+    if review_filter == "APPROVED":
+        df_candidates = df_candidates[df_candidates["approve"] == True].copy()
+    elif review_filter == "UNCHECKED":
+        df_candidates = df_candidates[df_candidates["approve"] == False].copy()
 
     editor_columns = [
         "article",
@@ -442,7 +446,7 @@ def render_stocks_new_tab(
         "target_value",
         "suggested_order",
         "rule_type",
-        "status",
+        "approve",
     ]
     edited = st.data_editor(
         df_candidates[["review_key"] + editor_columns],
@@ -464,10 +468,10 @@ def render_stocks_new_tab(
         ],
         column_config={
             "review_key": None,
-            "status": st.column_config.SelectboxColumn(
-                "status",
-                options=["Pending", "Approved", "Rejected"],
-                required=True,
+            "approve": st.column_config.CheckboxColumn(
+                "approve",
+                help="Leave checked to accept ordering for this article and city.",
+                default=True,
             ),
         },
         key=f"{settings_key}:review_editor",
@@ -479,13 +483,10 @@ def render_stocks_new_tab(
         key = str(row.get("review_key") or "")
         if not key:
             continue
-        new_status = str(row.get("status") or "Pending").strip().lower()
-        if new_status not in {"pending", "approved", "rejected"}:
-            new_status = "pending"
-        if updated_state.get(key, "pending") != new_status:
-            updated_state[key] = new_status
+        new_value = bool(row.get("approve", True))
+        if bool(updated_state.get(key, True)) != new_value:
+            updated_state[key] = new_value
             changed = True
     if changed:
         st.session_state[review_state_key] = updated_state
         _save_review_state(seller_client_id=str(seller_client_id), state=updated_state)
-        st.rerun()
