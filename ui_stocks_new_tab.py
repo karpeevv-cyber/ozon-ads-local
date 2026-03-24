@@ -440,6 +440,20 @@ def render_stocks_new_tab(
         if not approved_orders.empty
         else pd.DataFrame()
     )
+    if not df_orders.empty:
+        df_orders_display = df_orders.copy().astype(object)
+        for article in df_orders.index:
+            for city in df_orders.columns:
+                order_qty = int(df_orders.at[article, city])
+                if order_qty <= 0:
+                    df_orders_display.at[article, city] = "-"
+                    continue
+                stock_val = int(round(float(stock.at[article, city]))) if city in stock.columns and article in stock.index else 0
+                need60_val = int(round(float(need60.at[article, city]))) if city in need60.columns and article in need60.index else 0
+                transit_val = int(round(float(transit.at[article, city]))) if city in transit.columns and article in transit.index else 0
+                df_orders_display.at[article, city] = f"{order_qty} ({stock_val}/{need60_val}/{transit_val})"
+    else:
+        df_orders_display = pd.DataFrame()
 
     row_h = 35
     header_h = 38
@@ -532,4 +546,4 @@ def render_stocks_new_tab(
 
     if not df_orders.empty:
         st.markdown("### Saved Orders")
-        st.dataframe(df_orders.replace(0, "-").astype(object), width="stretch")
+        st.dataframe(df_orders_display, width="stretch")
