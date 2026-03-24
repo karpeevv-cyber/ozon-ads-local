@@ -72,13 +72,19 @@ def _save_review_state(*, seller_client_id: str, state: dict[str, dict[str, int 
         pass
 
 
-def _ensure_stocks_rows(*, seller_client_id: str, seller_api_key: str) -> tuple[list[dict], datetime | None, int]:
+def _ensure_stocks_rows(*, seller_client_id: str, seller_api_key: str, refresh: bool = False) -> tuple[list[dict], datetime | None, int]:
     cache_version = "v2"
     cache_key = f"stocks:{cache_version}:{seller_client_id}"
     ts_key = f"{cache_key}:ts"
     cache_file = Path(f"stocks_cache_{cache_version}_{seller_client_id}.pkl")
 
-    if cache_key not in st.session_state and cache_file.exists():
+    if refresh:
+        st.session_state.pop(cache_key, None)
+        st.session_state.pop(ts_key, None)
+        st.session_state.pop(f"{cache_key}:sku_count", None)
+        st.session_state.pop(f"{cache_key}:rows_count", None)
+
+    if cache_key not in st.session_state and cache_file.exists() and not refresh:
         try:
             with cache_file.open("rb") as f:
                 payload = pickle.load(f) or {}
@@ -222,11 +228,13 @@ def render_stocks_new_tab(
     review_state_key = f"stocks:new:review:{seller_client_id}"
     if review_state_key not in st.session_state:
         st.session_state[review_state_key] = _load_review_state(seller_client_id=str(seller_client_id))
+    refresh_stocks = st.button("Refresh stocks", key=f"{settings_key}:refresh")
     arrivals_text_map = _load_arrivals_text_map(seller_client_id=str(seller_client_id))
 
     rows, ts, sku_count = _ensure_stocks_rows(
         seller_client_id=str(seller_client_id),
         seller_api_key=str(seller_api_key),
+        refresh=bool(refresh_stocks),
     )
     if ts:
         st.caption(f"As of: {ts.strftime('%d.%m.%Y %H:%M')}")
