@@ -448,45 +448,49 @@ def render_stocks_new_tab(
         "rule_type",
         "approve",
     ]
-    edited = st.data_editor(
-        df_candidates[["review_key"] + editor_columns],
-        width="stretch",
-        hide_index=True,
-        disabled=[
-            "review_key",
-            "article",
-            "sku title",
-            "city",
-            "stock",
-            "need60",
-            "in_transit",
-            "total_with_transit",
-            "trigger_value",
-            "target_value",
-            "suggested_order",
-            "rule_type",
-        ],
-        column_config={
-            "review_key": None,
-            "approve": st.column_config.CheckboxColumn(
-                "approve",
-                help="Leave checked to accept ordering for this article and city.",
-                default=True,
-            ),
-        },
-        key=f"{settings_key}:review_editor",
-    )
+    with st.form(key=f"{settings_key}:review_form"):
+        edited = st.data_editor(
+            df_candidates[["review_key"] + editor_columns],
+            width="stretch",
+            hide_index=True,
+            disabled=[
+                "review_key",
+                "article",
+                "sku title",
+                "city",
+                "stock",
+                "need60",
+                "in_transit",
+                "total_with_transit",
+                "trigger_value",
+                "target_value",
+                "suggested_order",
+                "rule_type",
+            ],
+            column_config={
+                "review_key": None,
+                "approve": st.column_config.CheckboxColumn(
+                    "approve",
+                    help="Leave checked to accept ordering for this article and city.",
+                    default=True,
+                ),
+            },
+            key=f"{settings_key}:review_editor",
+        )
+        save_clicked = st.form_submit_button("Save approvals", width="stretch")
 
-    updated_state = dict(review_state)
-    changed = False
-    for row in edited.to_dict("records"):
-        key = str(row.get("review_key") or "")
-        if not key:
-            continue
-        new_value = bool(row.get("approve", True))
-        if bool(updated_state.get(key, True)) != new_value:
-            updated_state[key] = new_value
-            changed = True
-    if changed:
-        st.session_state[review_state_key] = updated_state
-        _save_review_state(seller_client_id=str(seller_client_id), state=updated_state)
+    if save_clicked:
+        updated_state = dict(review_state)
+        changed = False
+        for row in edited.to_dict("records"):
+            key = str(row.get("review_key") or "")
+            if not key:
+                continue
+            new_value = bool(row.get("approve", True))
+            if bool(updated_state.get(key, True)) != new_value:
+                updated_state[key] = new_value
+                changed = True
+        if changed:
+            st.session_state[review_state_key] = updated_state
+            _save_review_state(seller_client_id=str(seller_client_id), state=updated_state)
+            st.success("Approvals saved.")
