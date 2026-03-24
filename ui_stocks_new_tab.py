@@ -532,4 +532,4 @@ def render_stocks_new_tab(
 
     if not df_orders.empty:
         st.markdown("### Saved Orders")
-        st.dataframe(df_orders, width="stretch")
+        st.dataframe(df_orders.replace(0, "-").astype(object), width="stretch")
