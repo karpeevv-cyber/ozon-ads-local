@@ -647,7 +647,7 @@ tab_options = [
     "Unit Economics",
     "Unit Economics Products",
     "Finance balance",
-    "Stocks New",
+    "Stocks",
     "Storage",
     "Search Trends",
     "Formulas",
@@ -2403,7 +2403,7 @@ if selected_tab == "Unit Economics Products":
         company_name=selected_company,
     )
 
-if selected_tab == "Stocks New":
+if selected_tab == "Stocks":
     render_stocks_new_tab(seller_client_id=seller_client_id, seller_api_key=seller_api_key)
 
 if selected_tab == "Storage":
