@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import pickle
 
@@ -9,7 +9,12 @@ import pandas as pd
 import streamlit as st
 
 from clients_seller import seller_analytics_stocks
-from ui_storage_tab import _load_storage_cache_payload, _norm_city
+from ui_storage_tab import (
+    _build_lots_by_city_article,
+    _load_completed_order_ids,
+    _load_orders_by_id,
+    _norm_city,
+)
 from ui_stocks_tab import (
     _chunks,
     _is_moscow_or_spb,
@@ -175,53 +180,113 @@ def _ensure_stocks_rows(*, seller_client_id: str, seller_api_key: str, refresh: 
     )
 
 
+def _stocks_shipments_cache_path(*, seller_client_id: str) -> Path:
+    return Path(f"stocks_shipments_cache_{seller_client_id}.pkl")
+
+
+def _build_stocks_shipments_payload(*, seller_client_id: str, seller_api_key: str) -> dict:
+    order_ids = _load_completed_order_ids(
+        seller_client_id=seller_client_id,
+        seller_api_key=seller_api_key,
+    )
+    orders_by_id = _load_orders_by_id(
+        order_ids=order_ids,
+        seller_client_id=seller_client_id,
+        seller_api_key=seller_api_key,
+    )
+    lots_map = _build_lots_by_city_article(
+        orders_by_id=orders_by_id,
+        seller_client_id=seller_client_id,
+        seller_api_key=seller_api_key,
+    )
+    arrivals_grouped: dict[tuple[str, str], list[tuple[str, int]]] = {}
+    article_city_shipments: set[tuple[str, str]] = set()
+    for lots in lots_map.values():
+        for lot in lots:
+            article = str(lot.get("article") or "").strip()
+            city_key = str(lot.get("city_key") or "").strip() or _norm_city(str(lot.get("city") or ""))
+            if not article or not city_key:
+                continue
+            article_city_shipments.add((article, city_key))
+            arrival_dt = lot.get("arrival_dt")
+            arrival_date = arrival_dt.date().isoformat() if isinstance(arrival_dt, datetime) else ""
+            try:
+                qty = int(round(float(lot.get("qty", 0) or 0)))
+            except Exception:
+                qty = 0
+            if arrival_date and qty > 0:
+                arrivals_grouped.setdefault((article, city_key), []).append((arrival_date, qty))
+    arrivals_text_map: dict[tuple[str, str], str] = {}
+    for key, items in arrivals_grouped.items():
+        items = sorted(items, key=lambda x: x[0], reverse=True)
+        arrivals_text_map[key] = "\n".join(f"{dt}: {qty}" for dt, qty in items)
+    return {
+        "ts": datetime.now(),
+        "arrivals_text_map": arrivals_text_map,
+        "article_city_shipments": sorted(list(article_city_shipments)),
+    }
+
+
+def _ensure_stocks_shipments_cache(
+    *,
+    seller_client_id: str,
+    seller_api_key: str,
+    refresh: bool = False,
+) -> tuple[dict[tuple[str, str], str], set[tuple[str, str]], datetime | None]:
+    cache_key = f"stocks_shipments:{seller_client_id}"
+    ts_key = f"{cache_key}:ts"
+    cache_path = _stocks_shipments_cache_path(seller_client_id=seller_client_id)
+    now = datetime.now()
+
+    def _hydrate(payload: dict) -> tuple[dict[tuple[str, str], str], set[tuple[str, str]], datetime | None]:
+        arrivals_raw = payload.get("arrivals_text_map", {}) or {}
+        arrivals = {(str(k[0]), str(k[1])): str(v) for k, v in arrivals_raw.items()} if isinstance(arrivals_raw, dict) else {}
+        shipments_raw = payload.get("article_city_shipments", []) or []
+        shipments = {(str(x[0]), str(x[1])) for x in shipments_raw if isinstance(x, (list, tuple)) and len(x) == 2}
+        ts = payload.get("ts")
+        return arrivals, shipments, ts if isinstance(ts, datetime) else None
+
+    if refresh:
+        st.session_state.pop(cache_key, None)
+        st.session_state.pop(ts_key, None)
+
+    payload = st.session_state.get(cache_key)
+    payload_ts = st.session_state.get(ts_key)
+    is_fresh = isinstance(payload_ts, datetime) and (now - payload_ts) <= timedelta(days=1)
+    if payload and is_fresh and not refresh:
+        arrivals, shipments, ts = _hydrate(payload)
+        return arrivals, shipments, ts
+
+    if cache_path.exists() and not refresh:
+        try:
+            with cache_path.open("rb") as f:
+                payload = pickle.load(f) or {}
+            arrivals, shipments, ts = _hydrate(payload)
+            if ts is not None and (now - ts) <= timedelta(days=1):
+                st.session_state[cache_key] = payload
+                st.session_state[ts_key] = ts
+                return arrivals, shipments, ts
+        except Exception:
+            pass
+
+    payload = _build_stocks_shipments_payload(
+        seller_client_id=seller_client_id,
+        seller_api_key=seller_api_key,
+    )
+    ts = payload.get("ts") if isinstance(payload.get("ts"), datetime) else now
+    st.session_state[cache_key] = payload
+    st.session_state[ts_key] = ts
+    try:
+        with cache_path.open("wb") as f:
+            pickle.dump(payload, f)
+    except Exception:
+        pass
+    arrivals, shipments, ts = _hydrate(payload)
+    return arrivals, shipments, ts
+
+
 def _cell_review_key(*, article: str, city: str) -> str:
     return f"{article}|||{city}"
-
-
-def _load_arrivals_text_map(*, seller_client_id: str) -> dict[tuple[str, str], str]:
-    payload, _ts, _source = _load_storage_cache_payload(seller_client_id, "v12")
-    lot_rows = payload.get("lot_rows", []) if isinstance(payload, dict) else []
-    if not lot_rows:
-        return {}
-    grouped: dict[tuple[str, str], list[tuple[str, int]]] = {}
-    for row in lot_rows:
-        if not isinstance(row, dict):
-            continue
-        article = str(row.get("article") or "").strip()
-        if not article:
-            continue
-        city_key = str(row.get("city_key") or "").strip() or _norm_city(str(row.get("city") or ""))
-        arrival_date = str(row.get("arrival_date") or "").strip()
-        try:
-            shipped_qty = int(round(float(row.get("shipped_qty", 0) or 0)))
-        except Exception:
-            shipped_qty = 0
-        if not city_key or not arrival_date or shipped_qty <= 0:
-            continue
-        grouped.setdefault((article, city_key), []).append((arrival_date, shipped_qty))
-    out: dict[tuple[str, str], str] = {}
-    for key, items in grouped.items():
-        items = sorted(items, key=lambda x: x[0], reverse=True)
-        out[key] = "\n".join(f"{dt}: {qty}" for dt, qty in items)
-    return out
-
-
-def _load_article_city_shipments_map(*, seller_client_id: str) -> set[tuple[str, str]]:
-    payload, _ts, _source = _load_storage_cache_payload(seller_client_id, "v12")
-    lot_rows = payload.get("lot_rows", []) if isinstance(payload, dict) else []
-    if not lot_rows:
-        return set()
-    out: set[tuple[str, str]] = set()
-    for row in lot_rows:
-        if not isinstance(row, dict):
-            continue
-        article = str(row.get("article") or "").strip()
-        city_key = str(row.get("city_key") or "").strip() or _norm_city(str(row.get("city") or ""))
-        if not article or not city_key:
-            continue
-        out.add((article, city_key))
-    return out
 
 
 def _lookup_arrivals_text(*, arrivals_text_map: dict[tuple[str, str], str], article: str, city: str) -> str:
@@ -261,8 +326,11 @@ def render_stocks_new_tab(
     if review_state_key not in st.session_state:
         st.session_state[review_state_key] = _load_review_state(seller_client_id=str(seller_client_id))
     refresh_stocks = st.button("Refresh stocks", key=f"{settings_key}:refresh")
-    arrivals_text_map = _load_arrivals_text_map(seller_client_id=str(seller_client_id))
-    article_city_shipments = _load_article_city_shipments_map(seller_client_id=str(seller_client_id))
+    arrivals_text_map, article_city_shipments, shipments_ts = _ensure_stocks_shipments_cache(
+        seller_client_id=str(seller_client_id),
+        seller_api_key=str(seller_api_key),
+        refresh=bool(refresh_stocks),
+    )
 
     rows, ts, sku_count = _ensure_stocks_rows(
         seller_client_id=str(seller_client_id),
@@ -273,6 +341,8 @@ def render_stocks_new_tab(
         st.caption(f"As of: {ts.strftime('%d.%m.%Y %H:%M')}")
     else:
         st.caption("As of: -")
+    if shipments_ts:
+        st.caption(f"Shipment cache: {shipments_ts.strftime('%d.%m.%Y %H:%M')}")
 
     if not rows:
         st.info(f"No data. SKUs checked: {sku_count}.")
