@@ -207,23 +207,20 @@ def _load_arrivals_text_map(*, seller_client_id: str) -> dict[tuple[str, str], s
     return out
 
 
-def _load_city_shipment_totals_map(*, seller_client_id: str) -> dict[str, int]:
+def _load_article_city_shipments_map(*, seller_client_id: str) -> set[tuple[str, str]]:
     payload, _ts, _source = _load_storage_cache_payload(seller_client_id, "v12")
     lot_rows = payload.get("lot_rows", []) if isinstance(payload, dict) else []
     if not lot_rows:
-        return {}
-    out: dict[str, int] = {}
+        return set()
+    out: set[tuple[str, str]] = set()
     for row in lot_rows:
         if not isinstance(row, dict):
             continue
+        article = str(row.get("article") or "").strip()
         city_key = str(row.get("city_key") or "").strip() or _norm_city(str(row.get("city") or ""))
-        if not city_key:
+        if not article or not city_key:
             continue
-        try:
-            shipped_qty = int(round(float(row.get("shipped_qty", 0) or 0)))
-        except Exception:
-            shipped_qty = 0
-        out[city_key] = out.get(city_key, 0) + max(0, shipped_qty)
+        out.add((article, city_key))
     return out
 
 
@@ -265,7 +262,7 @@ def render_stocks_new_tab(
         st.session_state[review_state_key] = _load_review_state(seller_client_id=str(seller_client_id))
     refresh_stocks = st.button("Refresh stocks", key=f"{settings_key}:refresh")
     arrivals_text_map = _load_arrivals_text_map(seller_client_id=str(seller_client_id))
-    city_shipment_totals_map = _load_city_shipment_totals_map(seller_client_id=str(seller_client_id))
+    article_city_shipments = _load_article_city_shipments_map(seller_client_id=str(seller_client_id))
 
     rows, ts, sku_count = _ensure_stocks_rows(
         seller_client_id=str(seller_client_id),
@@ -398,7 +395,6 @@ def render_stocks_new_tab(
     target_value = need60.copy()
     candidate_mask = pd.DataFrame(False, index=df_pivot.index, columns=df_pivot.columns)
     for col in candidate_mask.columns:
-        city_is_eligible = int(city_shipment_totals_map.get(_norm_city(str(col)), 0) or 0) >= 10
         if _is_moscow_or_spb(str(col)):
             candidate_mask[col] = total_with_transit[col] <= need60[col]
             trigger_value[col] = need60[col]
@@ -407,7 +403,11 @@ def render_stocks_new_tab(
             candidate_mask[col] = total_with_transit[col] <= float(ui_settings.get("regional_order_min", 2))
             trigger_value[col] = float(ui_settings.get("regional_order_min", 2))
             target_value[col] = float(ui_settings.get("regional_order_target", 5))
-        candidate_mask[col] = candidate_mask[col] & city_is_eligible
+        city_key = _norm_city(str(col))
+        candidate_mask[col] = candidate_mask[col] & pd.Series(
+            [(str(article), city_key) in article_city_shipments for article in candidate_mask.index],
+            index=candidate_mask.index,
+        )
 
     review_state = st.session_state.get(review_state_key, {}) or {}
     review_rows: list[dict] = []
