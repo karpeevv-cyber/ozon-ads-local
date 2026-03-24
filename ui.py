@@ -639,6 +639,34 @@ if data_company and selected_company and data_company != selected_company:
     rows_csv = None
     daily_rows = None
 
+if rows_csv:
+    cache_key = make_ui_state_cache_key(selected_company, str(date_from), str(date_to))
+    cache = normalize_ui_state_cache(load_ui_state_cache(UI_STATE_CACHE_PATH))
+    cached_entry = get_ui_state_entry(cache, cache_key) or {}
+    if not cached_entry or len(cached_entry.get("rows_csv", []) or []) != len(rows_csv or []):
+        save_ui_state_entry(
+            UI_STATE_CACHE_PATH,
+            cache_key,
+            {
+                "rows_csv": rows_csv,
+                "rows_count": len(rows_csv),
+                "products_by_campaign_id": products_by_campaign_id,
+                "running_ids": running_ids,
+                "running_count": len(running_ids),
+                "daily_rows": daily_rows,
+                "ads_daily_by_campaign": ads_daily_by_campaign,
+                "by_day_sku": by_day_sku,
+                "date_from": str(date_from),
+                "date_to": str(date_to),
+                "target_drr": st.session_state.get("target_drr", target_drr),
+                "target_drr_pct": st.session_state.get("target_drr_pct", target_drr_pct),
+                "selected_company": selected_company,
+                "cpc_econ_range_map": st.session_state.get("cpc_econ_range_map", {}),
+                "cpc_econ_bounds_map": st.session_state.get("cpc_econ_bounds_map", {}),
+            },
+            selected_company=selected_company,
+        )
+
 tab_options = [
     "Main",
     "All campaigns",
