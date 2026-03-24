@@ -9,6 +9,7 @@ import pandas as pd
 import streamlit as st
 
 from clients_seller import seller_analytics_stocks
+from ui_storage_tab import _load_storage_cache_payload, _norm_city
 from ui_stocks_tab import (
     _chunks,
     _is_moscow_or_spb,
@@ -172,6 +173,34 @@ def _cell_review_key(*, article: str, city: str) -> str:
     return f"{article}|||{city}"
 
 
+def _load_arrivals_text_map(*, seller_client_id: str) -> dict[tuple[str, str], str]:
+    payload, _ts, _source = _load_storage_cache_payload(seller_client_id, "v12")
+    lot_rows = payload.get("lot_rows", []) if isinstance(payload, dict) else []
+    if not lot_rows:
+        return {}
+    grouped: dict[tuple[str, str], list[tuple[str, int]]] = {}
+    for row in lot_rows:
+        if not isinstance(row, dict):
+            continue
+        article = str(row.get("article") or "").strip()
+        if not article:
+            continue
+        city_key = str(row.get("city_key") or "").strip() or _norm_city(str(row.get("city") or ""))
+        arrival_date = str(row.get("arrival_date") or "").strip()
+        try:
+            shipped_qty = int(round(float(row.get("shipped_qty", 0) or 0)))
+        except Exception:
+            shipped_qty = 0
+        if not city_key or not arrival_date or shipped_qty <= 0:
+            continue
+        grouped.setdefault((article, city_key), []).append((arrival_date, shipped_qty))
+    out: dict[tuple[str, str], str] = {}
+    for key, items in grouped.items():
+        items = sorted(items, key=lambda x: x[0], reverse=True)
+        out[key] = "\n".join(f"{dt}: {qty}" for dt, qty in items)
+    return out
+
+
 def render_stocks_new_tab(
     *,
     seller_client_id: str | None,
@@ -193,6 +222,7 @@ def render_stocks_new_tab(
     review_state_key = f"stocks:new:review:{seller_client_id}"
     if review_state_key not in st.session_state:
         st.session_state[review_state_key] = _load_review_state(seller_client_id=str(seller_client_id))
+    arrivals_text_map = _load_arrivals_text_map(seller_client_id=str(seller_client_id))
 
     rows, ts, sku_count = _ensure_stocks_rows(
         seller_client_id=str(seller_client_id),
@@ -361,6 +391,7 @@ def render_stocks_new_tab(
                     "target_value": int(round(target_now)),
                     "suggested_order": suggested_order,
                     "order_qty": max(0, int(saved.get("order_qty", suggested_order) or 0)),
+                    "arrivals": arrivals_text_map.get((str(article), _norm_city(str(city))), ""),
                     "approve": bool(saved.get("approve", default_approve)),
                     "is_candidate": bool(candidate_mask.at[article, city]),
                 }
@@ -489,6 +520,7 @@ def render_stocks_new_tab(
         "stock",
         "need60",
         "in_transit",
+        "arrivals",
         "suggested_order",
         "order_qty",
         "is_candidate",
@@ -506,6 +538,7 @@ def render_stocks_new_tab(
                 "stock",
                 "need60",
                 "in_transit",
+                "arrivals",
                 "suggested_order",
                 "is_candidate",
             ],
