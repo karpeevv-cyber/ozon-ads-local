@@ -669,7 +669,9 @@ def render_storage_tab(
     cache_file = Path(f"storage_cache_{cache_version}_{seller_client_id}.pkl")
     source_key = f"{cache_key}:source"
 
-    refresh = st.button("Refresh storage", key=f"{cache_key}:refresh")
+    btn_cols = st.columns(2)
+    load_cached = btn_cols[0].button("Load cached storage", key=f"{cache_key}:load_cached")
+    refresh = btn_cols[1].button("Refresh storage", key=f"{cache_key}:refresh")
     current_payload = st.session_state.get(cache_key, {}) or {}
     current_lot_rows = current_payload.get("lot_rows", []) if isinstance(current_payload, dict) else []
     if cache_key not in st.session_state or not current_lot_rows:
@@ -678,6 +680,16 @@ def render_storage_tab(
             st.session_state[cache_key] = data
             st.session_state[ts_key] = ts
             st.session_state[source_key] = str(source_path) if source_path is not None else ""
+
+    if load_cached:
+        data, ts, source_path = _load_storage_cache_payload(seller_client_id, cache_version)
+        if data:
+            st.session_state[cache_key] = data
+            st.session_state[ts_key] = ts
+            st.session_state[source_key] = str(source_path) if source_path is not None else ""
+            st.success("Loaded storage from local cache.")
+        else:
+            st.warning("No local storage cache found for this store.")
 
     if refresh:
         try:
