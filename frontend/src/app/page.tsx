@@ -1,8 +1,8 @@
 import { BidAuditPanel } from "@/features/bids/components/BidAuditPanel";
 import { BidApplyCard } from "@/features/bids/components/BidApplyCard";
 import { CampaignFilters } from "@/features/campaigns/components/CampaignFilters";
-import { CampaignOverview } from "@/features/campaigns/components/CampaignOverview";
 import { FinancePanel } from "@/features/finance/components/FinancePanel";
+import { MainDashboard } from "@/features/main/components/MainDashboard";
 import { StocksPanel } from "@/features/stocks/components/StocksPanel";
 import { StoragePanel } from "@/features/storage/components/StoragePanel";
 import { TrendsPanel } from "@/features/trends/components/TrendsPanel";
@@ -237,7 +237,17 @@ async function renderTabContent(params: {
 
   switch (activeTab) {
     case "main": {
-      const [campaigns, report, recentBidChanges, campaignComments] = await Promise.all([
+      const [
+        campaigns,
+        report,
+        recentBidChanges,
+        campaignComments,
+        financeSummary,
+        unitEconomicsSummary,
+        stocksSnapshot,
+        storageSnapshot,
+        trendsSnapshot,
+      ] = await Promise.all([
         getRunningCampaigns(selectedCompany),
         getCampaignReport({
           company: selectedCompany,
@@ -246,15 +256,40 @@ async function renderTabContent(params: {
         }),
         getRecentBidChanges(),
         getCampaignComments(selectedCompany),
+        getFinanceSummary({
+          company: selectedCompany,
+          dateFrom,
+          dateTo,
+        }),
+        getUnitEconomicsSummary({
+          company: selectedCompany,
+          dateFrom,
+          dateTo,
+        }),
+        getStocksSnapshot(selectedCompany),
+        getStorageSnapshot(selectedCompany),
+        getTrendsSnapshot({
+          company: selectedCompany,
+          dateFrom,
+          dateTo,
+        }),
       ]);
 
       return (
         <>
-          <CampaignOverview companies={companies} campaigns={campaigns} report={report} />
-          <section className="dashboard-grid section-grid">
-            <BidApplyCard company={selectedCompany} />
-            <BidAuditPanel changes={recentBidChanges} comments={campaignComments} />
-          </section>
+          <MainDashboard
+            companies={companies}
+            selectedCompany={selectedCompany}
+            campaigns={campaigns}
+            report={report}
+            financeSummary={financeSummary}
+            unitEconomicsSummary={unitEconomicsSummary}
+            stocksSnapshot={stocksSnapshot}
+            storageSnapshot={storageSnapshot}
+            trendsSnapshot={trendsSnapshot}
+            recentBidChanges={recentBidChanges}
+            campaignComments={campaignComments}
+          />
         </>
       );
     }
