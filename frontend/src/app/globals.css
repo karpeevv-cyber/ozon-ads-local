@@ -67,24 +67,49 @@ a {
 }
 
 .nav-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 10px;
   margin-top: 28px;
 }
 
 .nav-pill {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  padding: 10px 14px;
+  justify-content: space-between;
+  padding: 12px 14px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.58);
   font-size: 0.95rem;
+  text-decoration: none;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.nav-pill:hover {
+  transform: translateX(2px);
+  border-color: rgba(125, 47, 27, 0.22);
+}
+
+.nav-pill-active {
+  background: linear-gradient(180deg, rgba(184, 92, 56, 0.16), rgba(184, 92, 56, 0.08));
+  border-color: rgba(125, 47, 27, 0.28);
+  color: var(--accent-deep);
+  font-weight: 700;
 }
 
 .page-content {
   padding: 34px;
+}
+
+.section-grid {
+  margin-top: 4px;
+}
+
+.section-card {
+  margin-top: 4px;
 }
 
 .loading-card,

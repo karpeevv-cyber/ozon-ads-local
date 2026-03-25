@@ -6,6 +6,7 @@ import { FinancePanel } from "@/features/finance/components/FinancePanel";
 import { StocksPanel } from "@/features/stocks/components/StocksPanel";
 import { StoragePanel } from "@/features/storage/components/StoragePanel";
 import { TrendsPanel } from "@/features/trends/components/TrendsPanel";
+import { UnitEconomicsEditor } from "@/features/unit-economics/components/UnitEconomicsEditor";
 import { UnitEconomicsPanel } from "@/features/unit-economics/components/UnitEconomicsPanel";
 import {
   getCampaignComments,
@@ -20,6 +21,7 @@ import {
   getUnitEconomicsProducts,
   getUnitEconomicsSummary,
 } from "@/shared/api/client";
+import { CampaignReport, CompanyConfig, RunningCampaign } from "@/shared/api/types";
 import { AppShell } from "@/shared/ui/AppShell";
 import { getDefaultDateRange } from "@/shared/utils/dates";
 
@@ -28,8 +30,317 @@ type HomePageProps = {
     company?: string;
     date_from?: string;
     date_to?: string;
+    tab?: string;
   }>;
 };
+
+type SupportedTab =
+  | "main"
+  | "all-campaigns"
+  | "current-campaigns"
+  | "tests"
+  | "unit-economics"
+  | "unit-economics-products"
+  | "finance-balance"
+  | "stocks"
+  | "storage"
+  | "search-trends"
+  | "formulas";
+
+const supportedTabs = new Set<SupportedTab>([
+  "main",
+  "all-campaigns",
+  "current-campaigns",
+  "tests",
+  "unit-economics",
+  "unit-economics-products",
+  "finance-balance",
+  "stocks",
+  "storage",
+  "search-trends",
+  "formulas",
+]);
+
+function resolveTab(value?: string): SupportedTab {
+  return supportedTabs.has(value as SupportedTab) ? (value as SupportedTab) : "main";
+}
+
+function PlaceholderPanel({
+  title,
+  eyebrow,
+  copy,
+}: {
+  title: string;
+  eyebrow: string;
+  copy: string;
+}) {
+  return (
+    <article className="panel-card panel-card-wide section-card">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">{eyebrow}</p>
+          <h3>{title}</h3>
+        </div>
+        <span className="status-badge">pending</span>
+      </div>
+      <p className="muted-copy">{copy}</p>
+    </article>
+  );
+}
+
+function CurrentCampaignsPanel({ campaigns }: { campaigns: RunningCampaign[] }) {
+  return (
+    <article className="panel-card panel-card-wide section-card">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Current campaigns</p>
+          <h3>Running campaign list</h3>
+        </div>
+        <span className="status-badge">{campaigns.length} active</span>
+      </div>
+      <div className="list-stack">
+        {campaigns.length === 0 ? (
+          <p className="muted-copy">No running campaigns returned by the backend.</p>
+        ) : (
+          campaigns.map((campaign) => (
+            <div className="list-row" key={campaign.campaign_id}>
+              <div>
+                <strong>{campaign.title || `Campaign ${campaign.campaign_id}`}</strong>
+                <p>
+                  ID {campaign.campaign_id} / State {campaign.state || "unknown"}
+                </p>
+              </div>
+              <span className="status-badge">{campaign.state || "unknown"}</span>
+            </div>
+          ))
+        )}
+      </div>
+    </article>
+  );
+}
+
+function AllCampaignsPanel({ report }: { report: CampaignReport }) {
+  const reportRows = report.rows.filter((row) => row.campaign_id !== "GRAND_TOTAL");
+
+  return (
+    <article className="panel-card panel-card-wide section-card">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">All campaigns</p>
+          <h3>Campaign report by period</h3>
+        </div>
+        <span className="status-badge">{reportRows.length} rows</span>
+      </div>
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>SKU</th>
+              <th>Title</th>
+              <th>Spend</th>
+              <th>Revenue</th>
+              <th>DRR %</th>
+              <th>Clicks</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reportRows.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="empty-cell">
+                  No report rows returned by the backend yet.
+                </td>
+              </tr>
+            ) : (
+              reportRows.map((row, index) => (
+                <tr key={`${row.campaign_id}:${row.sku || "all"}:${index}`}>
+                  <td>{row.campaign_id}</td>
+                  <td>{row.sku || "all"}</td>
+                  <td>{row.title || "Untitled campaign"}</td>
+                  <td>{row.money_spent}</td>
+                  <td>{row.total_revenue}</td>
+                  <td>{row.total_drr_pct}</td>
+                  <td>{row.clicks}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  );
+}
+
+function UnitEconomicsProductsPanel({
+  products,
+}: {
+  products: Awaited<ReturnType<typeof getUnitEconomicsProducts>>;
+}) {
+  return (
+    <>
+      <article className="panel-card panel-card-wide section-card">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Unit economics products</p>
+            <h3>Editable SKU cost matrix</h3>
+          </div>
+          <span className="status-badge">{products.rows.length} sku</span>
+        </div>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Name</th>
+                <th>Tea</th>
+                <th>Package</th>
+                <th>Label</th>
+                <th>Packing</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.rows.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="empty-cell">
+                    No unit economics products loaded yet.
+                  </td>
+                </tr>
+              ) : (
+                products.rows.map((row) => (
+                  <tr key={row.sku}>
+                    <td>{row.sku}</td>
+                    <td>{row.name || row.sku}</td>
+                    <td>{row.tea_cost}</td>
+                    <td>{row.package_cost}</td>
+                    <td>{row.label_cost}</td>
+                    <td>{row.packing_cost}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </article>
+      <UnitEconomicsEditor company={products.company} rows={products.rows} />
+    </>
+  );
+}
+
+async function renderTabContent(params: {
+  activeTab: SupportedTab;
+  selectedCompany: string;
+  dateFrom: string;
+  dateTo: string;
+  companies: CompanyConfig[];
+}) {
+  const { activeTab, selectedCompany, dateFrom, dateTo, companies } = params;
+
+  switch (activeTab) {
+    case "main": {
+      const [campaigns, report, recentBidChanges, campaignComments] = await Promise.all([
+        getRunningCampaigns(selectedCompany),
+        getCampaignReport({
+          company: selectedCompany,
+          dateFrom,
+          dateTo,
+        }),
+        getRecentBidChanges(),
+        getCampaignComments(selectedCompany),
+      ]);
+
+      return (
+        <>
+          <CampaignOverview companies={companies} campaigns={campaigns} report={report} />
+          <section className="dashboard-grid section-grid">
+            <BidApplyCard company={selectedCompany} />
+            <BidAuditPanel changes={recentBidChanges} comments={campaignComments} />
+          </section>
+        </>
+      );
+    }
+    case "all-campaigns": {
+      const report = await getCampaignReport({
+        company: selectedCompany,
+        dateFrom,
+        dateTo,
+      });
+      return <AllCampaignsPanel report={report} />;
+    }
+    case "current-campaigns": {
+      const campaigns = await getRunningCampaigns(selectedCompany);
+      return <CurrentCampaignsPanel campaigns={campaigns} />;
+    }
+    case "tests": {
+      const [recentBidChanges, campaignComments] = await Promise.all([
+        getRecentBidChanges(),
+        getCampaignComments(selectedCompany),
+      ]);
+      return (
+        <section className="dashboard-grid section-grid">
+          <BidApplyCard company={selectedCompany} />
+          <BidAuditPanel changes={recentBidChanges} comments={campaignComments} />
+        </section>
+      );
+    }
+    case "unit-economics": {
+      const [summary, products] = await Promise.all([
+        getUnitEconomicsSummary({
+          company: selectedCompany,
+          dateFrom,
+          dateTo,
+        }),
+        getUnitEconomicsProducts({
+          company: selectedCompany,
+          dateFrom,
+          dateTo,
+        }),
+      ]);
+      return <UnitEconomicsPanel summary={summary} products={products} />;
+    }
+    case "unit-economics-products": {
+      const products = await getUnitEconomicsProducts({
+        company: selectedCompany,
+        dateFrom,
+        dateTo,
+      });
+      return <UnitEconomicsProductsPanel products={products} />;
+    }
+    case "finance-balance": {
+      const summary = await getFinanceSummary({
+        company: selectedCompany,
+        dateFrom,
+        dateTo,
+      });
+      return <FinancePanel summary={summary} />;
+    }
+    case "stocks": {
+      const snapshot = await getStocksSnapshot(selectedCompany);
+      return <StocksPanel snapshot={snapshot} />;
+    }
+    case "storage": {
+      const snapshot = await getStorageSnapshot(selectedCompany);
+      return <StoragePanel snapshot={snapshot} />;
+    }
+    case "search-trends": {
+      const snapshot = await getTrendsSnapshot({
+        company: selectedCompany,
+        dateFrom,
+        dateTo,
+      });
+      return <TrendsPanel snapshot={snapshot} />;
+    }
+    case "formulas":
+      return (
+        <PlaceholderPanel
+          eyebrow="Formulas"
+          title="Formula workspace"
+          copy="This section is reserved for formula logic and decision calculators. The navigation is ready; the feature module still needs to be extracted into the new stack."
+        />
+      );
+    default:
+      return null;
+  }
+}
 
 export default async function HomePage({ searchParams }: HomePageProps) {
   const resolvedSearchParams = (await searchParams) || {};
@@ -38,68 +349,24 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const selectedCompany = resolvedSearchParams.company || companies[0]?.name || "default";
   const dateFrom = resolvedSearchParams.date_from || defaultRange.dateFrom;
   const dateTo = resolvedSearchParams.date_to || defaultRange.dateTo;
-  const [
-    campaigns,
-    report,
-    recentBidChanges,
-    campaignComments,
-    stocksSnapshot,
-    storageSnapshot,
-    financeSummary,
-    trendsSnapshot,
-    unitEconomicsSummary,
-    unitEconomicsProducts,
-  ] = await Promise.all([
-    getRunningCampaigns(selectedCompany),
-    getCampaignReport({
-      company: selectedCompany,
-      dateFrom,
-      dateTo,
-    }),
-    getRecentBidChanges(),
-    getCampaignComments(selectedCompany),
-    getStocksSnapshot(selectedCompany),
-    getStorageSnapshot(selectedCompany),
-    getFinanceSummary({
-      company: selectedCompany,
-      dateFrom,
-      dateTo,
-    }),
-    getTrendsSnapshot({
-      company: selectedCompany,
-      dateFrom,
-      dateTo,
-    }),
-    getUnitEconomicsSummary({
-      company: selectedCompany,
-      dateFrom,
-      dateTo,
-    }),
-    getUnitEconomicsProducts({
-      company: selectedCompany,
-      dateFrom,
-      dateTo,
-    }),
-  ]);
+  const activeTab = resolveTab(resolvedSearchParams.tab);
+  const content = await renderTabContent({
+    activeTab,
+    selectedCompany,
+    dateFrom,
+    dateTo,
+    companies,
+  });
 
   return (
-    <AppShell>
+    <AppShell activeTab={activeTab} company={selectedCompany} dateFrom={dateFrom} dateTo={dateTo}>
       <CampaignFilters
         companies={companies}
         selectedCompany={selectedCompany}
         dateFrom={dateFrom}
         dateTo={dateTo}
       />
-      <CampaignOverview companies={companies} campaigns={campaigns} report={report} />
-      <section className="dashboard-grid">
-        <BidApplyCard company={selectedCompany} />
-        <BidAuditPanel changes={recentBidChanges} comments={campaignComments} />
-        <StocksPanel snapshot={stocksSnapshot} />
-        <StoragePanel snapshot={storageSnapshot} />
-        <FinancePanel summary={financeSummary} />
-        <TrendsPanel snapshot={trendsSnapshot} />
-        <UnitEconomicsPanel summary={unitEconomicsSummary} products={unitEconomicsProducts} />
-      </section>
+      {content}
     </AppShell>
   );
 }
