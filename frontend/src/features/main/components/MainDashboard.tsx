@@ -42,6 +42,7 @@ function RevenueChart({ overview }: MainDashboardProps) {
 
   const maxRevenue = Math.max(...rows.map((row) => Number(row.total_revenue || 0)), 1);
   const compactClassName = rows.length > 18 ? " revenue-chart-compact" : rows.length > 12 ? " revenue-chart-tight" : "";
+  const labelStep = rows.length > 24 ? 4 : rows.length > 16 ? 3 : rows.length > 10 ? 2 : 1;
 
   return (
     <article className="panel-card panel-card-wide section-card">
@@ -56,16 +57,17 @@ function RevenueChart({ overview }: MainDashboardProps) {
         className={`revenue-chart${compactClassName}`}
         style={{ gridTemplateColumns: `repeat(${rows.length}, minmax(0, 1fr))` }}
       >
-        {rows.map((row) => {
+        {rows.map((row, index) => {
           const revenue = Number(row.total_revenue || 0);
           const height = Math.max(8, (revenue / maxRevenue) * 180);
+          const showLabel = index % labelStep === 0 || index === rows.length - 1;
           return (
             <div className="chart-col" key={row.day}>
-              <div className="chart-value">{formatMoney(revenue)}</div>
+              <div className="chart-value">{showLabel ? formatMoney(revenue) : ""}</div>
               <div className="chart-bar-wrap">
                 <div className="chart-bar" style={{ height: `${height}px` }} />
               </div>
-              <div className="chart-label">{formatDay(row.day)}</div>
+              <div className="chart-label">{showLabel ? formatDay(row.day) : ""}</div>
             </div>
           );
         })}
