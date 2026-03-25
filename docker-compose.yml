@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: ozon_ads
-      POSTGRES_USER: ozon_ads
-      POSTGRES_PASSWORD: ozon_ads
+      POSTGRES_DB: ${POSTGRES_DB:-ozon_ads}
+      POSTGRES_USER: ${POSTGRES_USER:-ozon_ads}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ozon_ads}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ozon_ads -d ozon_ads"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ozon_ads} -d ${POSTGRES_DB:-ozon_ads}"]
       interval: 10s
       timeout: 5s
       retries: 5
