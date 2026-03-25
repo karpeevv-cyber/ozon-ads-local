@@ -244,6 +244,11 @@ a {
   gap: 20px;
 }
 
+.main-dashboard .panel-card,
+.main-dashboard .panel-card-wide {
+  grid-column: span 12;
+}
+
 .hero-card,
 .panel-card {
   border: 1px solid var(--line);

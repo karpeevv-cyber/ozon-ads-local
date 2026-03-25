@@ -206,7 +206,7 @@ function DailyTable({ overview }: MainDashboardProps) {
 
 export function MainDashboard({ overview }: MainDashboardProps) {
   return (
-    <section className="dashboard-grid section-grid">
+    <section className="dashboard-grid section-grid main-dashboard">
       <RevenueChart overview={overview} />
       <WeeklyTable overview={overview} />
       <DailyTable overview={overview} />
