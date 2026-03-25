@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import time
+
 import requests
 
 SELLER_BASE = "https://api-seller.ozon.ru"
@@ -9,20 +10,20 @@ _SESSION = requests.Session()
 
 
 def must_env(name: str) -> str:
-    v = os.getenv(name)
-    if not v:
-        raise RuntimeError(f"Не задано в .env: {name}")
-    return v
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
 
 
-def parse_money(x) -> float:
-    if x is None:
+def parse_money(value) -> float:
+    if value is None:
         return 0.0
-    if isinstance(x, (int, float)):
-        return float(x)
-    s = str(x).strip().replace(" ", "").replace(",", ".")
+    if isinstance(value, (int, float)):
+        return float(value)
+    raw = str(value).strip().replace(" ", "").replace(",", ".")
     try:
-        return float(s)
+        return float(raw)
     except ValueError:
         return 0.0
 
@@ -35,22 +36,18 @@ def _post_with_backoff(
     timeout: int = 60,
     max_retries: int = 6,
 ):
-    """
-    Seller API часто отвечает 429. Для /v1/analytics/data по доке есть лимиты.
-    Делаем backoff (учитываем Retry-After если он есть).
-    """
     backoff = 2.0
     last_exc = None
 
     for _attempt in range(max_retries):
         try:
-            r = _SESSION.post(url, json=body, headers=headers, timeout=timeout)
+            response = _SESSION.post(url, json=body, headers=headers, timeout=timeout)
 
-            if r.status_code == 429:
-                ra = r.headers.get("Retry-After")
-                if ra:
+            if response.status_code == 429:
+                retry_after = response.headers.get("Retry-After")
+                if retry_after:
                     try:
-                        sleep_s = float(ra)
+                        sleep_s = float(retry_after)
                     except Exception:
                         sleep_s = backoff
                 else:
@@ -60,16 +57,15 @@ def _post_with_backoff(
                 backoff = min(backoff * 2, 70.0)
                 continue
 
-            if 500 <= r.status_code < 600:
+            if 500 <= response.status_code < 600:
                 time.sleep(backoff)
                 backoff = min(backoff * 2, 70.0)
                 continue
 
-            r.raise_for_status()
-            return r
-
-        except requests.RequestException as e:
-            last_exc = e
+            response.raise_for_status()
+            return response
+        except requests.RequestException as exc:
+            last_exc = exc
             time.sleep(backoff)
             backoff = min(backoff * 2, 70.0)
 
@@ -86,16 +82,6 @@ def seller_analytics_sku_day(
     client_id: str | None = None,
     api_key: str | None = None,
 ):
-    """
-    POST /v1/analytics/data
-
-    dimension=["sku","day"], metrics=["revenue","ordered_units"]
-
-    Возвращаем:
-      - by_sku: dict sku -> (revenue_sum, units_sum) за период
-      - by_day: dict day -> (revenue_sum, units_sum) за период
-      - by_day_sku: dict (day, sku) -> (revenue, units)
-    """
     url = f"{SELLER_BASE}/v1/analytics/data"
     headers = {
         "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
@@ -117,23 +103,20 @@ def seller_analytics_sku_day(
             "offset": int(offset),
         }
 
-        r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
-        j = r.json()
-        data = j.get("result", {}).get("data", []) or []
+        response = _post_with_backoff(url, headers=headers, body=body, timeout=60)
+        data = response.json().get("result", {}).get("data", []) or []
 
         if not data:
             break
 
         for row in data:
             dims = row.get("dimensions", []) or []
-            mets = row.get("metrics", []) or []
+            metrics = row.get("metrics", []) or []
 
-            # dimensions: ["sku","day"] -> [0]=sku, [1]=day
             sku = str(dims[0].get("id")) if len(dims) > 0 else ""
             day = str(dims[1].get("id")) if len(dims) > 1 else ""
-
-            revenue = parse_money(mets[0]) if len(mets) > 0 else 0.0
-            units_raw = mets[1] if len(mets) > 1 else 0
+            revenue = parse_money(metrics[0]) if len(metrics) > 0 else 0.0
+            units_raw = metrics[1] if len(metrics) > 1 else 0
             try:
                 units = int(units_raw) if units_raw is not None else 0
             except Exception:
@@ -142,33 +125,34 @@ def seller_analytics_sku_day(
             if not sku or not day:
                 continue
 
-            # (day, sku)
-            prev = by_day_sku.get((day, sku))
-            if prev is None:
+            prev_day_sku = by_day_sku.get((day, sku))
+            if prev_day_sku is None:
                 by_day_sku[(day, sku)] = (revenue, units)
             else:
-                by_day_sku[(day, sku)] = (prev[0] + revenue, prev[1] + units)
+                by_day_sku[(day, sku)] = (prev_day_sku[0] + revenue, prev_day_sku[1] + units)
 
-            # sku totals
-            prev_s = by_sku.get(sku)
-            if prev_s is None:
+            prev_sku = by_sku.get(sku)
+            if prev_sku is None:
                 by_sku[sku] = (revenue, units)
             else:
-                by_sku[sku] = (prev_s[0] + revenue, prev_s[1] + units)
+                by_sku[sku] = (prev_sku[0] + revenue, prev_sku[1] + units)
 
-            # day totals
-            prev_d = by_day.get(day)
-            if prev_d is None:
+            prev_day = by_day.get(day)
+            if prev_day is None:
                 by_day[day] = (revenue, units)
             else:
-                by_day[day] = (prev_d[0] + revenue, prev_d[1] + units)
+                by_day[day] = (prev_day[0] + revenue, prev_day[1] + units)
 
         if len(data) < limit:
             break
-
         offset += limit
 
     return by_sku, by_day, by_day_sku
+
+
+def seller_total_sales_all(date_from: str, date_to: str, limit: int = 1000):
+    by_sku, _by_day, _by_day_sku = seller_analytics_sku_day(date_from, date_to, limit=limit)
+    return by_sku
 
 
 def seller_analytics_data(
@@ -184,9 +168,6 @@ def seller_analytics_data(
     client_id: str | None = None,
     api_key: str | None = None,
 ):
-    """
-    Generic wrapper for POST /v1/analytics/data.
-    """
     url = f"{SELLER_BASE}/v1/analytics/data"
     headers = {
         "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
@@ -204,17 +185,8 @@ def seller_analytics_data(
         body["filters"] = filters
     if sort:
         body["sort"] = sort
-    r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
-    return r.json()
-
-
-def seller_total_sales_all(date_from: str, date_to: str, limit: int = 1000):
-    """
-    Backward-compatible wrapper.
-    Старый код ожидал sku -> (revenue, units) за период.
-    """
-    by_sku, _by_day, _by_day_sku = seller_analytics_sku_day(date_from, date_to, limit=limit)
-    return by_sku
+    response = _post_with_backoff(url, headers=headers, body=body, timeout=60)
+    return response.json()
 
 
 def seller_product_queries_details(
@@ -232,9 +204,6 @@ def seller_product_queries_details(
     timeout: int = 20,
     max_retries: int = 2,
 ):
-    """
-    POST /v1/analytics/product-queries/details
-    """
     url = f"{SELLER_BASE}/v1/analytics/product-queries/details"
     headers = {
         "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
@@ -246,49 +215,18 @@ def seller_product_queries_details(
         "limit_by_sku": int(limit_by_sku),
         "page": int(page),
         "page_size": int(page_size),
-        "skus": [str(s) for s in skus],
+        "skus": [str(sku) for sku in skus],
         "sort_by": sort_by,
         "sort_dir": sort_dir,
     }
-    r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
-    return r.json()
-
-
-def seller_product_info_prices(
-    *,
-    offer_ids: list[str] | None = None,
-    product_ids: list[str] | None = None,
-    visibility: str = "ALL",
-    cursor: str = "",
-    limit: int = 100,
-    client_id: str | None = None,
-    api_key: str | None = None,
-):
-    """
-    POST /v5/product/info/prices
-    """
-    url = f"{SELLER_BASE}/v5/product/info/prices"
-    headers = {
-        "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
-        "Api-Key": api_key or must_env("SELLER_API_KEY"),
-    }
-    body = {
-        "cursor": cursor,
-        "filter": {
-            "offer_id": [str(x) for x in (offer_ids or [])],
-            "product_id": [str(x) for x in (product_ids or [])],
-            "visibility": visibility,
-        },
-        "limit": int(limit),
-    }
-    r = _post_with_backoff(
+    response = _post_with_backoff(
         url,
         headers=headers,
         body=body,
         timeout=int(timeout),
         max_retries=int(max_retries),
     )
-    return r.json()
+    return response.json()
 
 
 def seller_finance_balance(
@@ -298,9 +236,6 @@ def seller_finance_balance(
     client_id: str | None = None,
     api_key: str | None = None,
 ):
-    """
-    POST /v1/finance/balance
-    """
     url = f"{SELLER_BASE}/v1/finance/balance"
     headers = {
         "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
@@ -310,8 +245,8 @@ def seller_finance_balance(
         "date_from": date_from,
         "date_to": date_to,
     }
-    r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
-    return r.json()
+    response = _post_with_backoff(url, headers=headers, body=body, timeout=60)
+    return response.json()
 
 
 def seller_product_list(
@@ -322,9 +257,6 @@ def seller_product_list(
     client_id: str | None = None,
     api_key: str | None = None,
 ):
-    """
-    POST /v3/product/list
-    """
     url = f"{SELLER_BASE}/v3/product/list"
     headers = {
         "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
@@ -335,8 +267,8 @@ def seller_product_list(
         "limit": int(limit),
         "filter": {"visibility": visibility},
     }
-    r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
-    return r.json()
+    response = _post_with_backoff(url, headers=headers, body=body, timeout=60)
+    return response.json()
 
 
 def seller_product_info_list(
@@ -345,17 +277,14 @@ def seller_product_info_list(
     client_id: str | None = None,
     api_key: str | None = None,
 ):
-    """
-    POST /v3/product/info/list
-    """
     url = f"{SELLER_BASE}/v3/product/info/list"
     headers = {
         "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
         "Api-Key": api_key or must_env("SELLER_API_KEY"),
     }
     body = {"product_id": [int(pid) for pid in product_ids if str(pid).isdigit()]}
-    r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
-    return r.json()
+    response = _post_with_backoff(url, headers=headers, body=body, timeout=60)
+    return response.json()
 
 
 def seller_analytics_stocks(
@@ -368,27 +297,22 @@ def seller_analytics_stocks(
     client_id: str | None = None,
     api_key: str | None = None,
 ):
-    """
-    POST /v1/analytics/stocks
-    """
     url = f"{SELLER_BASE}/v1/analytics/stocks"
     headers = {
         "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
         "Api-Key": api_key or must_env("SELLER_API_KEY"),
     }
-    body = {
-        "skus": [int(s) for s in skus if str(s).isdigit()],
-    }
+    body = {"skus": [int(sku) for sku in skus if str(sku).isdigit()]}
     if cluster_ids:
-        body["cluster_ids"] = [int(c) for c in cluster_ids]
+        body["cluster_ids"] = [int(cluster_id) for cluster_id in cluster_ids]
     if warehouse_ids:
-        body["warehouse_ids"] = [str(w) for w in warehouse_ids]
+        body["warehouse_ids"] = [str(warehouse_id) for warehouse_id in warehouse_ids]
     if turnover_grades:
         body["turnover_grades"] = turnover_grades
     if item_tags:
         body["item_tags"] = item_tags
-    r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
-    return r.json()
+    response = _post_with_backoff(url, headers=headers, body=body, timeout=60)
+    return response.json()
 
 
 def seller_supply_order_list(
@@ -401,9 +325,6 @@ def seller_supply_order_list(
     client_id: str | None = None,
     api_key: str | None = None,
 ):
-    """
-    POST /v3/supply-order/list
-    """
     url = f"{SELLER_BASE}/v3/supply-order/list"
     headers = {
         "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
@@ -416,8 +337,8 @@ def seller_supply_order_list(
         "sort_by": str(sort_by),
         "sort_dir": str(sort_dir),
     }
-    r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
-    return r.json()
+    response = _post_with_backoff(url, headers=headers, body=body, timeout=60)
+    return response.json()
 
 
 def seller_supply_order_get(
@@ -426,15 +347,12 @@ def seller_supply_order_get(
     client_id: str | None = None,
     api_key: str | None = None,
 ):
-    """
-    POST /v3/supply-order/get
-    """
     url = f"{SELLER_BASE}/v3/supply-order/get"
     headers = {
         "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
         "Api-Key": api_key or must_env("SELLER_API_KEY"),
     }
-    ids = [str(x) for x in order_ids if str(x).strip()]
+    ids = [str(value) for value in order_ids if str(value).strip()]
     body_variants = [
         {"order_ids": ids},
         {"supply_order_ids": ids},
@@ -443,46 +361,13 @@ def seller_supply_order_get(
     last_exc = None
     for body in body_variants:
         try:
-            r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
-            return r.json()
-        except Exception as e:
-            last_exc = e
+            response = _post_with_backoff(url, headers=headers, body=body, timeout=60)
+            return response.json()
+        except Exception as exc:
+            last_exc = exc
     if last_exc:
         raise last_exc
     raise RuntimeError("seller_supply_order_get failed without exception")
-
-
-def seller_supply_order_bundle(
-    *,
-    order_id: str,
-    client_id: str | None = None,
-    api_key: str | None = None,
-):
-    """
-    POST /v1/supply-order/bundle
-    """
-    url = f"{SELLER_BASE}/v1/supply-order/bundle"
-    headers = {
-        "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
-        "Api-Key": api_key or must_env("SELLER_API_KEY"),
-    }
-    oid = str(order_id)
-    body_variants = [
-        {"order_id": oid},
-        {"supply_order_id": oid},
-        {"order_ids": [oid]},
-        {"supply_order_ids": [oid]},
-    ]
-    last_exc = None
-    for body in body_variants:
-        try:
-            r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
-            return r.json()
-        except Exception as e:
-            last_exc = e
-    if last_exc:
-        raise last_exc
-    raise RuntimeError("seller_supply_order_bundle failed without exception")
 
 
 def seller_supply_order_bundle_query(
@@ -497,26 +382,22 @@ def seller_supply_order_bundle_query(
     client_id: str | None = None,
     api_key: str | None = None,
 ):
-    """
-    POST /v1/supply-order/bundle
-    Exact schema used by Ozon docs for bundle listing by bundle_ids.
-    """
     url = f"{SELLER_BASE}/v1/supply-order/bundle"
     headers = {
         "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
         "Api-Key": api_key or must_env("SELLER_API_KEY"),
     }
     body = {
-        "bundle_ids": [str(x) for x in bundle_ids if str(x).strip()],
+        "bundle_ids": [str(value) for value in bundle_ids if str(value).strip()],
         "is_asc": bool(is_asc),
         "item_tags_calculation": {
             "dropoff_warehouse_id": str(dropoff_warehouse_id),
-            "storage_warehouse_ids": [str(x) for x in storage_warehouse_ids if str(x).strip()],
+            "storage_warehouse_ids": [str(value) for value in storage_warehouse_ids if str(value).strip()],
         },
         "limit": int(limit),
         "sort_field": str(sort_field),
     }
     if str(last_id or "").strip():
         body["last_id"] = str(last_id)
-    r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
-    return r.json()
+    response = _post_with_backoff(url, headers=headers, body=body, timeout=60)
+    return response.json()

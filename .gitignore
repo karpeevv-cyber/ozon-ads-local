@@ -5,3 +5,16 @@ b/.env
 bb/.env
 campaign_comments.csv
 bid_changes.csv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.db
+.venv/
+node_modules/
+.next/
+backend/data/
+streamlit_start.log
+streamlit_start.err.log
+unit_economics_products_*.csv

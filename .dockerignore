@@ -1,0 +1,17 @@
+.git
+.gitignore
+.venv
+.vscode
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.pkl
+.env
+node_modules
+.next
+app.log
+streamlit_start.log
+streamlit_start.err.log
+ui_state_cache.pkl

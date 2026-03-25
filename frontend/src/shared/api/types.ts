@@ -1,0 +1,243 @@
+export type CompanyConfig = {
+  name: string;
+  perf_client_id: string;
+  perf_client_secret: string;
+  seller_client_id: string;
+  seller_api_key: string;
+};
+
+export type RunningCampaign = {
+  campaign_id: string;
+  title: string;
+  state: string;
+};
+
+export type CampaignReportRow = {
+  campaign_id: string;
+  sku: string;
+  title: string;
+  money_spent: string;
+  views: string;
+  clicks: string;
+  click_price: string;
+  orders_money_ads: string;
+  total_revenue: string;
+  ordered_units: string;
+  total_drr_pct: string;
+  ctr: number;
+  cr: number;
+  vor: number;
+  vpo: number;
+};
+
+export type CampaignReport = {
+  company: string;
+  date_from: string;
+  date_to: string;
+  target_drr_pct: number;
+  running_campaigns_count: number;
+  rows: CampaignReportRow[];
+};
+
+export type LoginPayload = {
+  email: string;
+  password: string;
+};
+
+export type TokenResponse = {
+  access_token: string;
+  token_type: string;
+};
+
+export type CurrentUser = {
+  id: number;
+  email: string;
+  full_name: string;
+  is_active: boolean;
+  is_admin: boolean;
+};
+
+export type BidChangeRecord = {
+  ts_iso: string;
+  date: string;
+  campaign_id: string;
+  sku: string;
+  old_bid_micro: number | null;
+  new_bid_micro: number | null;
+  reason: string;
+  comment: string;
+};
+
+export type CampaignCommentRecord = {
+  ts: string;
+  day: string;
+  week: string;
+  company: string;
+  campaign_id: string;
+  comment: string;
+};
+
+export type ApplyBidPayload = {
+  company?: string;
+  campaign_id: string;
+  sku: string;
+  bid_rub: number;
+  reason: string;
+  comment?: string;
+};
+
+export type ApplyBidResponse = {
+  company: string;
+  campaign_id: string;
+  sku: string;
+  old_bid_micro: number | null;
+  new_bid_micro: number;
+  reason: string;
+  comment: string;
+};
+
+export type StockRow = {
+  sku: string;
+  article: string;
+  title: string;
+  offer_id: string;
+  cluster: string;
+  turnover_grade: string;
+  available_stock_count: number;
+  ads_cluster: number;
+  transit_stock_count: number;
+};
+
+export type StocksSnapshot = {
+  company: string;
+  seller_client_id: string;
+  sku_count: number;
+  rows: StockRow[];
+};
+
+export type StorageRiskRow = {
+  city: string;
+  article: string;
+  fee_from_date: string;
+  days_until_fee_start: number;
+  sales_per_day: number;
+  qty_remaining_now: number;
+  qty_expected_at_fee_start: number;
+  volume_expected_liters: number;
+  estimated_daily_fee_rub: number;
+};
+
+export type StorageSnapshot = {
+  company: string;
+  seller_client_id: string;
+  sku_count: number;
+  order_count: number;
+  ship_lot_count: number;
+  stock_articles_count: number;
+  lot_rows: Record<string, unknown>[];
+  risk_rows: StorageRiskRow[];
+  unknown_stock_rows: Record<string, unknown>[];
+};
+
+export type FinanceRow = {
+  day: string;
+  opening_balance: number;
+  closing_balance: number;
+  change: number;
+  sales: number;
+  fee: number;
+  acquiring: number;
+  payments: number;
+  logistics: number;
+  returns: number;
+  storage: number;
+  marketing: number;
+  logistics_pct: number;
+};
+
+export type FinanceSummary = {
+  company: string;
+  date_from: string;
+  date_to: string;
+  rows: FinanceRow[];
+  totals: Record<string, number>;
+};
+
+export type TrendItem = {
+  id: string;
+  title: string;
+  trend_score: number;
+  confidence_score: number;
+  risk_score: number;
+  summary?: string;
+  reason_tags?: string;
+  products_count?: number;
+  revenue?: number;
+};
+
+export type TrendsSnapshot = {
+  niches: TrendItem[];
+  products: TrendItem[];
+  external_sources: Record<string, unknown>[];
+  errors: string[];
+  meta: Record<string, unknown>;
+};
+
+export type UnitEconomicsDayRow = {
+  day: string;
+  revenue: number;
+  ebitda_total: number;
+  tea_cost: number;
+  package_cost: number;
+  label_cost: number;
+  packing_cost: number;
+  delivery_fbo: number;
+  promotion: number;
+  ozon_percent_cost: number;
+  ozon_logistics: number;
+  other_costs: number;
+  review_points: number;
+  seller_bonuses: number;
+  taxes: number;
+  units_sold: number;
+};
+
+export type UnitEconomicsSummary = {
+  company: string;
+  date_from: string;
+  date_to: string;
+  rows: UnitEconomicsDayRow[];
+  totals: Record<string, number>;
+  totals_pct: Record<string, number | string>;
+};
+
+export type UnitEconomicsProductRow = {
+  sku: string;
+  name: string;
+  tea_cost: number;
+  package_cost: number;
+  label_cost: number;
+  packing_cost: number;
+};
+
+export type UnitEconomicsProducts = {
+  company: string;
+  date_from: string;
+  date_to: string;
+  rows: UnitEconomicsProductRow[];
+};
+
+export type UnitEconomicsProductUpdateRow = {
+  sku: string;
+  position: string;
+  tea_cost: number;
+  package_cost: number;
+  label_cost: number;
+  packing_cost: number;
+};
+
+export type UnitEconomicsProductsUpdateResponse = {
+  company: string;
+  rows: UnitEconomicsProductRow[];
+  saved_count: number;
+};

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from functools import lru_cache, wraps
 from datetime import date
+from functools import lru_cache
 import os
 import re
 
 import pandas as pd
 
-from clients_seller import (
+from app.services.integrations.ozon_seller import (
     seller_analytics_data,
     seller_product_info_list,
     seller_product_list,
@@ -17,47 +17,13 @@ from clients_seller import (
 
 ENABLE_QUERY_SIGNALS = os.getenv("TRENDS_ENABLE_QUERY_SIGNALS", "0").strip().lower() in {"1", "true", "yes"}
 
-try:
-    import streamlit as st  # type: ignore
-except Exception:  # pragma: no cover - fallback for non-Streamlit runtime
-    st = None
-
-try:
-    from streamlit.runtime import exists as streamlit_runtime_exists  # type: ignore
-except Exception:  # pragma: no cover - fallback for non-Streamlit runtime
-    streamlit_runtime_exists = lambda: False
-
-
-def cache_data(*, show_spinner: bool = False, ttl: int | None = None):
-    if st is not None and streamlit_runtime_exists():
-        return st.cache_data(show_spinner=show_spinner, ttl=ttl)
-
-    def decorator(func):
-        def _cached_call(*args, normalized_kwargs):
-            return func(*args, **dict(normalized_kwargs))
-
-        cached = lru_cache(maxsize=32)(_cached_call)
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            return cached(*args, tuple(sorted(kwargs.items())))
-
-        wrapper.clear = cached.cache_clear
-        return wrapper
-
-    return decorator
-
 
 def _normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", str(value or "").strip())
 
 
-@cache_data(show_spinner=False, ttl=900)
-def load_catalog(
-    *,
-    seller_client_id: str | None,
-    seller_api_key: str | None,
-) -> pd.DataFrame:
+@lru_cache(maxsize=32)
+def _load_catalog_cached(seller_client_id: str | None, seller_api_key: str | None) -> tuple[dict, ...]:
     product_ids: list[str] = []
     last_id = ""
     seen_last_ids: set[str] = set()
@@ -105,20 +71,27 @@ def load_catalog(
                     "offer_id": _normalize_text(item.get("offer_id") or ""),
                 }
             )
-    df = pd.DataFrame(rows)
+    return tuple(rows)
+
+
+def load_catalog(
+    *,
+    seller_client_id: str | None,
+    seller_api_key: str | None,
+) -> pd.DataFrame:
+    df = pd.DataFrame(list(_load_catalog_cached(seller_client_id, seller_api_key)))
     if df.empty:
         return pd.DataFrame(columns=["sku", "product_id", "title", "offer_id"])
     return df.drop_duplicates(subset=["sku"]).copy()
 
 
-@cache_data(show_spinner=False, ttl=900)
-def load_sales_history(
-    *,
+@lru_cache(maxsize=64)
+def _load_sales_history_cached(
     date_from: str,
     date_to: str,
     seller_client_id: str | None,
     seller_api_key: str | None,
-) -> pd.DataFrame:
+) -> tuple[dict, ...]:
     rows: list[dict] = []
     offset = 0
     limit = 1000
@@ -150,8 +123,17 @@ def load_sales_history(
         if len(data) < limit:
             break
         offset += limit
+    return tuple(rows)
 
-    df = pd.DataFrame(rows)
+
+def load_sales_history(
+    *,
+    date_from: str,
+    date_to: str,
+    seller_client_id: str | None,
+    seller_api_key: str | None,
+) -> pd.DataFrame:
+    df = pd.DataFrame(list(_load_sales_history_cached(date_from, date_to, seller_client_id, seller_api_key)))
     if df.empty:
         return pd.DataFrame(columns=["sku", "day", "revenue", "ordered_units"])
     df["day"] = pd.to_datetime(df["day"], errors="coerce")
@@ -196,17 +178,16 @@ def _extract_query_row(raw: dict, sku: str) -> dict | None:
     }
 
 
-@cache_data(show_spinner=False, ttl=900)
-def load_query_signals(
-    *,
+@lru_cache(maxsize=64)
+def _load_query_signals_cached(
     date_from: str,
     date_to: str,
     skus: tuple[str, ...],
     seller_client_id: str | None,
     seller_api_key: str | None,
-) -> pd.DataFrame:
+) -> tuple[dict, ...]:
     if not ENABLE_QUERY_SIGNALS:
-        return pd.DataFrame(columns=["sku", "query", "searches", "growth", "revenue"])
+        return tuple()
     rows: list[dict] = []
     batch_size = 5
     for offset in range(0, len(skus), batch_size):
@@ -244,8 +225,18 @@ def load_query_signals(
             row = _extract_query_row(item, sku)
             if row is not None:
                 rows.append(row)
+    return tuple(rows)
 
-    df = pd.DataFrame(rows)
+
+def load_query_signals(
+    *,
+    date_from: str,
+    date_to: str,
+    skus: tuple[str, ...],
+    seller_client_id: str | None,
+    seller_api_key: str | None,
+) -> pd.DataFrame:
+    df = pd.DataFrame(list(_load_query_signals_cached(date_from, date_to, skus, seller_client_id, seller_api_key)))
     if df.empty:
         return pd.DataFrame(columns=["sku", "query", "searches", "growth", "revenue"])
     return df

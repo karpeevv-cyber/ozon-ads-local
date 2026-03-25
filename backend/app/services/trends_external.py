@@ -1,48 +1,19 @@
 from __future__ import annotations
 
-from functools import lru_cache, wraps
+from functools import lru_cache
 import re
 
 import requests
 
-try:
-    import streamlit as st  # type: ignore
-except Exception:  # pragma: no cover - fallback for non-Streamlit runtime
-    st = None
-
-try:
-    from streamlit.runtime import exists as streamlit_runtime_exists  # type: ignore
-except Exception:  # pragma: no cover - fallback for non-Streamlit runtime
-    streamlit_runtime_exists = lambda: False
-
 
 SUGGEST_ENDPOINT = "https://suggestqueries.google.com/complete/search"
 TRANSLIT_MAP = {
-    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e",
-    "ж": "zh", "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m",
-    "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
-    "ф": "f", "х": "h", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "sch", "ъ": "",
-    "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+    "Р°": "a", "Р±": "b", "РІ": "v", "Рі": "g", "Рґ": "d", "Рµ": "e", "С‘": "e",
+    "Р¶": "zh", "Р·": "z", "Рё": "i", "Р№": "y", "Рє": "k", "Р»": "l", "Рј": "m",
+    "РЅ": "n", "Рѕ": "o", "Рї": "p", "СЂ": "r", "СЃ": "s", "С‚": "t", "Сѓ": "u",
+    "С„": "f", "С…": "h", "С†": "ts", "С‡": "ch", "С€": "sh", "С‰": "sch", "СЉ": "",
+    "С‹": "y", "СЊ": "", "СЌ": "e", "СЋ": "yu", "СЏ": "ya",
 }
-
-
-def cache_data(*, show_spinner: bool = False, ttl: int | None = None):
-    if st is not None and streamlit_runtime_exists():
-        return st.cache_data(show_spinner=show_spinner, ttl=ttl)
-
-    def decorator(func):
-        @lru_cache(maxsize=64)
-        def cached(*args, normalized_kwargs):
-            return func(*args, **dict(normalized_kwargs))
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            return cached(*args, tuple(sorted(kwargs.items())))
-
-        wrapper.clear = cached.cache_clear
-        return wrapper
-
-    return decorator
 
 
 def _normalize_text(value: str) -> str:
@@ -62,31 +33,22 @@ def _transliterate(value: str) -> str:
     return "".join(out)
 
 
-@cache_data(show_spinner=False, ttl=3600)
-def fetch_google_suggestions(
-    *,
-    term: str,
-    hl: str = "ru",
-    ds: str = "",
-) -> list[str]:
-    params = {
-        "client": "firefox",
-        "hl": hl,
-        "q": _normalize_text(term),
-    }
+@lru_cache(maxsize=256)
+def _fetch_google_suggestions(term: str, hl: str, ds: str) -> tuple[str, ...]:
+    params = {"client": "firefox", "hl": hl, "q": _normalize_text(term)}
     if ds:
         params["ds"] = ds
     resp = requests.get(SUGGEST_ENDPOINT, params=params, timeout=20)
     resp.raise_for_status()
-    return _parse_suggest_payload(resp.json())
+    return tuple(_parse_suggest_payload(resp.json()))
 
 
-@cache_data(show_spinner=False, ttl=3600)
-def load_external_suggestion_signals(
-    *,
-    terms: tuple[str, ...],
-    hl: str = "ru",
-) -> dict[str, dict[str, list[str]]]:
+def fetch_google_suggestions(*, term: str, hl: str = "ru", ds: str = "") -> list[str]:
+    return list(_fetch_google_suggestions(_normalize_text(term), hl, ds))
+
+
+@lru_cache(maxsize=64)
+def _load_external_suggestion_signals_cached(terms: tuple[str, ...], hl: str) -> dict[str, dict[str, list[str]]]:
     out: dict[str, dict[str, list[str]]] = {}
     for term in terms:
         norm_term = _normalize_text(term)
@@ -109,17 +71,17 @@ def load_external_suggestion_signals(
             try:
                 web_suggestions = fetch_google_suggestions(term=transliterated, hl="en", ds="")
             except Exception:
-                web_suggestions = web_suggestions
+                pass
         if transliterated and transliterated != norm_term and not youtube_suggestions:
             try:
                 youtube_suggestions = fetch_google_suggestions(term=transliterated, hl="en", ds="yt")
             except Exception:
-                youtube_suggestions = youtube_suggestions
+                pass
         if transliterated and transliterated != norm_term and not shopping_suggestions:
             try:
                 shopping_suggestions = fetch_google_suggestions(term=transliterated, hl="en", ds="sh")
             except Exception:
-                shopping_suggestions = shopping_suggestions
+                pass
         out[norm_term] = {
             "web": web_suggestions[:8],
             "youtube": youtube_suggestions[:8],
@@ -127,3 +89,12 @@ def load_external_suggestion_signals(
             "transliterated": [transliterated] if transliterated and transliterated != norm_term else [],
         }
     return out
+
+
+def load_external_suggestion_signals(
+    *,
+    terms: tuple[str, ...],
+    hl: str = "ru",
+) -> dict[str, dict[str, list[str]]]:
+    normalized_terms = tuple(term for term in (_normalize_text(item) for item in terms) if term)
+    return _load_external_suggestion_signals_cached(normalized_terms, hl)
