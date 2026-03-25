@@ -418,17 +418,23 @@ a {
 
 .revenue-chart {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(96px, 96px);
   gap: 14px;
   align-items: end;
   min-height: 250px;
   padding-top: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
 }
 
 .chart-col {
   display: grid;
   gap: 10px;
   align-items: end;
+  min-width: 0;
 }
 
 .chart-value,
