@@ -1,19 +1,9 @@
 from __future__ import annotations
 
-from functools import lru_cache, wraps
 import re
 
 import requests
-
-try:
-    import streamlit as st  # type: ignore
-except Exception:  # pragma: no cover - fallback for non-Streamlit runtime
-    st = None
-
-try:
-    from streamlit.runtime import exists as streamlit_runtime_exists  # type: ignore
-except Exception:  # pragma: no cover - fallback for non-Streamlit runtime
-    streamlit_runtime_exists = lambda: False
+import streamlit as st
 
 
 SUGGEST_ENDPOINT = "https://suggestqueries.google.com/complete/search"
@@ -24,25 +14,6 @@ TRANSLIT_MAP = {
     "ф": "f", "х": "h", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "sch", "ъ": "",
     "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
 }
-
-
-def cache_data(*, show_spinner: bool = False, ttl: int | None = None):
-    if st is not None and streamlit_runtime_exists():
-        return st.cache_data(show_spinner=show_spinner, ttl=ttl)
-
-    def decorator(func):
-        @lru_cache(maxsize=64)
-        def cached(*args, normalized_kwargs):
-            return func(*args, **dict(normalized_kwargs))
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            return cached(*args, tuple(sorted(kwargs.items())))
-
-        wrapper.clear = cached.cache_clear
-        return wrapper
-
-    return decorator
 
 
 def _normalize_text(value: str) -> str:
@@ -62,7 +33,7 @@ def _transliterate(value: str) -> str:
     return "".join(out)
 
 
-@cache_data(show_spinner=False, ttl=3600)
+@st.cache_data(show_spinner=False, ttl=3600)
 def fetch_google_suggestions(
     *,
     term: str,
@@ -81,7 +52,7 @@ def fetch_google_suggestions(
     return _parse_suggest_payload(resp.json())
 
 
-@cache_data(show_spinner=False, ttl=3600)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_external_suggestion_signals(
     *,
     terms: tuple[str, ...],

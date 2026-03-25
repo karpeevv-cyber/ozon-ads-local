@@ -229,8 +229,6 @@ def seller_product_queries_details(
     sort_dir: str = "DESCENDING",
     client_id: str | None = None,
     api_key: str | None = None,
-    timeout: int = 20,
-    max_retries: int = 2,
 ):
     """
     POST /v1/analytics/product-queries/details
@@ -281,13 +279,7 @@ def seller_product_info_prices(
         },
         "limit": int(limit),
     }
-    r = _post_with_backoff(
-        url,
-        headers=headers,
-        body=body,
-        timeout=int(timeout),
-        max_retries=int(max_retries),
-    )
+    r = _post_with_backoff(url, headers=headers, body=body, timeout=60)
     return r.json()
 
 

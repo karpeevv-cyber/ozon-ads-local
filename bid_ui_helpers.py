@@ -102,7 +102,7 @@ def add_bid_columns_daily(
     campaign_id: str,
     sku: str,
     day_col: str = "day",
-    out_change_col: str = "Bid change",
+    out_change_col: str = "Изменение bid",
 ) -> pd.DataFrame:
     if df_daily is None or df_daily.empty:
         return df_daily
@@ -136,7 +136,7 @@ def add_bid_columns_weekly(
     campaign_id: str,
     sku: str,
     week_col: str = "week",  # YYYY-MM-DD (week start)
-    out_change_col: str = "Bid change",
+    out_change_col: str = "Изменение bid",
 ) -> pd.DataFrame:
     if df_weekly is None or df_weekly.empty:
         return df_weekly
@@ -171,7 +171,7 @@ def add_bid_column_period(
     date_to: str,
     campaign_id_col: str = "campaign_id",
     sku_col: str = "sku",
-    out_change_col: str = "Bid change",
+    out_change_col: str = "РР·РјРµРЅРµРЅРёРµ bid",
 ) -> pd.DataFrame:
     if df is None or df.empty:
         return df

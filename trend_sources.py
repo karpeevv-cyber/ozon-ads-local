@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from functools import lru_cache, wraps
 from datetime import date
 import os
 import re
 
 import pandas as pd
+import streamlit as st
 
 from clients_seller import (
     seller_analytics_data,
@@ -17,42 +17,12 @@ from clients_seller import (
 
 ENABLE_QUERY_SIGNALS = os.getenv("TRENDS_ENABLE_QUERY_SIGNALS", "0").strip().lower() in {"1", "true", "yes"}
 
-try:
-    import streamlit as st  # type: ignore
-except Exception:  # pragma: no cover - fallback for non-Streamlit runtime
-    st = None
-
-try:
-    from streamlit.runtime import exists as streamlit_runtime_exists  # type: ignore
-except Exception:  # pragma: no cover - fallback for non-Streamlit runtime
-    streamlit_runtime_exists = lambda: False
-
-
-def cache_data(*, show_spinner: bool = False, ttl: int | None = None):
-    if st is not None and streamlit_runtime_exists():
-        return st.cache_data(show_spinner=show_spinner, ttl=ttl)
-
-    def decorator(func):
-        def _cached_call(*args, normalized_kwargs):
-            return func(*args, **dict(normalized_kwargs))
-
-        cached = lru_cache(maxsize=32)(_cached_call)
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            return cached(*args, tuple(sorted(kwargs.items())))
-
-        wrapper.clear = cached.cache_clear
-        return wrapper
-
-    return decorator
-
 
 def _normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", str(value or "").strip())
 
 
-@cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=900)
 def load_catalog(
     *,
     seller_client_id: str | None,
@@ -111,7 +81,7 @@ def load_catalog(
     return df.drop_duplicates(subset=["sku"]).copy()
 
 
-@cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=900)
 def load_sales_history(
     *,
     date_from: str,
@@ -196,7 +166,7 @@ def _extract_query_row(raw: dict, sku: str) -> dict | None:
     }
 
 
-@cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=900)
 def load_query_signals(
     *,
     date_from: str,
