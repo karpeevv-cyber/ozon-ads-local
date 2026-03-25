@@ -26,6 +26,7 @@ function formatPct(value: number) {
 
 function RevenueChart({ overview }: MainDashboardProps) {
   const rows = overview.chart_rows;
+
   if (rows.length === 0) {
     return (
       <article className="panel-card panel-card-wide section-card">
@@ -40,9 +41,36 @@ function RevenueChart({ overview }: MainDashboardProps) {
     );
   }
 
-  const maxRevenue = Math.max(...rows.map((row) => Number(row.total_revenue || 0)), 1);
-  const compactClassName = rows.length > 18 ? " revenue-chart-compact" : rows.length > 12 ? " revenue-chart-tight" : "";
+  const revenues = rows.map((row) => Number(row.total_revenue || 0));
+  const maxRevenue = Math.max(...revenues, 1);
+  const minRevenue = Math.min(...revenues, 0);
+  const totalRevenue = revenues.reduce((sum, value) => sum + value, 0);
+  const averageRevenue = totalRevenue / rows.length;
+
+  const chartWidth = 1200;
+  const chartHeight = 300;
+  const leftPad = 18;
+  const rightPad = 18;
+  const topPad = 18;
+  const bottomPad = 42;
+  const innerWidth = chartWidth - leftPad - rightPad;
+  const innerHeight = chartHeight - topPad - bottomPad;
+  const stepX = rows.length > 1 ? innerWidth / (rows.length - 1) : 0;
+  const range = maxRevenue - minRevenue || 1;
   const labelStep = rows.length > 24 ? 4 : rows.length > 16 ? 3 : rows.length > 10 ? 2 : 1;
+
+  const points = rows.map((row, index) => {
+    const revenue = Number(row.total_revenue || 0);
+    const x = leftPad + stepX * index;
+    const y = topPad + (1 - (revenue - minRevenue) / range) * innerHeight;
+    return { day: row.day, revenue, x, y };
+  });
+
+  const linePath = points
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`)
+    .join(" ");
+  const floorY = chartHeight - bottomPad;
+  const areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${floorY.toFixed(1)} L ${points[0].x.toFixed(1)} ${floorY.toFixed(1)} Z`;
 
   return (
     <article className="panel-card panel-card-wide section-card">
@@ -53,24 +81,60 @@ function RevenueChart({ overview }: MainDashboardProps) {
         </div>
         <span className="status-badge">{overview.date_from} to {overview.date_to}</span>
       </div>
-      <div
-        className={`revenue-chart${compactClassName}`}
-        style={{ gridTemplateColumns: `repeat(${rows.length}, minmax(0, 1fr))` }}
-      >
-        {rows.map((row, index) => {
-          const revenue = Number(row.total_revenue || 0);
-          const height = Math.max(8, (revenue / maxRevenue) * 180);
-          const showLabel = index % labelStep === 0 || index === rows.length - 1;
-          return (
-            <div className="chart-col" key={row.day}>
-              <div className="chart-value">{showLabel ? formatMoney(revenue) : ""}</div>
-              <div className="chart-bar-wrap">
-                <div className="chart-bar" style={{ height: `${height}px` }} />
-              </div>
-              <div className="chart-label">{showLabel ? formatDay(row.day) : ""}</div>
-            </div>
-          );
-        })}
+      <div className="chart-summary-grid">
+        <div>
+          <span className="metric-label">За период</span>
+          <strong>{formatMoney(totalRevenue)}</strong>
+        </div>
+        <div>
+          <span className="metric-label">В среднем в день</span>
+          <strong>{formatMoney(averageRevenue)}</strong>
+        </div>
+        <div>
+          <span className="metric-label">Пиковый день</span>
+          <strong>{formatMoney(maxRevenue)}</strong>
+        </div>
+      </div>
+      <div className="line-chart-card">
+        <svg
+          className="line-chart"
+          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+          preserveAspectRatio="none"
+          role="img"
+          aria-label="Выручка по дням"
+        >
+          <defs>
+            <linearGradient id="revenueArea" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="#ff7d61" stopOpacity="0.30" />
+              <stop offset="100%" stopColor="#ff7d61" stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+          {[0, 0.5, 1].map((ratio) => {
+            const y = topPad + innerHeight * ratio;
+            return <line className="line-chart-grid" key={ratio} x1={leftPad} x2={chartWidth - rightPad} y1={y} y2={y} />;
+          })}
+          <line className="line-chart-axis" x1={leftPad} x2={chartWidth - rightPad} y1={floorY} y2={floorY} />
+          <path className="line-chart-area" d={areaPath} />
+          <path className="line-chart-path" d={linePath} />
+          {points.map((point, index) => {
+            const showLabel = index % labelStep === 0 || index === points.length - 1;
+            return (
+              <g key={point.day}>
+                <circle className="line-chart-dot" cx={point.x} cy={point.y} r="4" />
+                {showLabel ? (
+                  <>
+                    <text className="line-chart-value" x={point.x} y={Math.max(14, point.y - 12)} textAnchor="middle">
+                      {formatInt(point.revenue)}
+                    </text>
+                    <text className="line-chart-label" x={point.x} y={chartHeight - 12} textAnchor="middle">
+                      {formatDay(point.day)}
+                    </text>
+                  </>
+                ) : null}
+              </g>
+            );
+          })}
+        </svg>
       </div>
     </article>
   );
