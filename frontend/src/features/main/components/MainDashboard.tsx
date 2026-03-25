@@ -41,6 +41,7 @@ function RevenueChart({ overview }: MainDashboardProps) {
   }
 
   const maxRevenue = Math.max(...rows.map((row) => Number(row.total_revenue || 0)), 1);
+  const compactClassName = rows.length > 18 ? " revenue-chart-compact" : rows.length > 12 ? " revenue-chart-tight" : "";
 
   return (
     <article className="panel-card panel-card-wide section-card">
@@ -51,7 +52,10 @@ function RevenueChart({ overview }: MainDashboardProps) {
         </div>
         <span className="status-badge">{overview.date_from} to {overview.date_to}</span>
       </div>
-      <div className="revenue-chart">
+      <div
+        className={`revenue-chart${compactClassName}`}
+        style={{ gridTemplateColumns: `repeat(${rows.length}, minmax(0, 1fr))` }}
+      >
         {rows.map((row) => {
           const revenue = Number(row.total_revenue || 0);
           const height = Math.max(8, (revenue / maxRevenue) * 180);
