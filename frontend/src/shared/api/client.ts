@@ -8,6 +8,7 @@ import {
   BidChangeRecord,
   FinanceSummary,
   LoginPayload,
+  MainOverview,
   RunningCampaign,
   StorageSnapshot,
   StocksSnapshot,
@@ -117,6 +118,23 @@ export function getCampaignReport(params: {
     search.set("company", params.company);
   }
   return requestJson<CampaignReport>(`/campaigns/report?${search.toString()}`);
+}
+
+export function getMainOverview(params: {
+  company?: string;
+  dateFrom: string;
+  dateTo: string;
+  targetDrrPct?: number;
+}): Promise<MainOverview> {
+  const search = new URLSearchParams({
+    date_from: params.dateFrom,
+    date_to: params.dateTo,
+    target_drr_pct: String(params.targetDrrPct ?? 20),
+  });
+  if (params.company) {
+    search.set("company", params.company);
+  }
+  return requestJson<MainOverview>(`/campaigns/main-overview?${search.toString()}`);
 }
 
 export function login(payload: LoginPayload): Promise<TokenResponse> {

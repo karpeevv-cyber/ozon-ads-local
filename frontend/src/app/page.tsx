@@ -13,6 +13,7 @@ import {
   getCampaignReport,
   getCompanies,
   getFinanceSummary,
+  getMainOverview,
   getRecentBidChanges,
   getRunningCampaigns,
   getStorageSnapshot,
@@ -237,61 +238,12 @@ async function renderTabContent(params: {
 
   switch (activeTab) {
     case "main": {
-      const [
-        campaigns,
-        report,
-        recentBidChanges,
-        campaignComments,
-        financeSummary,
-        unitEconomicsSummary,
-        stocksSnapshot,
-        storageSnapshot,
-        trendsSnapshot,
-      ] = await Promise.all([
-        getRunningCampaigns(selectedCompany),
-        getCampaignReport({
-          company: selectedCompany,
-          dateFrom,
-          dateTo,
-        }),
-        getRecentBidChanges(),
-        getCampaignComments(selectedCompany),
-        getFinanceSummary({
-          company: selectedCompany,
-          dateFrom,
-          dateTo,
-        }),
-        getUnitEconomicsSummary({
-          company: selectedCompany,
-          dateFrom,
-          dateTo,
-        }),
-        getStocksSnapshot(selectedCompany),
-        getStorageSnapshot(selectedCompany),
-        getTrendsSnapshot({
-          company: selectedCompany,
-          dateFrom,
-          dateTo,
-        }),
-      ]);
-
-      return (
-        <>
-          <MainDashboard
-            companies={companies}
-            selectedCompany={selectedCompany}
-            campaigns={campaigns}
-            report={report}
-            financeSummary={financeSummary}
-            unitEconomicsSummary={unitEconomicsSummary}
-            stocksSnapshot={stocksSnapshot}
-            storageSnapshot={storageSnapshot}
-            trendsSnapshot={trendsSnapshot}
-            recentBidChanges={recentBidChanges}
-            campaignComments={campaignComments}
-          />
-        </>
-      );
+      const overview = await getMainOverview({
+        company: selectedCompany,
+        dateFrom,
+        dateTo,
+      });
+      return <MainDashboard overview={overview} />;
     }
     case "all-campaigns": {
       const report = await getCampaignReport({

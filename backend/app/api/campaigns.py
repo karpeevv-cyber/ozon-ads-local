@@ -4,6 +4,7 @@ from app.schemas.campaigns import (
     CampaignReportResponse,
     CampaignSummaryResponse,
     CompanyConfigResponse,
+    MainOverviewResponse,
 )
 from app.services.campaign_reporting import (
     build_report_rows,
@@ -14,6 +15,7 @@ from app.services.company_config import default_company_from_env, load_company_c
 from app.services.integrations.ozon_ads import get_running_campaigns
 from app.services.integrations.ozon_ads import perf_token
 from app.services.integrations.ozon_seller import seller_analytics_sku_day
+from app.services.main_overview import get_main_overview
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
@@ -103,4 +105,21 @@ def get_campaign_report(
         target_drr_pct=float(target_drr_pct),
         running_campaigns_count=len(running_ids),
         rows=rows,
+    )
+
+
+@router.get("/main-overview", response_model=MainOverviewResponse)
+def main_overview(
+    company: str | None = Query(default=None),
+    date_from: str = Query(...),
+    date_to: str = Query(...),
+    target_drr_pct: float = Query(default=20.0),
+) -> MainOverviewResponse:
+    return MainOverviewResponse(
+        **get_main_overview(
+            company=company,
+            date_from=date_from,
+            date_to=date_to,
+            target_drr_pct=float(target_drr_pct),
+        )
     )

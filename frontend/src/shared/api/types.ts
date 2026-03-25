@@ -39,6 +39,56 @@ export type CampaignReport = {
   rows: CampaignReportRow[];
 };
 
+export type MainOverviewChartRow = {
+  day: string;
+  total_revenue: number;
+  money_spent: number;
+  total_drr_pct: number;
+};
+
+export type MainOverviewDailyRow = {
+  day: string;
+  total_revenue: number;
+  total_drr_pct: number;
+  money_spent: number;
+  views: number;
+  clicks: number;
+  ordered_units: number;
+  ctr: number;
+  cr: number;
+  organic_pct: number;
+  bid_changes_cnt: number;
+  comment: string;
+};
+
+export type MainOverviewWeeklyRow = {
+  week: string;
+  total_revenue: number;
+  total_drr_pct: number;
+  ebitda: number;
+  ebitda_pct: number;
+  total_revenue_per_day: number;
+  money_spent_per_day: number;
+  views_per_day: number;
+  clicks_per_day: number;
+  ordered_units_per_day: number;
+  ctr: number;
+  cr: number;
+  organic_pct: number;
+  bid_changes_cnt: number;
+  comment: string;
+};
+
+export type MainOverview = {
+  company: string;
+  date_from: string;
+  date_to: string;
+  target_drr_pct: number;
+  chart_rows: MainOverviewChartRow[];
+  daily_rows: MainOverviewDailyRow[];
+  weekly_rows: MainOverviewWeeklyRow[];
+};
+
 export type LoginPayload = {
   email: string;
   password: string;
