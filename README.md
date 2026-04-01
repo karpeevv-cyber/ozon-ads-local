@@ -1,5 +1,7 @@
 # Ozon Ads Migration Workspace
 
+Start here for any new task: [PROJECT_GUIDE.md](C:\Users\User\ozon-ads-local\PROJECT_GUIDE.md).
+
 This repository now contains two parallel product contours:
 
 - `legacy/streamlit` for the current Streamlit application
