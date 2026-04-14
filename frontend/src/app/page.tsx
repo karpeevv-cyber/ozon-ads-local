@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { BidAuditPanel } from "@/features/bids/components/BidAuditPanel";
 import { BidApplyCard } from "@/features/bids/components/BidApplyCard";
 import { CampaignFilters } from "@/features/campaigns/components/CampaignFilters";
@@ -329,6 +330,36 @@ async function renderTabContent(params: {
   }
 }
 
+function TabContentSkeleton() {
+  return (
+    <section className="dashboard-grid section-grid">
+      <article className="panel-card panel-card-wide section-card skeleton-card">
+        <div className="skeleton-line skeleton-line-lg" />
+        <div className="skeleton-line" />
+        <div className="skeleton-line" />
+      </article>
+      <article className="panel-card panel-card-wide section-card skeleton-card">
+        <div className="skeleton-line skeleton-line-lg" />
+        <div className="skeleton-grid">
+          {Array.from({ length: 8 }).map((_, idx) => (
+            <span className="skeleton-cell" key={idx} />
+          ))}
+        </div>
+      </article>
+    </section>
+  );
+}
+
+async function TabContent(params: {
+  activeTab: SupportedTab;
+  selectedCompany: string;
+  dateFrom: string;
+  dateTo: string;
+  companies: CompanyConfig[];
+}) {
+  return await renderTabContent(params);
+}
+
 export default async function HomePage({ searchParams }: HomePageProps) {
   const resolvedSearchParams = (await searchParams) || {};
   const companies = await getCompanies();
@@ -337,23 +368,23 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const dateFrom = resolvedSearchParams.date_from || defaultRange.dateFrom;
   const dateTo = resolvedSearchParams.date_to || defaultRange.dateTo;
   const activeTab = resolveTab(resolvedSearchParams.tab);
-  const content = await renderTabContent({
-    activeTab,
-    selectedCompany,
-    dateFrom,
-    dateTo,
-    companies,
-  });
-
   return (
-    <AppShell activeTab={activeTab} company={selectedCompany} dateFrom={dateFrom} dateTo={dateTo}>
+    <AppShell>
       <CampaignFilters
         companies={companies}
         selectedCompany={selectedCompany}
         dateFrom={dateFrom}
         dateTo={dateTo}
       />
-      {content}
+      <Suspense fallback={<TabContentSkeleton />}>
+        <TabContent
+          activeTab={activeTab}
+          selectedCompany={selectedCompany}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          companies={companies}
+        />
+      </Suspense>
     </AppShell>
   );
 }

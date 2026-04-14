@@ -50,7 +50,12 @@ export function AuthGate({ children }: AuthGateProps) {
   }
 
   if (loading) {
-    return <div className="loading-card">Checking access...</div>;
+    return (
+      <div className="loading-card skeleton-card" aria-busy="true" aria-live="polite">
+        <div className="skeleton-line skeleton-line-lg" />
+        <div className="skeleton-line" />
+      </div>
+    );
   }
 
   if (!token || !user) {

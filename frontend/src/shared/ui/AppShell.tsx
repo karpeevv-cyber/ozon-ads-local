@@ -1,11 +1,11 @@
+"use client";
+
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ReactNode } from "react";
 import { AuthGate } from "@/features/auth/components/AuthGate";
 
 type AppShellProps = {
-  activeTab: string;
-  company?: string;
-  dateFrom?: string;
-  dateTo?: string;
   children: ReactNode;
 };
 
@@ -23,7 +23,13 @@ const navItems = [
   { id: "formulas", label: "Formulas" },
 ];
 
-export function AppShell({ activeTab, company, dateFrom, dateTo, children }: AppShellProps) {
+export function AppShell({ children }: AppShellProps) {
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab") || "main";
+  const company = searchParams.get("company");
+  const dateFrom = searchParams.get("date_from");
+  const dateTo = searchParams.get("date_to");
+
   const makeHref = (tab: string) => {
     const params = new URLSearchParams();
     params.set("tab", tab);
@@ -52,13 +58,14 @@ export function AppShell({ activeTab, company, dateFrom, dateTo, children }: App
           </div>
           <nav className="nav-list" aria-label="Primary">
             {navItems.map((item) => (
-              <a
+              <Link
                 className={`nav-pill${item.id === activeTab ? " nav-pill-active" : ""}`}
                 href={makeHref(item.id)}
                 key={item.id}
+                prefetch={false}
               >
                 {item.label}
-              </a>
+              </Link>
             ))}
           </nav>
         </aside>

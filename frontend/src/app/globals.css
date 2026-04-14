@@ -162,6 +162,50 @@ a {
   color: #8f1d14;
 }
 
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-card {
+  border: 1px solid var(--line);
+}
+
+.skeleton-line,
+.skeleton-cell {
+  display: block;
+  width: 100%;
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(225, 214, 197, 0.4) 25%, rgba(255, 248, 239, 0.85) 50%, rgba(225, 214, 197, 0.4) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s linear infinite;
+}
+
+.skeleton-line {
+  height: 14px;
+  margin: 10px 0;
+}
+
+.skeleton-line-lg {
+  height: 22px;
+  width: 65%;
+}
+
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.skeleton-cell {
+  height: 36px;
+}
+
 .session-bar {
   display: flex;
   justify-content: space-between;
