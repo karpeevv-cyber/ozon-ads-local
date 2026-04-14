@@ -1,3 +1,4 @@
+import logging
 import requests
 from fastapi import APIRouter, Query
 
@@ -19,6 +20,7 @@ from app.services.integrations.ozon_seller import seller_analytics_sku_day
 from app.services.main_overview import get_main_overview
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/companies", response_model=list[CompanyConfigResponse])
@@ -122,6 +124,7 @@ def main_overview(
     date_to: str = Query(...),
     target_drr_pct: float = Query(default=20.0),
 ) -> MainOverviewResponse:
+    company_name, _config = resolve_company_config(company)
     try:
         payload = get_main_overview(
             company=company,
@@ -132,7 +135,18 @@ def main_overview(
     except requests.HTTPError as exc:
         if exc.response is None or exc.response.status_code != 429:
             raise
-        company_name, _config = resolve_company_config(company)
+        logger.warning("main_overview degraded due to upstream 429", extra={"company": company_name})
+        payload = {
+            "company": company_name,
+            "date_from": date_from,
+            "date_to": date_to,
+            "target_drr_pct": float(target_drr_pct),
+            "chart_rows": [],
+            "daily_rows": [],
+            "weekly_rows": [],
+        }
+    except Exception:
+        logger.exception("main_overview degraded due to unexpected error")
         payload = {
             "company": company_name,
             "date_from": date_from,
