@@ -1,3 +1,4 @@
+import requests
 from fastapi import APIRouter, Query
 
 from app.schemas.campaigns import (
@@ -31,10 +32,16 @@ def list_companies() -> list[CompanyConfigResponse]:
 @router.get("/running", response_model=list[CampaignSummaryResponse])
 def list_running_campaigns(company: str | None = Query(default=None)) -> list[CampaignSummaryResponse]:
     _company_name, config = resolve_company_config(company)
-    campaigns = get_running_campaigns(
-        client_id=(config.get("perf_client_id") or "").strip() or None,
-        client_secret=(config.get("perf_client_secret") or "").strip() or None,
-    )
+    try:
+        campaigns = get_running_campaigns(
+            client_id=(config.get("perf_client_id") or "").strip() or None,
+            client_secret=(config.get("perf_client_secret") or "").strip() or None,
+        )
+    except requests.HTTPError as exc:
+        if exc.response is not None and exc.response.status_code == 429:
+            campaigns = []
+        else:
+            raise
     return [
         CampaignSummaryResponse(
             id=str(campaign.get("id", "")),
@@ -115,11 +122,24 @@ def main_overview(
     date_to: str = Query(...),
     target_drr_pct: float = Query(default=20.0),
 ) -> MainOverviewResponse:
-    return MainOverviewResponse(
-        **get_main_overview(
+    try:
+        payload = get_main_overview(
             company=company,
             date_from=date_from,
             date_to=date_to,
             target_drr_pct=float(target_drr_pct),
         )
-    )
+    except requests.HTTPError as exc:
+        if exc.response is None or exc.response.status_code != 429:
+            raise
+        company_name, _config = resolve_company_config(company)
+        payload = {
+            "company": company_name,
+            "date_from": date_from,
+            "date_to": date_to,
+            "target_drr_pct": float(target_drr_pct),
+            "chart_rows": [],
+            "daily_rows": [],
+            "weekly_rows": [],
+        }
+    return MainOverviewResponse(**payload)

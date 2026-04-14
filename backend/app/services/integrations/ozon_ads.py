@@ -7,6 +7,9 @@ PERF_BASE = "https://api-performance.ozon.ru"
 _SESSION = requests.Session()
 _TOKEN_CACHE: dict[tuple[str, str], tuple[str, float]] = {}
 _TOKEN_TTL_SECONDS = 25 * 60
+_RETRY_STATUS = {429, 500, 502, 503, 504}
+_MAX_RETRIES = 3
+_RETRY_BASE_DELAY = 0.8
 
 
 def must_env(name: str) -> str:
@@ -14,6 +17,34 @@ def must_env(name: str) -> str:
     if not value:
         raise RuntimeError(f"Missing required environment variable: {name}")
     return value
+
+
+def _request_with_retry(method: str, url: str, **kwargs) -> requests.Response:
+    last_error: Exception | None = None
+    for attempt in range(_MAX_RETRIES):
+        try:
+            response = _SESSION.request(method, url, **kwargs)
+            if response.status_code in _RETRY_STATUS and attempt < (_MAX_RETRIES - 1):
+                retry_after = response.headers.get("Retry-After")
+                if retry_after:
+                    try:
+                        delay = float(retry_after)
+                    except ValueError:
+                        delay = _RETRY_BASE_DELAY * (2**attempt)
+                else:
+                    delay = _RETRY_BASE_DELAY * (2**attempt)
+                time.sleep(max(0.2, delay))
+                continue
+            return response
+        except requests.RequestException as exc:
+            last_error = exc
+            if attempt >= (_MAX_RETRIES - 1):
+                raise
+            time.sleep(_RETRY_BASE_DELAY * (2**attempt))
+
+    if last_error:
+        raise last_error
+    raise RuntimeError("Failed to execute request")
 
 
 def perf_token(client_id: str | None = None, client_secret: str | None = None) -> str:
@@ -33,7 +64,7 @@ def perf_token(client_id: str | None = None, client_secret: str | None = None) -
         "grant_type": "client_credentials",
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    response = _SESSION.post(url, data=data, headers=headers, timeout=30)
+    response = _request_with_retry("POST", url, data=data, headers=headers, timeout=30)
     response.raise_for_status()
     token = response.json()["access_token"]
     _TOKEN_CACHE[cache_key] = (token, time.time())
@@ -42,7 +73,8 @@ def perf_token(client_id: str | None = None, client_secret: str | None = None) -
 
 def get_campaigns(token: str) -> list[dict]:
     url = f"{PERF_BASE}/api/client/campaign"
-    response = _SESSION.get(
+    response = _request_with_retry(
+        "GET",
         url,
         params={"advObjectType": "SKU"},
         headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
@@ -64,7 +96,7 @@ def get_campaign_products_page(token: str, campaign_id: str, page: int = 1, page
     url = f"{PERF_BASE}/api/client/campaign/{campaign_id}/v2/products"
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
     params = {"page": page, "pageSize": page_size}
-    response = _SESSION.get(url, headers=headers, params=params, timeout=30)
+    response = _request_with_retry("GET", url, headers=headers, params=params, timeout=30)
     response.raise_for_status()
     return response.json()
 
@@ -89,7 +121,7 @@ def get_campaign_stats_json(token: str, date_from: str, date_to: str, campaign_i
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
     params = [("dateFrom", date_from), ("dateTo", date_to)]
     params += [("campaignIds", str(campaign_id)) for campaign_id in campaign_ids]
-    response = _SESSION.get(url, headers=headers, params=params, timeout=60)
+    response = _request_with_retry("GET", url, headers=headers, params=params, timeout=60)
     response.raise_for_status()
     return response.json()
 
@@ -97,7 +129,7 @@ def get_campaign_stats_json(token: str, date_from: str, date_to: str, campaign_i
 def update_campaign_product_bids(token: str, campaign_id: str, bids: list[dict]) -> dict:
     url = f"{PERF_BASE}/api/client/campaign/{campaign_id}/products"
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
-    response = _SESSION.put(url, json={"bids": bids}, headers=headers, timeout=30)
+    response = _request_with_retry("PUT", url, json={"bids": bids}, headers=headers, timeout=30)
     response.raise_for_status()
     try:
         return response.json()
