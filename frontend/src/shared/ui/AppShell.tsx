@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { ReactNode } from "react";
 import { AuthGate } from "@/features/auth/components/AuthGate";
 
@@ -53,13 +52,13 @@ export function AppShell({ activeTab, company, dateFrom, dateTo, children }: App
           </div>
           <nav className="nav-list" aria-label="Primary">
             {navItems.map((item) => (
-              <Link
+              <a
                 className={`nav-pill${item.id === activeTab ? " nav-pill-active" : ""}`}
                 href={makeHref(item.id)}
                 key={item.id}
               >
                 {item.label}
-              </Link>
+              </a>
             ))}
           </nav>
         </aside>

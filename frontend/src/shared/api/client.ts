@@ -27,11 +27,22 @@ function getApiBaseUrl(): string {
   return process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
 }
 
+function withTimeout(ms: number): { signal: AbortSignal; cleanup: () => void } {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ms);
+  return {
+    signal: controller.signal,
+    cleanup: () => clearTimeout(timeoutId),
+  };
+}
+
 async function requestJson<T>(path: string): Promise<T> {
   const apiUrl = `${getApiBaseUrl()}${path}`;
+  const timeout = withTimeout(25000);
   const response = await fetch(apiUrl, {
     cache: "no-store",
-  });
+    signal: timeout.signal,
+  }).finally(timeout.cleanup);
 
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status} ${response.statusText} for ${apiUrl}`);
@@ -42,6 +53,7 @@ async function requestJson<T>(path: string): Promise<T> {
 
 export async function postJson<T>(path: string, body: unknown, token?: string): Promise<T> {
   const apiUrl = `${getApiBaseUrl()}${path}`;
+  const timeout = withTimeout(25000);
   const response = await fetch(apiUrl, {
     method: "POST",
     headers: {
@@ -50,7 +62,8 @@ export async function postJson<T>(path: string, body: unknown, token?: string): 
     },
     body: JSON.stringify(body),
     cache: "no-store",
-  });
+    signal: timeout.signal,
+  }).finally(timeout.cleanup);
 
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status} ${response.statusText} for ${apiUrl}`);
@@ -61,6 +74,7 @@ export async function postJson<T>(path: string, body: unknown, token?: string): 
 
 export async function putJson<T>(path: string, body: unknown, token?: string): Promise<T> {
   const apiUrl = `${getApiBaseUrl()}${path}`;
+  const timeout = withTimeout(25000);
   const response = await fetch(apiUrl, {
     method: "PUT",
     headers: {
@@ -69,7 +83,8 @@ export async function putJson<T>(path: string, body: unknown, token?: string): P
     },
     body: JSON.stringify(body),
     cache: "no-store",
-  });
+    signal: timeout.signal,
+  }).finally(timeout.cleanup);
 
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status} ${response.statusText} for ${apiUrl}`);
@@ -80,12 +95,14 @@ export async function putJson<T>(path: string, body: unknown, token?: string): P
 
 export async function getAuthedJson<T>(path: string, token: string): Promise<T> {
   const apiUrl = `${getApiBaseUrl()}${path}`;
+  const timeout = withTimeout(25000);
   const response = await fetch(apiUrl, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
     cache: "no-store",
-  });
+    signal: timeout.signal,
+  }).finally(timeout.cleanup);
 
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status} ${response.statusText} for ${apiUrl}`);
