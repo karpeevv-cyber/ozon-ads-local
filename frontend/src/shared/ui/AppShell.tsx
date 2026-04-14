@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { ReactNode } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ReactNode, useEffect, useState, useTransition } from "react";
 import { AuthGate } from "@/features/auth/components/AuthGate";
 
 type AppShellProps = {
@@ -24,11 +23,22 @@ const navItems = [
 ];
 
 export function AppShell({ children }: AppShellProps) {
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+  const [optimisticTab, setOptimisticTab] = useState<string | null>(null);
   const activeTab = searchParams.get("tab") || "main";
+  const displayedTab = optimisticTab ?? activeTab;
   const company = searchParams.get("company");
   const dateFrom = searchParams.get("date_from");
   const dateTo = searchParams.get("date_to");
+  const showTabSwitchSkeleton = isPending && optimisticTab !== null;
+
+  useEffect(() => {
+    if (optimisticTab && optimisticTab === activeTab) {
+      setOptimisticTab(null);
+    }
+  }, [activeTab, optimisticTab]);
 
   const makeHref = (tab: string) => {
     const params = new URLSearchParams();
@@ -45,6 +55,13 @@ export function AppShell({ children }: AppShellProps) {
     return `/?${params.toString()}`;
   };
 
+  const handleTabClick = (tab: string) => {
+    setOptimisticTab(tab);
+    startTransition(() => {
+      router.push(makeHref(tab));
+    });
+  };
+
   return (
     <AuthGate>
       <div className="app-shell">
@@ -58,18 +75,37 @@ export function AppShell({ children }: AppShellProps) {
           </div>
           <nav className="nav-list" aria-label="Primary">
             {navItems.map((item) => (
-              <Link
-                className={`nav-pill${item.id === activeTab ? " nav-pill-active" : ""}`}
-                href={makeHref(item.id)}
+              <button
+                className={`nav-pill${item.id === displayedTab ? " nav-pill-active" : ""}`}
                 key={item.id}
-                prefetch={false}
+                type="button"
+                onClick={() => handleTabClick(item.id)}
               >
                 {item.label}
-              </Link>
+              </button>
             ))}
           </nav>
         </aside>
-        <main className="page-content">{children}</main>
+        <main className="page-content page-content-shell">
+          {children}
+          {showTabSwitchSkeleton ? (
+            <div className="tab-loading-overlay" aria-live="polite" aria-busy="true">
+              <div className="panel-card panel-card-wide section-card skeleton-card">
+                <div className="skeleton-line skeleton-line-lg" />
+                <div className="skeleton-line" />
+                <div className="skeleton-line" />
+              </div>
+              <div className="panel-card panel-card-wide section-card skeleton-card">
+                <div className="skeleton-line skeleton-line-lg" />
+                <div className="skeleton-grid">
+                  {Array.from({ length: 8 }).map((_, idx) => (
+                    <span className="skeleton-cell" key={idx} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </main>
       </div>
     </AuthGate>
   );

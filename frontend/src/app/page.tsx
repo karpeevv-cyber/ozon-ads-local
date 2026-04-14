@@ -368,6 +368,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const dateFrom = resolvedSearchParams.date_from || defaultRange.dateFrom;
   const dateTo = resolvedSearchParams.date_to || defaultRange.dateTo;
   const activeTab = resolveTab(resolvedSearchParams.tab);
+  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}`;
   return (
     <AppShell>
       <CampaignFilters
@@ -376,7 +377,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         dateFrom={dateFrom}
         dateTo={dateTo}
       />
-      <Suspense fallback={<TabContentSkeleton />}>
+      <Suspense key={tabStateKey} fallback={<TabContentSkeleton />}>
         <TabContent
           activeTab={activeTab}
           selectedCompany={selectedCompany}

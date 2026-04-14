@@ -76,12 +76,17 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.58);
   font-size: 0.95rem;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
   text-decoration: none;
+  cursor: pointer;
   transition:
     transform 120ms ease,
     border-color 120ms ease,
@@ -102,6 +107,23 @@ a {
 
 .page-content {
   padding: 34px;
+}
+
+.page-content-shell {
+  position: relative;
+}
+
+.tab-loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: start;
+  gap: 20px;
+  padding-top: 140px;
+  background: rgba(244, 239, 230, 0.58);
+  backdrop-filter: blur(1px);
+  pointer-events: none;
+  z-index: 12;
 }
 
 .section-grid {
