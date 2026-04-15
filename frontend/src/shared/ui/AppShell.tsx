@@ -92,6 +92,13 @@ export function AppShell({ children }: AppShellProps) {
           {children}
           {showTabSwitchSkeleton ? (
             <div className="tab-loading-overlay" aria-live="polite" aria-busy="true">
+              <section className="filters-card skeleton-card tab-filters-skeleton">
+                <div className="tab-filters-skeleton-grid">
+                  <div className="skeleton-line" />
+                  <div className="skeleton-line" />
+                  <div className="skeleton-line" />
+                </div>
+              </section>
               <div className="panel-card panel-card-wide section-card skeleton-card">
                 <div className="skeleton-line skeleton-line-lg" />
                 <div className="skeleton-line" />
