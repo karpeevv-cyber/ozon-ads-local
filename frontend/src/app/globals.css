@@ -120,8 +120,7 @@ a {
   align-content: start;
   gap: 20px;
   padding-top: 140px;
-  background: rgba(244, 239, 230, 0.58);
-  backdrop-filter: blur(1px);
+  background: #f4efe6;
   pointer-events: none;
   z-index: 12;
 }
