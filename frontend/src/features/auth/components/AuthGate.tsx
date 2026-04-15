@@ -15,8 +15,32 @@ export function AuthGate({ children }: AuthGateProps) {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  function readStoredToken(): string | null {
+    try {
+      return window.localStorage.getItem("ozon_ads_token");
+    } catch {
+      return null;
+    }
+  }
+
+  function writeStoredToken(nextToken: string) {
+    try {
+      window.localStorage.setItem("ozon_ads_token", nextToken);
+    } catch {
+      // Ignore storage errors in strict privacy/browser modes.
+    }
+  }
+
+  function clearStoredToken() {
+    try {
+      window.localStorage.removeItem("ozon_ads_token");
+    } catch {
+      // Ignore storage errors in strict privacy/browser modes.
+    }
+  }
+
   useEffect(() => {
-    const savedToken = window.localStorage.getItem("ozon_ads_token");
+    const savedToken = readStoredToken();
     if (!savedToken) {
       setLoading(false);
       return;
@@ -27,7 +51,7 @@ export function AuthGate({ children }: AuthGateProps) {
         setUser(response);
       })
       .catch(() => {
-        window.localStorage.removeItem("ozon_ads_token");
+        clearStoredToken();
         setToken(null);
         setUser(null);
       })
@@ -37,7 +61,7 @@ export function AuthGate({ children }: AuthGateProps) {
   }, []);
 
   function handleAuthenticated(nextToken: string) {
-    window.localStorage.setItem("ozon_ads_token", nextToken);
+    writeStoredToken(nextToken);
     setToken(nextToken);
     setLoading(true);
     getCurrentUser(nextToken)
