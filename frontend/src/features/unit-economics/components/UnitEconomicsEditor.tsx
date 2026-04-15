@@ -41,9 +41,17 @@ export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps)
     );
   }
 
+  function readStoredToken(): string | null {
+    try {
+      return window.localStorage.getItem("ozon_ads_token");
+    } catch {
+      return null;
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const token = window.localStorage.getItem("ozon_ads_token");
+    const token = readStoredToken();
     if (!token) {
       setStatus("Authentication token is missing");
       return;

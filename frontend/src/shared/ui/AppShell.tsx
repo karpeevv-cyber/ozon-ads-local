@@ -89,7 +89,7 @@ export function AppShell({ children }: AppShellProps) {
           </nav>
         </aside>
         <main className="page-content page-content-shell">
-          {children}
+          <div className={`tab-content${showTabSwitchSkeleton ? " tab-content-hidden" : ""}`}>{children}</div>
           {showTabSwitchSkeleton ? (
             <div className="tab-loading-overlay" aria-live="polite" aria-busy="true">
               <section className="filters-card skeleton-card tab-filters-skeleton">

@@ -113,6 +113,10 @@ a {
   position: relative;
 }
 
+.tab-content-hidden {
+  visibility: hidden;
+}
+
 .tab-loading-overlay {
   position: absolute;
   inset: 0;
@@ -120,7 +124,6 @@ a {
   align-content: start;
   gap: 20px;
   padding: 34px;
-  background: #f4efe6;
   pointer-events: none;
   z-index: 12;
 }
