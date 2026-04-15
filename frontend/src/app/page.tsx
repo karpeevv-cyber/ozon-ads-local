@@ -90,6 +90,21 @@ function PlaceholderPanel({
   );
 }
 
+function LoadErrorPanel({ title, details }: { title: string; details: string }) {
+  return (
+    <article className="panel-card panel-card-wide section-card">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Data error</p>
+          <h3>{title}</h3>
+        </div>
+        <span className="status-badge">retry</span>
+      </div>
+      <p className="muted-copy">{details}</p>
+    </article>
+  );
+}
+
 function CurrentCampaignsPanel({ campaigns }: { campaigns: RunningCampaign[] }) {
   return (
     <article className="panel-card panel-card-wide section-card">
@@ -357,12 +372,33 @@ async function TabContent(params: {
   dateTo: string;
   companies: CompanyConfig[];
 }) {
-  return await renderTabContent(params);
+  try {
+    return await renderTabContent(params);
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Не удалось загрузить данные вкладки. Повторите попытку через пару секунд.";
+    console.error("Tab render failed", {
+      tab: params.activeTab,
+      company: params.selectedCompany,
+      dateFrom: params.dateFrom,
+      dateTo: params.dateTo,
+      message,
+    });
+    return <LoadErrorPanel title={`Ошибка загрузки вкладки "${params.activeTab}"`} details={message} />;
+  }
 }
 
 export default async function HomePage({ searchParams }: HomePageProps) {
   const resolvedSearchParams = (await searchParams) || {};
-  const companies = await getCompanies();
+  let companies: CompanyConfig[] = [];
+  try {
+    companies = await getCompanies();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown companies load error";
+    console.error("Companies load failed", { message });
+  }
   const defaultRange = getDefaultDateRange();
   const selectedCompany = resolvedSearchParams.company || companies[0]?.name || "default";
   const dateFrom = resolvedSearchParams.date_from || defaultRange.dateFrom;
