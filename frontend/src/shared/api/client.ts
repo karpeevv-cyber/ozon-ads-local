@@ -38,7 +38,8 @@ function withTimeout(ms: number): { signal: AbortSignal; cleanup: () => void } {
 
 async function requestJson<T>(path: string): Promise<T> {
   const apiUrl = `${getApiBaseUrl()}${path}`;
-  const timeout = withTimeout(25000);
+  const timeoutMs = typeof window === "undefined" ? 120000 : 25000;
+  const timeout = withTimeout(timeoutMs);
   const response = await fetch(apiUrl, {
     cache: "no-store",
     signal: timeout.signal,
@@ -53,7 +54,8 @@ async function requestJson<T>(path: string): Promise<T> {
 
 export async function postJson<T>(path: string, body: unknown, token?: string): Promise<T> {
   const apiUrl = `${getApiBaseUrl()}${path}`;
-  const timeout = withTimeout(25000);
+  const timeoutMs = typeof window === "undefined" ? 120000 : 25000;
+  const timeout = withTimeout(timeoutMs);
   const response = await fetch(apiUrl, {
     method: "POST",
     headers: {
@@ -74,7 +76,8 @@ export async function postJson<T>(path: string, body: unknown, token?: string): 
 
 export async function putJson<T>(path: string, body: unknown, token?: string): Promise<T> {
   const apiUrl = `${getApiBaseUrl()}${path}`;
-  const timeout = withTimeout(25000);
+  const timeoutMs = typeof window === "undefined" ? 120000 : 25000;
+  const timeout = withTimeout(timeoutMs);
   const response = await fetch(apiUrl, {
     method: "PUT",
     headers: {
@@ -95,7 +98,8 @@ export async function putJson<T>(path: string, body: unknown, token?: string): P
 
 export async function getAuthedJson<T>(path: string, token: string): Promise<T> {
   const apiUrl = `${getApiBaseUrl()}${path}`;
-  const timeout = withTimeout(25000);
+  const timeoutMs = typeof window === "undefined" ? 120000 : 25000;
+  const timeout = withTimeout(timeoutMs);
   const response = await fetch(apiUrl, {
     headers: {
       Authorization: `Bearer ${token}`,

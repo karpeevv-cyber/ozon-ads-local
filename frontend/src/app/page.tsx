@@ -105,6 +105,16 @@ function LoadErrorPanel({ title, details }: { title: string; details: string }) 
   );
 }
 
+function isAbortLikeError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const maybeError = error as { name?: string; message?: string };
+  const name = String(maybeError.name || "").toLowerCase();
+  const message = String(maybeError.message || "").toLowerCase();
+  return name.includes("abort") || message.includes("aborted");
+}
+
 function CurrentCampaignsPanel({ campaigns }: { campaigns: RunningCampaign[] }) {
   return (
     <article className="panel-card panel-card-wide section-card">
@@ -375,6 +385,9 @@ async function TabContent(params: {
   try {
     return await renderTabContent(params);
   } catch (error) {
+    if (isAbortLikeError(error)) {
+      return <TabContentSkeleton />;
+    }
     const message =
       error instanceof Error
         ? error.message
