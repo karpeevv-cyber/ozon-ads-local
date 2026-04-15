@@ -1,7 +1,8 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { ReactNode, useEffect, useState, useTransition } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { ReactNode, useEffect, useState } from "react";
 import { AuthGate } from "@/features/auth/components/AuthGate";
 
 type AppShellProps = {
@@ -23,22 +24,30 @@ const navItems = [
 ];
 
 export function AppShell({ children }: AppShellProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
   const [optimisticTab, setOptimisticTab] = useState<string | null>(null);
   const activeTab = searchParams.get("tab") || "main";
   const displayedTab = optimisticTab ?? activeTab;
   const company = searchParams.get("company");
   const dateFrom = searchParams.get("date_from");
   const dateTo = searchParams.get("date_to");
-  const showTabSwitchSkeleton = isPending && optimisticTab !== null;
+  const showTabSwitchSkeleton = optimisticTab !== null && optimisticTab !== activeTab;
 
   useEffect(() => {
     if (optimisticTab && optimisticTab === activeTab) {
       setOptimisticTab(null);
     }
   }, [activeTab, optimisticTab]);
+
+  useEffect(() => {
+    if (!optimisticTab) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setOptimisticTab(null);
+    }, 6000);
+    return () => window.clearTimeout(timeoutId);
+  }, [optimisticTab]);
 
   const makeHref = (tab: string) => {
     const params = new URLSearchParams();
@@ -55,13 +64,6 @@ export function AppShell({ children }: AppShellProps) {
     return `/?${params.toString()}`;
   };
 
-  const handleTabClick = (tab: string) => {
-    setOptimisticTab(tab);
-    startTransition(() => {
-      router.push(makeHref(tab));
-    });
-  };
-
   return (
     <AuthGate>
       <div className="app-shell">
@@ -75,14 +77,14 @@ export function AppShell({ children }: AppShellProps) {
           </div>
           <nav className="nav-list" aria-label="Primary">
             {navItems.map((item) => (
-              <button
+              <Link
                 className={`nav-pill${item.id === displayedTab ? " nav-pill-active" : ""}`}
+                href={makeHref(item.id)}
                 key={item.id}
-                type="button"
-                onClick={() => handleTabClick(item.id)}
+                onClick={() => setOptimisticTab(item.id)}
               >
                 {item.label}
-              </button>
+              </Link>
             ))}
           </nav>
         </aside>
