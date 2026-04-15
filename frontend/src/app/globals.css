@@ -107,6 +107,7 @@ a {
 
 .page-content {
   padding: 34px;
+  background: var(--bg);
 }
 
 .page-content-shell {
