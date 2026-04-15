@@ -419,13 +419,16 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const activeTab = resolveTab(resolvedSearchParams.tab);
   const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}`;
   return (
-    <AppShell>
-      <CampaignFilters
-        companies={companies}
-        selectedCompany={selectedCompany}
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-      />
+    <AppShell
+      filters={
+        <CampaignFilters
+          companies={companies}
+          selectedCompany={selectedCompany}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+        />
+      }
+    >
       <Suspense key={tabStateKey} fallback={<TabContentSkeleton />}>
         <TabContent
           activeTab={activeTab}

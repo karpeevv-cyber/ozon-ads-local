@@ -6,6 +6,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { AuthGate } from "@/features/auth/components/AuthGate";
 
 type AppShellProps = {
+  filters: ReactNode;
   children: ReactNode;
 };
 
@@ -23,7 +24,7 @@ const navItems = [
   { id: "formulas", label: "Formulas" },
 ];
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ filters, children }: AppShellProps) {
   const searchParams = useSearchParams();
   const [optimisticTab, setOptimisticTab] = useState<string | null>(null);
   const activeTab = searchParams.get("tab") || "main";
@@ -89,31 +90,27 @@ export function AppShell({ children }: AppShellProps) {
           </nav>
         </aside>
         <main className="page-content page-content-shell">
-          <div className={`tab-content${showTabSwitchSkeleton ? " tab-content-hidden" : ""}`}>{children}</div>
-          {showTabSwitchSkeleton ? (
-            <div className="tab-loading-overlay" aria-live="polite" aria-busy="true">
-              <section className="filters-card skeleton-card tab-filters-skeleton">
-                <div className="tab-filters-skeleton-grid">
-                  <div className="skeleton-line" />
+          {filters}
+          <div className="tab-content-shell">
+            <div className={`tab-content${showTabSwitchSkeleton ? " tab-content-hidden" : ""}`}>{children}</div>
+            {showTabSwitchSkeleton ? (
+              <div className="tab-loading-overlay" aria-live="polite" aria-busy="true">
+                <div className="panel-card panel-card-wide section-card skeleton-card">
+                  <div className="skeleton-line skeleton-line-lg" />
                   <div className="skeleton-line" />
                   <div className="skeleton-line" />
                 </div>
-              </section>
-              <div className="panel-card panel-card-wide section-card skeleton-card">
-                <div className="skeleton-line skeleton-line-lg" />
-                <div className="skeleton-line" />
-                <div className="skeleton-line" />
-              </div>
-              <div className="panel-card panel-card-wide section-card skeleton-card">
-                <div className="skeleton-line skeleton-line-lg" />
-                <div className="skeleton-grid">
-                  {Array.from({ length: 8 }).map((_, idx) => (
-                    <span className="skeleton-cell" key={idx} />
-                  ))}
+                <div className="panel-card panel-card-wide section-card skeleton-card">
+                  <div className="skeleton-line skeleton-line-lg" />
+                  <div className="skeleton-grid">
+                    {Array.from({ length: 8 }).map((_, idx) => (
+                      <span className="skeleton-cell" key={idx} />
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </main>
       </div>
     </AuthGate>

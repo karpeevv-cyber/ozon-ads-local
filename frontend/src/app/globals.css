@@ -113,6 +113,10 @@ a {
   position: relative;
 }
 
+.tab-content-shell {
+  position: relative;
+}
+
 .tab-content-hidden {
   visibility: hidden;
 }
@@ -123,20 +127,9 @@ a {
   display: grid;
   align-content: start;
   gap: 20px;
-  padding: 34px;
+  padding: 0;
   pointer-events: none;
   z-index: 12;
-}
-
-.tab-filters-skeleton {
-  margin-bottom: 0;
-  box-shadow: none;
-}
-
-.tab-filters-skeleton-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
 }
 
 .section-grid {
