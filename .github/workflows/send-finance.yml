@@ -46,7 +46,6 @@ jobs:
 
   send_second_company:
     runs-on: ubuntu-latest
-    if: ${{ secrets.TG_CHAT_ID_2 != '' && secrets.COMPANY_NAME_2 != '' && secrets.PERF_CLIENT_ID_2 != '' && secrets.PERF_CLIENT_SECRET_2 != '' && secrets.SELLER_CLIENT_ID_2 != '' && secrets.SELLER_API_KEY_2 != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -71,7 +70,12 @@ jobs:
           PERF_CLIENT_SECRET: ${{ secrets.PERF_CLIENT_SECRET_2 }}
           SELLER_CLIENT_ID: ${{ secrets.SELLER_CLIENT_ID_2 }}
           SELLER_API_KEY: ${{ secrets.SELLER_API_KEY_2 }}
-        run: python send_finance_yesterday.py
+        run: |
+          if [ -z "$TG_CHAT_ID" ] || [ -z "$COMPANY_NAME" ] || [ -z "$PERF_CLIENT_ID" ] || [ -z "$PERF_CLIENT_SECRET" ] || [ -z "$SELLER_CLIENT_ID" ] || [ -z "$SELLER_API_KEY" ]; then
+            echo "Second-company secrets are not fully set. Skipping."
+            exit 0
+          fi
+          python send_finance_yesterday.py
 
       - name: Show app log on failure (second company)
         if: failure()
