@@ -472,18 +472,29 @@ def _load_main_day_metrics(
     )
     revenue, _units = by_day.get(day_iso, (0.0, 0))
     revenue = float(revenue or 0.0)
-
-    token = perf_token(perf_client_id, perf_client_secret)
-    campaigns = get_campaigns(token)
-    running_ids = [str(c.get("id")) for c in campaigns if c.get("state") == "CAMPAIGN_STATE_RUNNING"]
-    if not running_ids:
-        return {"revenue": revenue, "drr_pct": 0.0}
+    if revenue <= 0:
+        # Fallback: some responses may return a day key with time suffix.
+        revenue = sum(
+            float(v[0] or 0.0)
+            for k, v in by_day.items()
+            if str(k).startswith(day_iso)
+        )
+    if revenue <= 0:
+        # Single-day request fallback: sum across all SKU totals.
+        revenue = sum(float(v[0] or 0.0) for v in _by_sku.values())
 
     spend = 0.0
-    for batch in _chunks(running_ids, 10):
-        stats = get_campaign_stats_json(token, day_iso, day_iso, batch)
-        for r in (stats.get("rows", []) or []):
-            spend += float(r.get("moneySpent", 0) or 0.0)
+    try:
+        token = perf_token(perf_client_id, perf_client_secret)
+        campaigns = get_campaigns(token)
+        running_ids = [str(c.get("id")) for c in campaigns if c.get("state") == "CAMPAIGN_STATE_RUNNING"]
+        if running_ids:
+            for batch in _chunks(running_ids, 10):
+                stats = get_campaign_stats_json(token, day_iso, day_iso, batch)
+                for r in (stats.get("rows", []) or []):
+                    spend += float(r.get("moneySpent", r.get("money_spent", 0)) or 0.0)
+    except Exception:
+        logger.exception("Failed to load ads spend for main day metrics")
     drr_pct = (spend / revenue * 100.0) if revenue > 0 else 0.0
     return {"revenue": revenue, "drr_pct": drr_pct}
 
@@ -523,17 +534,13 @@ def main() -> int:
         seller_api_key=seller_api_key,
     )
     row = _format_balance_row(yesterday, data)
-    try:
-        main_metrics = _load_main_day_metrics(
-            yesterday,
-            seller_client_id=seller_client_id,
-            seller_api_key=seller_api_key,
-            perf_client_id=perf_client_id,
-            perf_client_secret=perf_client_secret,
-        )
-    except Exception:
-        logger.exception("Failed to load main day metrics for TG message")
-        main_metrics = {"revenue": 0.0, "drr_pct": 0.0}
+    main_metrics = _load_main_day_metrics(
+        yesterday,
+        seller_client_id=seller_client_id,
+        seller_api_key=seller_api_key,
+        perf_client_id=perf_client_id,
+        perf_client_secret=perf_client_secret,
+    )
     row["Revenue"] = str(_ceil_int(main_metrics.get("revenue", 0.0)))
     row["drr"] = f"{float(main_metrics.get('drr_pct', 0.0) or 0.0):.1f}"
 
