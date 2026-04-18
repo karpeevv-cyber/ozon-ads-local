@@ -50,6 +50,12 @@ def _ceil_int(value) -> int:
         return 0
 
 
+def _chunks(items: list[str], size: int) -> list[list[str]]:
+    if size <= 0:
+        size = 1
+    return [items[i:i + size] for i in range(0, len(items), size)]
+
+
 def _parse_test_comment_payload(comment: str) -> dict | None:
     text = str(comment or "").strip()
     if not text.startswith(TEST_META_PREFIX):
@@ -473,10 +479,11 @@ def _load_main_day_metrics(
     if not running_ids:
         return {"revenue": revenue, "drr_pct": 0.0}
 
-    stats = get_campaign_stats_json(token, day_iso, day_iso, running_ids)
     spend = 0.0
-    for r in (stats.get("rows", []) or []):
-        spend += float(r.get("moneySpent", 0) or 0.0)
+    for batch in _chunks(running_ids, 10):
+        stats = get_campaign_stats_json(token, day_iso, day_iso, batch)
+        for r in (stats.get("rows", []) or []):
+            spend += float(r.get("moneySpent", 0) or 0.0)
     drr_pct = (spend / revenue * 100.0) if revenue > 0 else 0.0
     return {"revenue": revenue, "drr_pct": drr_pct}
 
@@ -516,13 +523,17 @@ def main() -> int:
         seller_api_key=seller_api_key,
     )
     row = _format_balance_row(yesterday, data)
-    main_metrics = _load_main_day_metrics(
-        yesterday,
-        seller_client_id=seller_client_id,
-        seller_api_key=seller_api_key,
-        perf_client_id=perf_client_id,
-        perf_client_secret=perf_client_secret,
-    )
+    try:
+        main_metrics = _load_main_day_metrics(
+            yesterday,
+            seller_client_id=seller_client_id,
+            seller_api_key=seller_api_key,
+            perf_client_id=perf_client_id,
+            perf_client_secret=perf_client_secret,
+        )
+    except Exception:
+        logger.exception("Failed to load main day metrics for TG message")
+        main_metrics = {"revenue": 0.0, "drr_pct": 0.0}
     row["Revenue"] = str(_ceil_int(main_metrics.get("revenue", 0.0)))
     row["drr"] = f"{float(main_metrics.get('drr_pct', 0.0) or 0.0):.1f}"
 
