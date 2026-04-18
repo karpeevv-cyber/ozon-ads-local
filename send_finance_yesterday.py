@@ -56,6 +56,38 @@ def _chunks(items: list[str], size: int) -> list[list[str]]:
     return [items[i:i + size] for i in range(0, len(items), size)]
 
 
+def _to_float(value) -> float:
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        text = str(value).strip().replace(" ", "").replace(",", ".")
+        return float(text) if text else 0.0
+    except Exception:
+        return 0.0
+
+
+def _row_spend_value(row: dict) -> float:
+    direct = (
+        _to_float(row.get("moneySpent"))
+        or _to_float(row.get("money_spent"))
+        or _to_float(row.get("spend"))
+    )
+    if direct > 0:
+        return direct
+    days = row.get("days")
+    if isinstance(days, list):
+        return sum(
+            _to_float(d.get("moneySpent"))
+            or _to_float(d.get("money_spent"))
+            or _to_float(d.get("spend"))
+            for d in days
+            if isinstance(d, dict)
+        )
+    return 0.0
+
+
 def _parse_test_comment_payload(comment: str) -> dict | None:
     text = str(comment or "").strip()
     if not text.startswith(TEST_META_PREFIX):
@@ -487,12 +519,20 @@ def _load_main_day_metrics(
     try:
         token = perf_token(perf_client_id, perf_client_secret)
         campaigns = get_campaigns(token)
-        running_ids = [str(c.get("id")) for c in campaigns if c.get("state") == "CAMPAIGN_STATE_RUNNING"]
+        running_ids = []
+        for c in campaigns:
+            cid = str(c.get("id") or "").strip()
+            state = str(c.get("state") or "").upper()
+            if cid and "RUNNING" in state:
+                running_ids.append(cid)
+        if not running_ids:
+            running_ids = [str(c.get("id")) for c in campaigns if str(c.get("id") or "").strip()]
         if running_ids:
             for batch in _chunks(running_ids, 10):
                 stats = get_campaign_stats_json(token, day_iso, day_iso, batch)
                 for r in (stats.get("rows", []) or []):
-                    spend += float(r.get("moneySpent", r.get("money_spent", 0)) or 0.0)
+                    if isinstance(r, dict):
+                        spend += _row_spend_value(r)
     except Exception:
         logger.exception("Failed to load ads spend for main day metrics")
     drr_pct = (spend / revenue * 100.0) if revenue > 0 else 0.0
@@ -567,7 +607,7 @@ def main() -> int:
         "проверка",
         "% логистики",
     ]
-    ordered_keys += ["Revenue", "drr"]
+    ordered_keys = [ordered_keys[0], "Revenue", "drr", *ordered_keys[1:]]
     lines = [f"{k}: {row.get(k, '')}" for k in ordered_keys]
     text = "\n".join(lines)
     _send_telegram_message(token, chat_id, text)
