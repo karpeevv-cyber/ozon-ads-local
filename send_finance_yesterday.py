@@ -609,6 +609,10 @@ def main() -> int:
     ]
     ordered_keys = [ordered_keys[0], "Revenue", "drr", *ordered_keys[1:]]
     lines = [f"{k}: {row.get(k, '')}" for k in ordered_keys]
+    if len(lines) >= 3:
+        lines.insert(3, "")
+    if len(lines) >= 7:
+        lines.insert(7, "")
     text = "\n".join(lines)
     _send_telegram_message(token, chat_id, text)
 
