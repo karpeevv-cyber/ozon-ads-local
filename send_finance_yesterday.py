@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 import requests
 
 from bid_changes import load_bid_changes
-from clients_ads import perf_token, get_campaign_stats_json
+from clients_ads import perf_token, get_campaign_stats_json, get_campaigns
 from clients_seller import seller_finance_balance
 from clients_seller import seller_analytics_sku_day, seller_analytics_stocks
 from ui_helpers import load_company_configs, default_company_from_env
@@ -449,6 +449,38 @@ def _send_telegram_message(token: str, chat_id: str, text: str) -> None:
     r.raise_for_status()
 
 
+def _load_main_day_metrics(
+    day_iso: str,
+    *,
+    seller_client_id: str,
+    seller_api_key: str,
+    perf_client_id: str,
+    perf_client_secret: str,
+) -> dict[str, float]:
+    _by_sku, by_day, _by_day_sku = seller_analytics_sku_day(
+        day_iso,
+        day_iso,
+        limit=1000,
+        client_id=seller_client_id,
+        api_key=seller_api_key,
+    )
+    revenue, _units = by_day.get(day_iso, (0.0, 0))
+    revenue = float(revenue or 0.0)
+
+    token = perf_token(perf_client_id, perf_client_secret)
+    campaigns = get_campaigns(token)
+    running_ids = [str(c.get("id")) for c in campaigns if c.get("state") == "CAMPAIGN_STATE_RUNNING"]
+    if not running_ids:
+        return {"revenue": revenue, "drr_pct": 0.0}
+
+    stats = get_campaign_stats_json(token, day_iso, day_iso, running_ids)
+    spend = 0.0
+    for r in (stats.get("rows", []) or []):
+        spend += float(r.get("moneySpent", 0) or 0.0)
+    drr_pct = (spend / revenue * 100.0) if revenue > 0 else 0.0
+    return {"revenue": revenue, "drr_pct": drr_pct}
+
+
 def main() -> int:
     _load_env_file(".env")
 
@@ -484,6 +516,15 @@ def main() -> int:
         seller_api_key=seller_api_key,
     )
     row = _format_balance_row(yesterday, data)
+    main_metrics = _load_main_day_metrics(
+        yesterday,
+        seller_client_id=seller_client_id,
+        seller_api_key=seller_api_key,
+        perf_client_id=perf_client_id,
+        perf_client_secret=perf_client_secret,
+    )
+    row["Revenue"] = str(_ceil_int(main_metrics.get("revenue", 0.0)))
+    row["drr"] = f"{float(main_metrics.get('drr_pct', 0.0) or 0.0):.1f}"
 
     ordered_keys = [
         "день",
@@ -508,6 +549,7 @@ def main() -> int:
         "проверка",
         "% логистики",
     ]
+    ordered_keys += ["Revenue", "drr"]
     lines = [f"{k}: {row.get(k, '')}" for k in ordered_keys]
     text = "\n".join(lines)
     _send_telegram_message(token, chat_id, text)
