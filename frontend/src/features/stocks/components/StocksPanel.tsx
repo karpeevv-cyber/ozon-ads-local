@@ -1,9 +1,10 @@
+import type { CSSProperties } from "react";
 import { StocksWorkspace } from "@/shared/api/types";
 import { StocksControls } from "@/features/stocks/components/StocksControls";
 
 type StocksPanelProps = {
   workspace: StocksWorkspace;
-  reviewMode: boolean;
+  highlightMode: string;
 };
 
 function formatTimestamp(value: string | null) {
@@ -38,7 +39,41 @@ function formatShipmentDate(value: string | null) {
   }).format(date);
 }
 
-export function StocksPanel({ workspace, reviewMode }: StocksPanelProps) {
+export function StocksPanel({ workspace, highlightMode }: StocksPanelProps) {
+  function quantifyByMode(cell: StocksWorkspace["rows"][number]["cells"][number]): number {
+    if (highlightMode === "paid_now") {
+      return cell.paid_storage_qty || 0;
+    }
+    if (highlightMode === "paid_30") {
+      return cell.paid_storage_soon_30_qty || 0;
+    }
+    if (highlightMode === "paid_60") {
+      return cell.paid_storage_soon_60_qty || 0;
+    }
+    return 0;
+  }
+
+  function gradientStyle(quantity: number): CSSProperties {
+    if (quantity <= 0) {
+      return {};
+    }
+    const step = Math.max(1, Math.ceil(quantity / 5));
+    const alpha = Math.min(0.62, 0.16 + step * 0.06);
+    return {
+      backgroundImage: `linear-gradient(135deg, rgba(184, 92, 56, ${alpha}) 0%, rgba(184, 92, 56, ${Math.max(0.12, alpha - 0.08)}) 100%)`,
+    };
+  }
+
+  function candidateStyle(isCandidate: boolean): CSSProperties {
+    if (!isCandidate) {
+      return {};
+    }
+    return {
+      backgroundImage: "linear-gradient(135deg, rgba(53, 94, 59, 0.28) 0%, rgba(53, 94, 59, 0.18) 100%)",
+      fontWeight: 700,
+    };
+  }
+
   return (
     <section className="section-grid stocks-panel-section">
       <article className="panel-card section-card stocks-panel-card">
@@ -54,7 +89,7 @@ export function StocksPanel({ workspace, reviewMode }: StocksPanelProps) {
           regionalOrderMin={workspace.settings.regional_order_min}
           regionalOrderTarget={workspace.settings.regional_order_target}
           positionFilter={workspace.settings.position_filter}
-          reviewMode={reviewMode}
+          highlightMode={highlightMode}
         />
 
         <div className="stocks-kpi-row">
@@ -99,7 +134,12 @@ export function StocksPanel({ workspace, reviewMode }: StocksPanelProps) {
                       <strong>{row.article}</strong>
                     </td>
                     {row.cells.map((cell) => {
-                      const className = reviewMode && cell.is_candidate ? "stocks-candidate-cell" : "";
+                      let style: CSSProperties = {};
+                      if (highlightMode === "candidates") {
+                        style = candidateStyle(cell.is_candidate);
+                      } else if (highlightMode !== "none") {
+                        style = gradientStyle(quantifyByMode(cell));
+                      }
                       const shipmentTooltip = cell.shipment_events.length
                         ? cell.shipment_events
                             .map((event) => {
@@ -117,7 +157,7 @@ export function StocksPanel({ workspace, reviewMode }: StocksPanelProps) {
                       return (
                         <td
                           key={`${row.article}:${cell.city}`}
-                          className={className}
+                          style={style}
                           title={title}
                         >
                           {cell.display_value}

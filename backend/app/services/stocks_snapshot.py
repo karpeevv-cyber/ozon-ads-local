@@ -295,6 +295,8 @@ def get_stocks_workspace(
     matrix_rows: list[dict] = []
     candidate_count = 0
     now_utc = datetime.utcnow()
+    soon_30_cutoff = now_utc + timedelta(days=30)
+    soon_60_cutoff = now_utc + timedelta(days=60)
     for article in stock.index.astype(str).tolist():
         cells: list[dict] = []
         for city in stock.columns.astype(str).tolist():
@@ -306,8 +308,27 @@ def get_stocks_workspace(
             is_candidate = bool(candidate_mask.at[article, city])
             shipment_meta = shipment_events_by_cell.get((article, city_key), {})
             events = shipment_meta.get("events") or []
+            events_for_calc = shipment_meta.get("events_for_calc") or events
             remaining_stock = max(0, stock_value)
             shipment_events = []
+            paid_storage_qty = 0
+            paid_storage_soon_30_qty = 0
+            paid_storage_soon_60_qty = 0
+            for item in events_for_calc:
+                qty = int(item.get("quantity") or 0)
+                event_at = item.get("event_at")
+                unsold_qty = min(qty, remaining_stock)
+                remaining_stock = max(0, remaining_stock - unsold_qty)
+                free_storage_until = event_at + timedelta(days=120) if (event_at and unsold_qty > 0) else None
+                paid_qty = int(unsold_qty) if (free_storage_until is not None and free_storage_until <= now_utc) else 0
+                if paid_qty > 0:
+                    paid_storage_qty += paid_qty
+                elif free_storage_until is not None and unsold_qty > 0:
+                    if free_storage_until <= soon_30_cutoff:
+                        paid_storage_soon_30_qty += int(unsold_qty)
+                    if free_storage_until <= soon_60_cutoff:
+                        paid_storage_soon_60_qty += int(unsold_qty)
+            remaining_stock = max(0, stock_value)
             for item in events:
                 qty = int(item.get("quantity") or 0)
                 event_at = item.get("event_at")
@@ -341,6 +362,9 @@ def get_stocks_workspace(
                     "shipment_last_at": shipment_meta.get("last_event_at").isoformat()
                     if shipment_meta.get("last_event_at")
                     else None,
+                    "paid_storage_qty": paid_storage_qty,
+                    "paid_storage_soon_30_qty": paid_storage_soon_30_qty,
+                    "paid_storage_soon_60_qty": paid_storage_soon_60_qty,
                     "shipment_events": shipment_events,
                 }
             )

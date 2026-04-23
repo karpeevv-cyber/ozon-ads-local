@@ -7,14 +7,14 @@ type StocksControlsProps = {
   regionalOrderMin: number;
   regionalOrderTarget: number;
   positionFilter: string;
-  reviewMode: boolean;
+  highlightMode: string;
 };
 
 export function StocksControls({
   regionalOrderMin,
   regionalOrderTarget,
   positionFilter,
-  reviewMode,
+  highlightMode,
 }: StocksControlsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -22,7 +22,7 @@ export function StocksControls({
   const [draftMin, setDraftMin] = useState(String(regionalOrderMin));
   const [draftTarget, setDraftTarget] = useState(String(regionalOrderTarget));
   const [draftPositionFilter, setDraftPositionFilter] = useState(positionFilter);
-  const [draftReviewMode, setDraftReviewMode] = useState(reviewMode);
+  const [draftHighlightMode, setDraftHighlightMode] = useState(highlightMode);
 
   function buildParams() {
     const params = new URLSearchParams(searchParams.toString());
@@ -31,7 +31,7 @@ export function StocksControls({
     params.set("stocks_regional_order_min", String(nextMin));
     params.set("stocks_regional_order_target", String(nextTarget));
     params.set("stocks_position_filter", draftPositionFilter);
-    params.set("stocks_review_mode", draftReviewMode ? "1" : "0");
+    params.set("stocks_highlight_mode", draftHighlightMode);
     params.set("tab", "stocks");
     return params;
   }
@@ -80,14 +80,19 @@ export function StocksControls({
           disabled={isPending}
         />
       </label>
-      <label className="stocks-toggle">
-        <span>Highlight candidates</span>
-        <input
-          type="checkbox"
-          checked={draftReviewMode}
-          onChange={(event) => setDraftReviewMode(event.target.checked)}
+      <label>
+        <span>Highlight mode</span>
+        <select
+          value={draftHighlightMode}
+          onChange={(event) => setDraftHighlightMode(event.target.value)}
           disabled={isPending}
-        />
+        >
+          <option value="none">None</option>
+          <option value="candidates">Candidates for order</option>
+          <option value="paid_now">Paid storage now</option>
+          <option value="paid_30">Paid storage in 30 days</option>
+          <option value="paid_60">Paid storage in 60 days</option>
+        </select>
       </label>
       <div className="stocks-controls-actions">
         <button type="submit" className="stocks-primary-button" disabled={isPending}>

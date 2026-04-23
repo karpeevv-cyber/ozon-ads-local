@@ -303,6 +303,7 @@ def load_shipment_events_map(
                 "events_count": 0,
                 "last_event_at": None,
                 "events": [],
+                "events_for_calc": [],
             }
             out[key] = entry
         qty = int(item.quantity or 0)
@@ -310,6 +311,12 @@ def load_shipment_events_map(
         entry["events_count"] += 1
         if entry["last_event_at"] is None:
             entry["last_event_at"] = item.event_at
+        entry["events_for_calc"].append(
+            {
+                "quantity": qty,
+                "event_at": item.event_at,
+            }
+        )
         if len(entry["events"]) < max(1, int(per_cell_limit)):
             entry["events"].append(
                 {

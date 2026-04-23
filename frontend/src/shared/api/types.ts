@@ -189,6 +189,9 @@ export type StocksWorkspaceCell = {
   shipment_events_count: number;
   shipment_last_at: string | null;
   shipment_total_qty: number;
+  paid_storage_qty: number;
+  paid_storage_soon_30_qty: number;
+  paid_storage_soon_60_qty: number;
   city: string;
   stock: number;
   need60: number;

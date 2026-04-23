@@ -52,6 +52,9 @@ class StocksWorkspaceCellResponse(BaseModel):
     shipment_total_qty: int = 0
     shipment_events_count: int = 0
     shipment_last_at: str | None = None
+    paid_storage_qty: int = 0
+    paid_storage_soon_30_qty: int = 0
+    paid_storage_soon_60_qty: int = 0
     shipment_events: list[ShipmentEventItem] = Field(default_factory=list)
 
 

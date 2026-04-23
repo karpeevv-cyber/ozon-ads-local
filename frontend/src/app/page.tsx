@@ -36,7 +36,7 @@ type HomePageProps = {
     stocks_regional_order_min?: string;
     stocks_regional_order_target?: string;
     stocks_position_filter?: string;
-    stocks_review_mode?: string;
+    stocks_highlight_mode?: string;
   }>;
 };
 
@@ -266,7 +266,7 @@ async function renderTabContent(params: {
   stocksRegionalOrderMin: number;
   stocksRegionalOrderTarget: number;
   stocksPositionFilter: string;
-  stocksReviewMode: boolean;
+  stocksHighlightMode: string;
 }) {
   const {
     activeTab,
@@ -277,7 +277,7 @@ async function renderTabContent(params: {
     stocksRegionalOrderMin,
     stocksRegionalOrderTarget,
     stocksPositionFilter,
-    stocksReviewMode,
+    stocksHighlightMode,
   } = params;
 
   switch (activeTab) {
@@ -351,7 +351,7 @@ async function renderTabContent(params: {
         regionalOrderTarget: stocksRegionalOrderTarget,
         positionFilter: stocksPositionFilter,
       });
-      return <StocksPanel workspace={workspace} reviewMode={stocksReviewMode} />;
+      return <StocksPanel workspace={workspace} highlightMode={stocksHighlightMode} />;
     }
     case "storage": {
       const snapshot = await getStorageSnapshot(selectedCompany);
@@ -407,7 +407,7 @@ async function TabContent(params: {
   stocksRegionalOrderMin: number;
   stocksRegionalOrderTarget: number;
   stocksPositionFilter: string;
-  stocksReviewMode: boolean;
+  stocksHighlightMode: string;
 }) {
   try {
     return await renderTabContent(params);
@@ -454,8 +454,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   )
     ? String(resolvedSearchParams.stocks_position_filter || "ALL").toUpperCase()
     : "ALL";
-  const stocksReviewMode = String(resolvedSearchParams.stocks_review_mode || "1") !== "0";
-  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}:${stocksRegionalOrderMin}:${stocksRegionalOrderTarget}:${stocksPositionFilter}:${stocksReviewMode ? "1" : "0"}`;
+  const allowedHighlightModes = new Set(["none", "candidates", "paid_now", "paid_30", "paid_60"]);
+  const requestedHighlightMode = String(resolvedSearchParams.stocks_highlight_mode || "candidates").toLowerCase();
+  const stocksHighlightMode = allowedHighlightModes.has(requestedHighlightMode) ? requestedHighlightMode : "candidates";
+  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}:${stocksRegionalOrderMin}:${stocksRegionalOrderTarget}:${stocksPositionFilter}:${stocksHighlightMode}`;
   return (
     <AppShell
       filters={
@@ -477,7 +479,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           stocksRegionalOrderMin={stocksRegionalOrderMin}
           stocksRegionalOrderTarget={stocksRegionalOrderTarget}
           stocksPositionFilter={stocksPositionFilter}
-          stocksReviewMode={stocksReviewMode}
+          stocksHighlightMode={stocksHighlightMode}
         />
       </Suspense>
     </AppShell>
