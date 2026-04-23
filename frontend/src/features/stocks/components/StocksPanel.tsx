@@ -100,7 +100,6 @@ export function StocksPanel({ workspace, reviewMode }: StocksPanelProps) {
                   <tr key={row.article}>
                     <td className="stocks-sticky-cell">
                       <strong>{row.article}</strong>
-                      <p>{row.title || row.article}</p>
                     </td>
                     {row.cells.map((cell) => {
                       const backgroundColor = TURNOVER_GRADE_COLORS[cell.turnover_grade] || "transparent";

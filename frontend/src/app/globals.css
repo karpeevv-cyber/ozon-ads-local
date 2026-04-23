@@ -406,8 +406,13 @@ a {
 }
 
 .stocks-matrix-wrap {
-  overflow-x: auto;
+  overflow: auto;
   max-width: 100%;
+  min-height: clamp(280px, 44vh, 520px);
+  max-height: calc(100vh - 340px);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  scrollbar-gutter: stable both-edges;
 }
 
 .stocks-panel-section {
@@ -430,41 +435,41 @@ a {
 
 .stocks-matrix-table th,
 .stocks-matrix-table td {
-  min-width: 98px;
+  min-width: 80px;
   white-space: nowrap;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
 }
 
 .stocks-matrix-table th {
-  font-size: 0.76rem;
-  letter-spacing: 0.06em;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  padding: 8px 6px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface);
+}
+
+.stocks-matrix-table thead th:first-child {
+  left: 0;
+  z-index: 4;
 }
 
 .stocks-matrix-table td {
-  padding: 9px 8px;
+  padding: 7px 6px;
 }
 
 .stocks-sticky-cell {
   position: sticky;
   left: 0;
-  z-index: 1;
-  min-width: 170px !important;
+  z-index: 3;
+  min-width: 132px !important;
   background: var(--surface);
 }
 
 .stocks-sticky-cell strong {
-  font-size: 0.86rem;
+  font-size: 0.8rem;
   letter-spacing: 0.02em;
-}
-
-.stocks-sticky-cell p {
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 0.76rem;
-  max-width: 200px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .stocks-candidate-cell {
