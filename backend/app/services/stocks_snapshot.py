@@ -9,7 +9,6 @@ from app.services.company_config import resolve_company_config
 from app.services.legacy_compat import (
     build_stocks_rows,
     build_stocks_rows_cached,
-    load_storage_cache_payload,
 )
 from app.services.shipment_history import load_shipment_pairs
 
@@ -86,27 +85,14 @@ def _build_shipments_lookup(
     company_name: str,
     db: Session | None,
 ) -> tuple[set[tuple[str, str]], datetime | None]:
-    if db is not None:
-        pairs, ts = load_shipment_pairs(
-            db,
-            company_name=company_name,
-            seller_client_id=seller_client_id,
-        )
-        if pairs:
-            return pairs, ts
-    payload, ts, _source_path = load_storage_cache_payload(seller_client_id, "v12")
-    lot_rows = payload.get("lot_rows", []) if isinstance(payload, dict) else []
-    article_city_pairs: set[tuple[str, str]] = set()
-    for lot in lot_rows:
-        if not isinstance(lot, dict):
-            continue
-        article = str(lot.get("article") or "").strip()
-        city_key = str(lot.get("city_key") or "").strip()
-        if not city_key:
-            city_key = _normalize_city(str(lot.get("city") or ""))
-        if article and city_key:
-            article_city_pairs.add((article, city_key))
-    return article_city_pairs, ts if isinstance(ts, datetime) else None
+    if db is None:
+        return set(), None
+    pairs, ts = load_shipment_pairs(
+        db,
+        company_name=company_name,
+        seller_client_id=seller_client_id,
+    )
+    return pairs, ts
 
 
 def get_stocks_snapshot(*, company: str | None = None) -> dict:
