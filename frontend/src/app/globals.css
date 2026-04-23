@@ -439,8 +439,8 @@ a {
   font-size: 0.82rem;
 }
 
-.stocks-matrix-table th {
-  font-size: 0.476rem;
+.stocks-matrix-table thead th {
+  font-size: 0.476rem !important;
   letter-spacing: 0.04em;
   padding: 8px 6px;
   position: sticky;
