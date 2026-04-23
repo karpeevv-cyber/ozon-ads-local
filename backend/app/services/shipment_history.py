@@ -17,6 +17,15 @@ def normalize_city(value: str) -> str:
     text = str(value or "").strip().upper().replace("Ё", "Е")
     if not text:
         return "UNKNOWN"
+    compact = text.replace(" ", "").replace("-", "").replace("_", "")
+    if (
+        compact.startswith("СПБ")
+        or compact.startswith("SPB")
+        or "САНКТПЕТЕРБУРГ" in compact
+        or "SAINTPETERSBURG" in compact
+        or "STPETERSBURG" in compact
+    ):
+        return "САНКТ-ПЕТЕРБУРГ"
     if "МОСКВА" in text or "МО И ДАЛЬНИЕ РЕГИОНЫ" in text or "МО И ДАЛ" in text:
         return "МОСКВА"
     if "САНКТ-ПЕТЕРБУРГ" in text or "СЗО" in text:
