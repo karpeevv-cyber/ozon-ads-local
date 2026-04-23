@@ -408,8 +408,7 @@ a {
 .stocks-matrix-wrap {
   overflow: auto;
   max-width: 100%;
-  min-height: clamp(280px, 44vh, 520px);
-  max-height: calc(100vh - 340px);
+  height: clamp(300px, calc(100vh - 560px), 620px);
   border: 1px solid var(--line);
   border-radius: 14px;
   scrollbar-gutter: stable both-edges;
@@ -435,7 +434,7 @@ a {
 
 .stocks-matrix-table th,
 .stocks-matrix-table td {
-  min-width: 80px;
+  min-width: 72px;
   white-space: nowrap;
   font-size: 0.82rem;
 }
@@ -457,6 +456,13 @@ a {
 
 .stocks-matrix-table td {
   padding: 7px 6px;
+}
+
+.stocks-city-head {
+  display: block;
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .stocks-sticky-cell {

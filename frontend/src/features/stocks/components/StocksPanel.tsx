@@ -91,7 +91,9 @@ export function StocksPanel({ workspace, reviewMode }: StocksPanelProps) {
                 <tr>
                   <th>Article</th>
                   {workspace.columns.map((column) => (
-                    <th key={column}>{column}</th>
+                    <th key={column} title={column}>
+                      <span className="stocks-city-head">{column}</span>
+                    </th>
                   ))}
                 </tr>
               </thead>
