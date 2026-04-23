@@ -50,23 +50,19 @@ export function StocksPanel({ workspace, reviewMode }: StocksPanelProps) {
           reviewMode={reviewMode}
         />
 
-        <div className="summary-grid stocks-summary-grid">
-          <div>
-            <span>Articles</span>
-            <strong>{workspace.summary.article_count}</strong>
-          </div>
-          <div>
-            <span>Cities</span>
-            <strong>{workspace.summary.city_count}</strong>
-          </div>
-          <div>
-            <span>Candidates</span>
-            <strong>{workspace.summary.candidate_count}</strong>
-          </div>
-          <div>
-            <span>Approved</span>
-            <strong>{workspace.summary.approved_count}</strong>
-          </div>
+        <div className="stocks-kpi-row">
+          <span className="stocks-kpi-chip">
+            Articles <strong>{workspace.summary.article_count}</strong>
+          </span>
+          <span className="stocks-kpi-chip">
+            Cities <strong>{workspace.summary.city_count}</strong>
+          </span>
+          <span className="stocks-kpi-chip">
+            Candidates <strong>{workspace.summary.candidate_count}</strong>
+          </span>
+          <span className="stocks-kpi-chip">
+            Approved <strong>{workspace.summary.approved_count}</strong>
+          </span>
         </div>
 
         <div className="stocks-meta">
