@@ -4,7 +4,7 @@ import { StocksControls } from "@/features/stocks/components/StocksControls";
 
 type StocksPanelProps = {
   workspace: StocksWorkspace;
-  highlightMode: string;
+  highlightLevels: string[];
 };
 
 function formatTimestamp(value: string | null) {
@@ -39,39 +39,46 @@ function formatShipmentDate(value: string | null) {
   }).format(date);
 }
 
-export function StocksPanel({ workspace, highlightMode }: StocksPanelProps) {
-  function quantifyByMode(cell: StocksWorkspace["rows"][number]["cells"][number]): number {
-    if (highlightMode === "paid_now") {
-      return cell.paid_storage_qty || 0;
-    }
-    if (highlightMode === "paid_30") {
-      return cell.paid_storage_soon_30_qty || 0;
-    }
-    if (highlightMode === "paid_60") {
-      return cell.paid_storage_soon_60_qty || 0;
-    }
-    return 0;
+export function StocksPanel({ workspace, highlightLevels }: StocksPanelProps) {
+  function qtyToBucket(quantity: number): number {
+    if (quantity < 5) return 0;
+    if (quantity < 10) return 1;
+    if (quantity < 15) return 2;
+    if (quantity < 20) return 3;
+    return 4;
   }
 
-  function gradientStyle(quantity: number): CSSProperties {
-    if (quantity <= 0) {
-      return {};
-    }
-    const step = Math.max(1, Math.ceil(quantity / 5));
-    const alpha = Math.min(0.9, 0.12 + step * 0.12);
-    const alphaSoft = Math.max(0.16, alpha - 0.22);
-    return {
-      backgroundImage: `linear-gradient(135deg, rgba(184, 92, 56, ${alpha}) 0%, rgba(152, 58, 30, ${alphaSoft}) 100%)`,
-    };
+  function bucketToFill(bucket: number): string {
+    if (bucket <= 0) return "rgba(224, 224, 224, 0.45)";
+    if (bucket === 1) return "rgba(173, 231, 180, 0.62)";
+    if (bucket === 2) return "rgba(255, 237, 168, 0.66)";
+    if (bucket === 3) return "rgba(255, 189, 189, 0.68)";
+    return "rgba(241, 106, 106, 0.72)";
   }
 
-  function candidateStyle(isCandidate: boolean): CSSProperties {
-    if (!isCandidate) {
+  function storageHighlightStyle(cell: StocksWorkspace["rows"][number]["cells"][number]): CSSProperties {
+    if (highlightLevels.length === 0) {
       return {};
     }
+    const nowQty = cell.paid_storage_qty || 0;
+    const in30Qty = cell.paid_storage_soon_30_qty || 0;
+    const in60Qty = cell.paid_storage_soon_60_qty || 0;
+    let bucket = 0;
+    if (highlightLevels.length === 1) {
+      const mode = highlightLevels[0];
+      const qty = mode === "paid_now" ? nowQty : mode === "paid_30" ? in30Qty : in60Qty;
+      bucket = qtyToBucket(qty);
+    } else {
+      const score = qtyToBucket(nowQty) * 3 + qtyToBucket(in30Qty) * 2 + qtyToBucket(in60Qty);
+      if (score >= 10) bucket = 4;
+      else if (score >= 7) bucket = 3;
+      else if (score >= 4) bucket = 2;
+      else if (score >= 1) bucket = 1;
+      else bucket = 0;
+    }
+    const fill = bucketToFill(bucket);
     return {
-      backgroundImage: "linear-gradient(135deg, rgba(53, 94, 59, 0.28) 0%, rgba(53, 94, 59, 0.18) 100%)",
-      fontWeight: 700,
+      backgroundColor: fill,
     };
   }
 
@@ -90,7 +97,7 @@ export function StocksPanel({ workspace, highlightMode }: StocksPanelProps) {
           regionalOrderMin={workspace.settings.regional_order_min}
           regionalOrderTarget={workspace.settings.regional_order_target}
           positionFilter={workspace.settings.position_filter}
-          highlightMode={highlightMode}
+          highlightLevels={highlightLevels}
         />
 
         <div className="stocks-kpi-row">
@@ -135,12 +142,7 @@ export function StocksPanel({ workspace, highlightMode }: StocksPanelProps) {
                       <strong>{row.article}</strong>
                     </td>
                     {row.cells.map((cell) => {
-                      let style: CSSProperties = {};
-                      if (highlightMode === "candidates") {
-                        style = candidateStyle(cell.is_candidate);
-                      } else if (highlightMode !== "none") {
-                        style = gradientStyle(quantifyByMode(cell));
-                      }
+                      const style = storageHighlightStyle(cell);
                       const shipmentTooltip = cell.shipment_events.length
                         ? cell.shipment_events
                             .map((event) => {
@@ -154,14 +156,23 @@ export function StocksPanel({ workspace, highlightMode }: StocksPanelProps) {
                             })
                             .join("\n")
                         : "- нет отгрузок";
-                      const title = ["Отгрузки", shipmentTooltip].join("\n");
+                      const title = [
+                        "Отгрузки",
+                        `Платно сейчас: ${cell.paid_storage_qty} шт`,
+                        `Платно в 30 дней: ${cell.paid_storage_soon_30_qty} шт`,
+                        `Платно в 60 дней: ${cell.paid_storage_soon_60_qty} шт`,
+                        shipmentTooltip,
+                      ].join("\n");
                       return (
                         <td
                           key={`${row.article}:${cell.city}`}
                           style={style}
                           title={title}
                         >
-                          {cell.display_value}
+                          <span>{cell.display_value}</span>
+                          <small className="stocks-cell-risk">
+                            P:{cell.paid_storage_qty} | 30:{cell.paid_storage_soon_30_qty} | 60:{cell.paid_storage_soon_60_qty}
+                          </small>
                         </td>
                       );
                     })}

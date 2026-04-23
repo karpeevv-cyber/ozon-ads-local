@@ -286,7 +286,7 @@ a {
 
 .stocks-controls {
   display: grid;
-  grid-template-columns: minmax(180px, 1.2fr) 112px 112px 150px auto;
+  grid-template-columns: minmax(180px, 1.2fr) 112px 112px minmax(220px, 1fr) auto;
   gap: 10px;
   margin-bottom: 10px;
   align-items: end;
@@ -314,14 +314,30 @@ a {
   font: inherit;
 }
 
-.stocks-toggle {
-  grid-template-columns: 1fr auto;
-  align-items: center;
+.stocks-highlight-group {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.56);
 }
 
-.stocks-toggle input {
-  width: 18px;
-  height: 18px;
+.stocks-highlight-group legend {
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.stocks-check {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  margin-right: 10px;
+}
+
+.stocks-check input {
+  width: 16px;
+  height: 16px;
 }
 
 .stocks-controls-actions {
@@ -456,6 +472,19 @@ a {
 
 .stocks-matrix-table td {
   padding: 7px 6px;
+  vertical-align: middle;
+}
+
+.stocks-matrix-table td > span {
+  display: block;
+}
+
+.stocks-cell-risk {
+  display: block;
+  margin-top: 2px;
+  color: rgba(28, 26, 23, 0.72);
+  font-size: 0.66rem;
+  letter-spacing: 0.01em;
 }
 
 .stocks-city-head {

@@ -7,14 +7,14 @@ type StocksControlsProps = {
   regionalOrderMin: number;
   regionalOrderTarget: number;
   positionFilter: string;
-  highlightMode: string;
+  highlightLevels: string[];
 };
 
 export function StocksControls({
   regionalOrderMin,
   regionalOrderTarget,
   positionFilter,
-  highlightMode,
+  highlightLevels,
 }: StocksControlsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -22,7 +22,16 @@ export function StocksControls({
   const [draftMin, setDraftMin] = useState(String(regionalOrderMin));
   const [draftTarget, setDraftTarget] = useState(String(regionalOrderTarget));
   const [draftPositionFilter, setDraftPositionFilter] = useState(positionFilter);
-  const [draftHighlightMode, setDraftHighlightMode] = useState(highlightMode);
+  const [draftHighlightLevels, setDraftHighlightLevels] = useState<string[]>(highlightLevels);
+
+  function toggleHighlightLevel(level: string, checked: boolean) {
+    setDraftHighlightLevels((prev) => {
+      if (checked) {
+        return prev.includes(level) ? prev : [...prev, level];
+      }
+      return prev.filter((item) => item !== level);
+    });
+  }
 
   function buildParams() {
     const params = new URLSearchParams(searchParams.toString());
@@ -31,7 +40,11 @@ export function StocksControls({
     params.set("stocks_regional_order_min", String(nextMin));
     params.set("stocks_regional_order_target", String(nextTarget));
     params.set("stocks_position_filter", draftPositionFilter);
-    params.set("stocks_highlight_mode", draftHighlightMode);
+    if (draftHighlightLevels.length > 0) {
+      params.set("stocks_highlight_levels", draftHighlightLevels.join(","));
+    } else {
+      params.delete("stocks_highlight_levels");
+    }
     params.set("tab", "stocks");
     return params;
   }
@@ -80,20 +93,33 @@ export function StocksControls({
           disabled={isPending}
         />
       </label>
-      <label>
-        <span>Highlight mode</span>
-        <select
-          value={draftHighlightMode}
-          onChange={(event) => setDraftHighlightMode(event.target.value)}
-          disabled={isPending}
-        >
-          <option value="none">None</option>
-          <option value="candidates">Candidates for order</option>
-          <option value="paid_now">Paid storage now</option>
-          <option value="paid_30">Paid storage in 30 days</option>
-          <option value="paid_60">Paid storage in 60 days</option>
-        </select>
-      </label>
+      <fieldset className="stocks-highlight-group" disabled={isPending}>
+        <legend>Highlight levels</legend>
+        <label className="stocks-check">
+          <input
+            type="checkbox"
+            checked={draftHighlightLevels.includes("paid_now")}
+            onChange={(event) => toggleHighlightLevel("paid_now", event.target.checked)}
+          />
+          <span>Paid now</span>
+        </label>
+        <label className="stocks-check">
+          <input
+            type="checkbox"
+            checked={draftHighlightLevels.includes("paid_30")}
+            onChange={(event) => toggleHighlightLevel("paid_30", event.target.checked)}
+          />
+          <span>Paid in 30d</span>
+        </label>
+        <label className="stocks-check">
+          <input
+            type="checkbox"
+            checked={draftHighlightLevels.includes("paid_60")}
+            onChange={(event) => toggleHighlightLevel("paid_60", event.target.checked)}
+          />
+          <span>Paid in 60d</span>
+        </label>
+      </fieldset>
       <div className="stocks-controls-actions">
         <button type="submit" className="stocks-primary-button" disabled={isPending}>
           Apply
