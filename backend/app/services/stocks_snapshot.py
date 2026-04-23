@@ -10,7 +10,7 @@ from app.services.legacy_compat import (
     build_stocks_rows,
     build_stocks_rows_cached,
 )
-from app.services.shipment_history import load_shipment_pairs
+from app.services.shipment_history import load_shipment_pairs, rebuild_shipment_history_from_api
 
 
 TRANSIT_DAYS_MAP = {
@@ -176,6 +176,21 @@ def get_stocks_workspace(
         company_name=company_name,
         db=db,
     )
+    if db is not None and not shipments_pairs:
+        try:
+            rebuild_shipment_history_from_api(
+                db,
+                company_name=company_name,
+                seller_client_id=seller_client_id,
+                seller_api_key=seller_api_key,
+            )
+            shipments_pairs, shipments_ts = _build_shipments_lookup(
+                seller_client_id,
+                company_name=company_name,
+                db=db,
+            )
+        except Exception:
+            shipments_pairs, shipments_ts = set(), None
 
     df = pd.DataFrame(filtered_rows)
     if df.empty:
