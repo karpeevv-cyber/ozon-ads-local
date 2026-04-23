@@ -384,8 +384,13 @@ a {
   overflow-x: auto;
 }
 
+.stocks-panel-full {
+  grid-column: span 12;
+}
+
 .stocks-matrix-table {
   min-width: max-content;
+  width: 100%;
 }
 
 .stocks-matrix-table th,
