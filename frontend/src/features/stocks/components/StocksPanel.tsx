@@ -6,14 +6,6 @@ type StocksPanelProps = {
   reviewMode: boolean;
 };
 
-const TURNOVER_GRADE_COLORS: Record<string, string> = {
-  DEFICIT: "#83ffb3",
-  POPULAR: "#d5ffe5",
-  ACTUAL: "#a2d8ff",
-  SURPLUS: "#ffcaca",
-  NO_SALES: "#ff7d7d",
-};
-
 function formatTimestamp(value: string | null) {
   if (!value) {
     return "-";
@@ -85,18 +77,6 @@ export function StocksPanel({ workspace, reviewMode }: StocksPanelProps) {
           <span>Shipments cache: {formatTimestamp(workspace.shipments_updated_at)}</span>
         </div>
 
-        <p className="muted-copy">
-          Cell format: <strong>Stock / Need60 / InTransit</strong>
-        </p>
-
-        <div className="stocks-legend">
-          <span><i style={{ backgroundColor: "#83ffb3" }} /> Deficit</span>
-          <span><i style={{ backgroundColor: "#d5ffe5" }} /> Popular</span>
-          <span><i style={{ backgroundColor: "#a2d8ff" }} /> Actual</span>
-          <span><i style={{ backgroundColor: "#ffcaca" }} /> Surplus</span>
-          <span><i style={{ backgroundColor: "#ff7d7d" }} /> No sales</span>
-        </div>
-
         {workspace.rows.length === 0 || workspace.columns.length === 0 ? (
           <p className="muted-copy">No stocks data matched the current filters.</p>
         ) : (
@@ -119,7 +99,6 @@ export function StocksPanel({ workspace, reviewMode }: StocksPanelProps) {
                       <strong>{row.article}</strong>
                     </td>
                     {row.cells.map((cell) => {
-                      const backgroundColor = TURNOVER_GRADE_COLORS[cell.turnover_grade] || "transparent";
                       const className = reviewMode && cell.is_candidate ? "stocks-candidate-cell" : "";
                       const shipmentTooltip = cell.shipment_events.length
                         ? cell.shipment_events
@@ -139,7 +118,6 @@ export function StocksPanel({ workspace, reviewMode }: StocksPanelProps) {
                         <td
                           key={`${row.article}:${cell.city}`}
                           className={className}
-                          style={{ backgroundColor }}
                           title={title}
                         >
                           {cell.display_value}
