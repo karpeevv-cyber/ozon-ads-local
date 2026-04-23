@@ -44,12 +44,6 @@ export function StocksControls({
     });
   }
 
-  function handleRefresh() {
-    startTransition(() => {
-      router.refresh();
-    });
-  }
-
   return (
     <form className="stocks-controls" onSubmit={handleApply}>
       <label>
@@ -96,9 +90,6 @@ export function StocksControls({
         />
       </label>
       <div className="stocks-controls-actions">
-        <button type="button" className="stocks-secondary-button" onClick={handleRefresh} disabled={isPending}>
-          Refresh
-        </button>
         <button type="submit" className="stocks-primary-button" disabled={isPending}>
           Apply
         </button>
