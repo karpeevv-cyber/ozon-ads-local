@@ -123,7 +123,15 @@ export function StocksPanel({ workspace, reviewMode }: StocksPanelProps) {
                       const className = reviewMode && cell.is_candidate ? "stocks-candidate-cell" : "";
                       const shipmentTooltip = cell.shipment_events.length
                         ? cell.shipment_events
-                            .map((event) => `- ${formatShipmentDate(event.event_at)}: ${event.quantity} шт`)
+                            .map((event) => {
+                              if (event.paid_qty > 0) {
+                                return `- ${formatShipmentDate(event.event_at)}: ${event.quantity} шт, из них ${event.paid_qty} хранятся платно`;
+                              }
+                              if (event.unsold_qty > 0) {
+                                return `- ${formatShipmentDate(event.event_at)}: ${event.quantity} шт, из них ${event.unsold_qty} бесплатно до ${formatShipmentDate(event.free_storage_until)}`;
+                              }
+                              return `- ${formatShipmentDate(event.event_at)}: ${event.quantity} шт`;
+                            })
                             .join("\n")
                         : "- нет отгрузок";
                       const title = ["Отгрузки", shipmentTooltip].join("\n");

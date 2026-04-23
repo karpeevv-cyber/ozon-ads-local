@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 from sqlalchemy.orm import Session
@@ -285,6 +285,7 @@ def get_stocks_workspace(
 
     matrix_rows: list[dict] = []
     candidate_count = 0
+    now_utc = datetime.utcnow()
     for article in stock.index.astype(str).tolist():
         cells: list[dict] = []
         for city in stock.columns.astype(str).tolist():
@@ -296,6 +297,24 @@ def get_stocks_workspace(
             is_candidate = bool(candidate_mask.at[article, city])
             shipment_meta = shipment_events_by_cell.get((article, city_key), {})
             events = shipment_meta.get("events") or []
+            remaining_stock = max(0, stock_value)
+            shipment_events = []
+            for item in events:
+                qty = int(item.get("quantity") or 0)
+                event_at = item.get("event_at")
+                unsold_qty = min(qty, remaining_stock)
+                remaining_stock = max(0, remaining_stock - unsold_qty)
+                free_storage_until = event_at + timedelta(days=120) if (event_at and unsold_qty > 0) else None
+                paid_qty = int(unsold_qty) if (free_storage_until is not None and free_storage_until <= now_utc) else 0
+                shipment_events.append(
+                    {
+                        "quantity": qty,
+                        "event_at": event_at.isoformat() if event_at else None,
+                        "unsold_qty": int(unsold_qty),
+                        "free_storage_until": free_storage_until.isoformat() if free_storage_until else None,
+                        "paid_qty": paid_qty,
+                    }
+                )
             if is_candidate:
                 candidate_count += 1
             cells.append(
@@ -313,13 +332,7 @@ def get_stocks_workspace(
                     "shipment_last_at": shipment_meta.get("last_event_at").isoformat()
                     if shipment_meta.get("last_event_at")
                     else None,
-                    "shipment_events": [
-                        {
-                            "quantity": int(item.get("quantity") or 0),
-                            "event_at": item.get("event_at").isoformat() if item.get("event_at") else None,
-                        }
-                        for item in events
-                    ],
+                    "shipment_events": shipment_events,
                 }
             )
         matrix_rows.append(

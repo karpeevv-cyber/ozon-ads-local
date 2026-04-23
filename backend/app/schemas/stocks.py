@@ -37,6 +37,9 @@ class StocksWorkspaceCellResponse(BaseModel):
     class ShipmentEventItem(BaseModel):
         quantity: int
         event_at: str | None
+        unsold_qty: int = 0
+        free_storage_until: str | None = None
+        paid_qty: int = 0
 
     city: str
     stock: int
