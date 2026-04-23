@@ -153,13 +153,7 @@ export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPa
                             })
                             .join("\n")
                         : "- нет отгрузок";
-                      const title = [
-                        "Отгрузки",
-                        `Платно сейчас: ${cell.paid_storage_qty} шт`,
-                        `Платно в 30 дней: ${cell.paid_storage_soon_30_qty} шт`,
-                        `Платно в 60 дней: ${cell.paid_storage_soon_60_qty} шт`,
-                        shipmentTooltip,
-                      ].join("\n");
+                      const title = ["Отгрузки", shipmentTooltip].join("\n");
                       return (
                         <td
                           key={`${row.article}:${cell.city}`}
