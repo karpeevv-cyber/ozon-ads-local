@@ -57,6 +57,12 @@ def _to_int(value: object) -> int:
 
 
 def _event_time(order: dict, supply: dict) -> datetime:
+    state = str(order.get("state") or "").strip().upper()
+    if state == "COMPLETED":
+        completed_at = _parse_dt(order.get("state_updated_date"))
+        if completed_at is not None:
+            return completed_at
+
     timeslot = order.get("timeslot") or {}
     nested = timeslot.get("timeslot") or {}
     for key in ("from", "to"):
