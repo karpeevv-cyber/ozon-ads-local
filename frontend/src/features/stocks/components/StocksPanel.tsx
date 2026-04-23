@@ -126,13 +126,7 @@ export function StocksPanel({ workspace, reviewMode }: StocksPanelProps) {
                             .map((event) => `- ${formatShipmentDate(event.event_at)}: ${event.quantity} шт`)
                             .join("\n")
                         : "- нет отгрузок";
-                      const title = [
-                        `Stock ${cell.stock}, Need60 ${cell.need60}, InTransit ${cell.in_transit}`,
-                        `Отгружено всего: ${cell.shipment_total_qty} шт`,
-                        `Дата последней: ${formatShipmentDate(cell.shipment_last_at)}`,
-                        "Последние отгрузки:",
-                        shipmentTooltip,
-                      ].join("\n");
+                      const title = ["Отгрузки", shipmentTooltip].join("\n");
                       return (
                         <td
                           key={`${row.article}:${cell.city}`}

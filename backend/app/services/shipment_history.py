@@ -57,12 +57,17 @@ def _to_int(value: object) -> int:
 
 
 def _event_time(order: dict, supply: dict) -> datetime:
+    timeslot = order.get("timeslot") or {}
+    nested = timeslot.get("timeslot") or {}
+    for key in ("from", "to"):
+        dt = _parse_dt(nested.get(key))
+        if dt is not None:
+            return dt
     for key in (
+        "created_date",
+        "state_updated_date",
         "updated_at",
-        "acceptance_at_storage_warehouse_at",
-        "accepted_at_supply_warehouse_at",
         "created_at",
-        "order_creation_date",
     ):
         dt = _parse_dt(order.get(key))
         if dt is not None:
