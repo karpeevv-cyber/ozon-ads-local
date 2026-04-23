@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterable
 
 from sqlalchemy.orm import Session
@@ -30,6 +30,48 @@ def normalize_city(value: str) -> str:
             break
     text = text.replace("_1", "").replace("_2", "").strip("_ ").strip()
     return text or "UNKNOWN"
+
+
+def _parse_dt(value: object) -> datetime | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
+    except Exception:
+        return None
+
+
+def _to_int(value: object) -> int:
+    try:
+        return int(float(value or 0))
+    except Exception:
+        return 0
+
+
+def _event_time(order: dict, supply: dict) -> datetime:
+    for key in (
+        "updated_at",
+        "acceptance_at_storage_warehouse_at",
+        "accepted_at_supply_warehouse_at",
+        "created_at",
+        "order_creation_date",
+    ):
+        dt = _parse_dt(order.get(key))
+        if dt is not None:
+            return dt
+    for key in ("updated_at", "created_at", "date"):
+        dt = _parse_dt(supply.get(key))
+        if dt is not None:
+            return dt
+    return datetime.utcnow()
 
 
 def sync_shipment_history(
@@ -84,6 +126,97 @@ def sync_shipment_history(
     db.commit()
 
 
+def _sync_shipment_events(
+    db: Session,
+    *,
+    company_name: str,
+    seller_client_id: str,
+    events: list[dict],
+) -> None:
+    from app.models.shipment_event import ShipmentEvent
+
+    (
+        db.query(ShipmentEvent)
+        .filter(ShipmentEvent.company_name == str(company_name or ""))
+        .filter(ShipmentEvent.seller_client_id == str(seller_client_id or ""))
+        .delete(synchronize_session=False)
+    )
+
+    if events:
+        db.bulk_save_objects(
+            [
+                ShipmentEvent(
+                    company_name=str(company_name or ""),
+                    seller_client_id=str(seller_client_id or ""),
+                    article=str(item.get("article") or "").strip(),
+                    city_key=str(item.get("city_key") or "").strip(),
+                    city=str(item.get("city") or "").strip(),
+                    event_at=item.get("event_at") or datetime.utcnow(),
+                    quantity=max(0, _to_int(item.get("quantity") or 0)),
+                    order_id=str(item.get("order_id") or "").strip(),
+                    bundle_id=str(item.get("bundle_id") or "").strip(),
+                )
+                for item in events
+                if str(item.get("article") or "").strip() and str(item.get("city_key") or "").strip()
+            ]
+        )
+
+
+def _sync_shipment_history_from_events(
+    db: Session,
+    *,
+    company_name: str,
+    seller_client_id: str,
+    events: list[dict],
+) -> None:
+    from app.models.shipment_history import ShipmentHistory
+
+    (
+        db.query(ShipmentHistory)
+        .filter(ShipmentHistory.company_name == str(company_name or ""))
+        .filter(ShipmentHistory.seller_client_id == str(seller_client_id or ""))
+        .delete(synchronize_session=False)
+    )
+
+    aggregate: dict[tuple[str, str], dict] = {}
+    for event in events:
+        article = str(event.get("article") or "").strip()
+        city_key = str(event.get("city_key") or "").strip()
+        event_at = event.get("event_at") or datetime.utcnow()
+        if not article or not city_key:
+            continue
+        key = (article, city_key)
+        item = aggregate.get(key)
+        if item is None:
+            aggregate[key] = {
+                "count": 1,
+                "first": event_at,
+                "last": event_at,
+            }
+            continue
+        item["count"] += 1
+        if event_at < item["first"]:
+            item["first"] = event_at
+        if event_at > item["last"]:
+            item["last"] = event_at
+
+    if aggregate:
+        db.bulk_save_objects(
+            [
+                ShipmentHistory(
+                    company_name=str(company_name or ""),
+                    seller_client_id=str(seller_client_id or ""),
+                    article=article,
+                    city_key=city_key,
+                    shipments_count=int(values["count"]),
+                    first_shipment_at=values["first"],
+                    last_shipment_at=values["last"],
+                )
+                for (article, city_key), values in aggregate.items()
+            ]
+        )
+
+
 def load_shipment_pairs(
     db: Session,
     *,
@@ -111,6 +244,61 @@ def load_shipment_pairs(
     }
     ts = max((item.updated_at for item in rows if item.updated_at is not None), default=None)
     return pairs, ts
+
+
+def load_shipment_events_map(
+    db: Session,
+    *,
+    company_name: str,
+    seller_client_id: str,
+    articles: set[str],
+    city_keys: set[str],
+    per_cell_limit: int = 5,
+) -> dict[tuple[str, str], dict]:
+    if not seller_client_id or not articles or not city_keys:
+        return {}
+    create_all()
+    from app.models.shipment_event import ShipmentEvent
+
+    rows = (
+        db.query(ShipmentEvent)
+        .filter(ShipmentEvent.company_name == str(company_name or ""))
+        .filter(ShipmentEvent.seller_client_id == str(seller_client_id or ""))
+        .filter(ShipmentEvent.article.in_(sorted(articles)))
+        .filter(ShipmentEvent.city_key.in_(sorted(city_keys)))
+        .order_by(ShipmentEvent.event_at.desc())
+        .all()
+    )
+    out: dict[tuple[str, str], dict] = {}
+    for item in rows:
+        article = str(item.article or "").strip()
+        city_key = str(item.city_key or "").strip()
+        if not article or not city_key:
+            continue
+        key = (article, city_key)
+        entry = out.get(key)
+        if entry is None:
+            entry = {
+                "total_quantity": 0,
+                "events_count": 0,
+                "last_event_at": None,
+                "events": [],
+            }
+            out[key] = entry
+        qty = int(item.quantity or 0)
+        entry["total_quantity"] += qty
+        entry["events_count"] += 1
+        if entry["last_event_at"] is None:
+            entry["last_event_at"] = item.event_at
+        if len(entry["events"]) < max(1, int(per_cell_limit)):
+            entry["events"].append(
+                {
+                    "quantity": qty,
+                    "event_at": item.event_at,
+                    "city": str(item.city or "").strip(),
+                }
+            )
+    return out
 
 
 def _completed_order_ids(
@@ -227,17 +415,25 @@ def rebuild_shipment_history_from_api(
     if not seller_client_id or not seller_api_key:
         return 0
 
+    create_all()
     order_ids = _completed_order_ids(
         seller_client_id=seller_client_id,
         seller_api_key=seller_api_key,
     )
     if not order_ids:
-        sync_shipment_history(
+        _sync_shipment_events(
             db,
             company_name=company_name,
             seller_client_id=seller_client_id,
-            lot_rows=[],
+            events=[],
         )
+        _sync_shipment_history_from_events(
+            db,
+            company_name=company_name,
+            seller_client_id=seller_client_id,
+            events=[],
+        )
+        db.commit()
         return 0
 
     orders = _orders_by_ids(
@@ -246,11 +442,12 @@ def rebuild_shipment_history_from_api(
         seller_api_key=seller_api_key,
     )
 
-    lot_rows: list[dict] = []
+    events: list[dict] = []
     bundle_cache: dict[tuple[str, str, str], list[dict]] = {}
     for order in orders:
         if not isinstance(order, dict):
             continue
+        order_id = str(order.get("order_id") or "").strip()
         dropoff = order.get("drop_off_warehouse") or {}
         dropoff_id = str(dropoff.get("warehouse_id") or "").strip()
         if not dropoff_id:
@@ -267,6 +464,7 @@ def rebuild_shipment_history_from_api(
                 continue
             city = storage_name or storage_id
             city_key = normalize_city(city)
+            event_at = _event_time(order, supply)
             cache_key = (bundle_id, dropoff_id, storage_id)
             items = bundle_cache.get(cache_key)
             if items is None:
@@ -285,18 +483,35 @@ def rebuild_shipment_history_from_api(
                 article = str(item.get("offer_id") or "").strip()
                 if not article:
                     continue
-                lot_rows.append(
+                quantity = max(
+                    _to_int(item.get("quantity")),
+                    _to_int(item.get("qty")),
+                    _to_int(item.get("count")),
+                    1,
+                )
+                events.append(
                     {
                         "article": article,
                         "city_key": city_key,
                         "city": city,
+                        "event_at": event_at,
+                        "quantity": quantity,
+                        "order_id": order_id,
+                        "bundle_id": bundle_id,
                     }
                 )
 
-    sync_shipment_history(
+    _sync_shipment_events(
         db,
         company_name=company_name,
         seller_client_id=seller_client_id,
-        lot_rows=lot_rows,
+        events=events,
     )
-    return len(lot_rows)
+    _sync_shipment_history_from_events(
+        db,
+        company_name=company_name,
+        seller_client_id=seller_client_id,
+        events=events,
+    )
+    db.commit()
+    return len(events)

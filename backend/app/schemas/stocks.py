@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class StockRowResponse(BaseModel):
@@ -34,6 +34,10 @@ class StocksWorkspaceSummaryResponse(BaseModel):
 
 
 class StocksWorkspaceCellResponse(BaseModel):
+    class ShipmentEventItem(BaseModel):
+        quantity: int
+        event_at: str | None
+
     city: str
     stock: int
     need60: int
@@ -42,6 +46,10 @@ class StocksWorkspaceCellResponse(BaseModel):
     turnover_grade: str
     is_candidate: bool
     display_value: str
+    shipment_total_qty: int = 0
+    shipment_events_count: int = 0
+    shipment_last_at: str | None = None
+    shipment_events: list[ShipmentEventItem] = Field(default_factory=list)
 
 
 class StocksWorkspaceRowResponse(BaseModel):

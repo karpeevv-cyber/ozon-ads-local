@@ -10,7 +10,11 @@ from app.services.legacy_compat import (
     build_stocks_rows,
     build_stocks_rows_cached,
 )
-from app.services.shipment_history import load_shipment_pairs, rebuild_shipment_history_from_api
+from app.services.shipment_history import (
+    load_shipment_events_map,
+    load_shipment_pairs,
+    rebuild_shipment_history_from_api,
+)
 
 
 TRANSIT_DAYS_MAP = {
@@ -270,16 +274,28 @@ def get_stocks_workspace(
             index=candidate_mask.index,
         )
 
+    shipment_events_by_cell = load_shipment_events_map(
+        db,
+        company_name=company_name,
+        seller_client_id=seller_client_id,
+        articles={str(article) for article in stock.index.astype(str).tolist()},
+        city_keys={_normalize_city(str(city)) for city in stock.columns.astype(str).tolist()},
+        per_cell_limit=6,
+    )
+
     matrix_rows: list[dict] = []
     candidate_count = 0
     for article in stock.index.astype(str).tolist():
         cells: list[dict] = []
         for city in stock.columns.astype(str).tolist():
+            city_key = _normalize_city(str(city))
             stock_value = int(round(float(stock.at[article, city])))
             need60_value = int(round(float(need60.at[article, city])))
             in_transit_value = int(round(float(transit.at[article, city])))
             total_value = int(round(float(total_with_transit.at[article, city])))
             is_candidate = bool(candidate_mask.at[article, city])
+            shipment_meta = shipment_events_by_cell.get((article, city_key), {})
+            events = shipment_meta.get("events") or []
             if is_candidate:
                 candidate_count += 1
             cells.append(
@@ -292,6 +308,18 @@ def get_stocks_workspace(
                     "turnover_grade": str(grade_map.at[article, city] or ""),
                     "is_candidate": is_candidate,
                     "display_value": f"{stock_value} | {need60_value} | {in_transit_value}",
+                    "shipment_total_qty": int(shipment_meta.get("total_quantity") or 0),
+                    "shipment_events_count": int(shipment_meta.get("events_count") or 0),
+                    "shipment_last_at": shipment_meta.get("last_event_at").isoformat()
+                    if shipment_meta.get("last_event_at")
+                    else None,
+                    "shipment_events": [
+                        {
+                            "quantity": int(item.get("quantity") or 0),
+                            "event_at": item.get("event_at").isoformat() if item.get("event_at") else None,
+                        }
+                        for item in events
+                    ],
                 }
             )
         matrix_rows.append(

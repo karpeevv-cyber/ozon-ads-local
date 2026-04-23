@@ -10,6 +10,7 @@ from app.models import (
     CampaignProduct,
     MarketplaceCredential,
     Organization,
+    ShipmentEvent,
     ShipmentHistory,
     StorageSnapshotCache,
     TrendsSnapshotCache,

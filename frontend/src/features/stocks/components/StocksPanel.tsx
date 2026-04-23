@@ -31,6 +31,21 @@ function formatTimestamp(value: string | null) {
   }).format(date);
 }
 
+function formatShipmentDate(value: string | null) {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
+
 export function StocksPanel({ workspace, reviewMode }: StocksPanelProps) {
   return (
     <section className="section-grid stocks-panel-section">
@@ -106,12 +121,24 @@ export function StocksPanel({ workspace, reviewMode }: StocksPanelProps) {
                     {row.cells.map((cell) => {
                       const backgroundColor = TURNOVER_GRADE_COLORS[cell.turnover_grade] || "transparent";
                       const className = reviewMode && cell.is_candidate ? "stocks-candidate-cell" : "";
+                      const shipmentTooltip = cell.shipment_events.length
+                        ? cell.shipment_events
+                            .map((event) => `- ${formatShipmentDate(event.event_at)}: ${event.quantity} шт`)
+                            .join("\n")
+                        : "- нет отгрузок";
+                      const title = [
+                        `Stock ${cell.stock}, Need60 ${cell.need60}, InTransit ${cell.in_transit}`,
+                        `Отгружено всего: ${cell.shipment_total_qty} шт`,
+                        `Дата последней: ${formatShipmentDate(cell.shipment_last_at)}`,
+                        "Последние отгрузки:",
+                        shipmentTooltip,
+                      ].join("\n");
                       return (
                         <td
                           key={`${row.article}:${cell.city}`}
                           className={className}
                           style={{ backgroundColor }}
-                          title={`Stock ${cell.stock}, Need60 ${cell.need60}, InTransit ${cell.in_transit}`}
+                          title={title}
                         >
                           {cell.display_value}
                         </td>
