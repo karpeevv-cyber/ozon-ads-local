@@ -107,14 +107,17 @@ a {
 
 .page-content {
   padding: 34px;
+  min-width: 0;
 }
 
 .page-content-shell {
   position: relative;
+  min-width: 0;
 }
 
 .tab-content-shell {
   position: relative;
+  min-width: 0;
 }
 
 .tab-content-hidden {
@@ -382,16 +385,19 @@ a {
 
 .stocks-matrix-wrap {
   overflow-x: auto;
+  max-width: 100%;
 }
 
 .stocks-panel-section {
   display: block;
   width: 100%;
+  max-width: 100%;
 }
 
 .stocks-panel-card {
   width: 100%;
   max-width: none;
+  min-width: 0;
 }
 
 .stocks-matrix-table {
