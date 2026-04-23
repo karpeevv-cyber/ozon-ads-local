@@ -42,18 +42,20 @@ function formatShipmentDate(value: string | null) {
 
 export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPanelProps) {
   function qtyToBucket(quantity: number): number {
-    if (quantity < 5) return 0;
-    if (quantity < 10) return 1;
-    if (quantity < 15) return 2;
-    if (quantity < 20) return 3;
-    return 4;
+    if (quantity <= 0) return 0;
+    if (quantity <= 5) return 1;
+    if (quantity <= 10) return 2;
+    if (quantity <= 15) return 3;
+    if (quantity <= 20) return 4;
+    return 5;
   }
 
   function bucketToFill(bucket: number): string {
-    if (bucket <= 0) return "rgba(224, 224, 224, 0.45)";
-    if (bucket === 1) return "rgba(173, 231, 180, 0.62)";
-    if (bucket === 2) return "rgba(255, 237, 168, 0.66)";
-    if (bucket === 3) return "rgba(255, 189, 189, 0.68)";
+    if (bucket <= 0) return "transparent";
+    if (bucket === 1) return "rgba(224, 224, 224, 0.45)";
+    if (bucket === 2) return "rgba(173, 231, 180, 0.62)";
+    if (bucket === 3) return "rgba(255, 237, 168, 0.66)";
+    if (bucket === 4) return "rgba(255, 189, 189, 0.68)";
     return "rgba(241, 106, 106, 0.72)";
   }
 
@@ -71,9 +73,10 @@ export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPa
       bucket = qtyToBucket(qty);
     } else {
       const score = qtyToBucket(nowQty) * 3 + qtyToBucket(in30Qty) * 2 + qtyToBucket(in60Qty);
-      if (score >= 10) bucket = 4;
-      else if (score >= 7) bucket = 3;
-      else if (score >= 4) bucket = 2;
+      if (score >= 15) bucket = 5;
+      else if (score >= 10) bucket = 4;
+      else if (score >= 6) bucket = 3;
+      else if (score >= 3) bucket = 2;
       else if (score >= 1) bucket = 1;
       else bucket = 0;
     }
