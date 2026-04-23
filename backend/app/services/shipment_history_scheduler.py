@@ -9,7 +9,7 @@ from app.db.session import SessionLocal
 from app.services.company_config import default_company_from_env, load_company_configs
 from app.services.shipment_history import rebuild_shipment_history_from_api
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 
 def _iter_company_credentials() -> list[tuple[str, str, str]]:

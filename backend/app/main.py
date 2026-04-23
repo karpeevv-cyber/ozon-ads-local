@@ -10,7 +10,7 @@ from app.api.router import build_api_router
 from app.core.config import get_settings
 from app.services.shipment_history_scheduler import shipment_history_scheduler_loop
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 
 def create_app() -> FastAPI:
