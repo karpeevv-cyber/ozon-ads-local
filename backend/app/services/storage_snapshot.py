@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.db.bootstrap import create_all
 from app.services.company_config import resolve_company_config
 from app.services.legacy_compat import build_fee_risk_forecast_table, load_storage_cache_payload
+from app.services.shipment_history import sync_shipment_history
 from app.services.storage_paths import REPO_ROOT, backend_data_path
 
 
@@ -156,6 +157,16 @@ def get_storage_snapshot(*, company: str | None = None, db: Session | None = Non
                 source_ref=source_ref,
             )
     lot_rows = payload.get("lot_rows", []) if isinstance(payload, dict) else []
+    if db is not None and isinstance(payload, dict) and "lot_rows" in payload:
+        try:
+            sync_shipment_history(
+                db,
+                company_name=company_name,
+                seller_client_id=seller_client_id,
+                lot_rows=list(lot_rows) if isinstance(lot_rows, list) else [],
+            )
+        except Exception:
+            pass
     df_lots = pd.DataFrame(lot_rows)
     df_risk = build_fee_risk_forecast_table(df_lots) if not df_lots.empty else pd.DataFrame()
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 import pandas as pd
+from sqlalchemy.orm import Session
 
 from app.services.company_config import resolve_company_config
 from app.services.legacy_compat import (
@@ -10,6 +11,7 @@ from app.services.legacy_compat import (
     build_stocks_rows_cached,
     load_storage_cache_payload,
 )
+from app.services.shipment_history import load_shipment_pairs
 
 
 TRANSIT_DAYS_MAP = {
@@ -78,7 +80,20 @@ def _position_filter_rows(rows: list[dict], position_filter: str) -> list[dict]:
     return out
 
 
-def _build_shipments_lookup(seller_client_id: str) -> tuple[set[tuple[str, str]], datetime | None]:
+def _build_shipments_lookup(
+    seller_client_id: str,
+    *,
+    company_name: str,
+    db: Session | None,
+) -> tuple[set[tuple[str, str]], datetime | None]:
+    if db is not None:
+        pairs, ts = load_shipment_pairs(
+            db,
+            company_name=company_name,
+            seller_client_id=seller_client_id,
+        )
+        if pairs:
+            return pairs, ts
     payload, ts, _source_path = load_storage_cache_payload(seller_client_id, "v12")
     lot_rows = payload.get("lot_rows", []) if isinstance(payload, dict) else []
     article_city_pairs: set[tuple[str, str]] = set()
@@ -130,6 +145,7 @@ def get_stocks_workspace(
     regional_order_min: int = 2,
     regional_order_target: int = 5,
     position_filter: str = "ALL",
+    db: Session | None = None,
 ) -> dict:
     company_name, config = resolve_company_config(company)
     seller_client_id = (config.get("seller_client_id") or "").strip()
@@ -169,7 +185,11 @@ def get_stocks_workspace(
         seller_api_key=seller_api_key,
     )
     filtered_rows = _position_filter_rows(base_rows, normalized_position_filter)
-    shipments_pairs, shipments_ts = _build_shipments_lookup(seller_client_id)
+    shipments_pairs, shipments_ts = _build_shipments_lookup(
+        seller_client_id,
+        company_name=company_name,
+        db=db,
+    )
 
     df = pd.DataFrame(filtered_rows)
     if df.empty:

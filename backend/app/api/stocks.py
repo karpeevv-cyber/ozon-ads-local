@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 
+from app.db.session import get_db
 from app.schemas.stocks import StocksSnapshotResponse, StocksWorkspaceResponse
 from app.services.stocks_snapshot import get_stocks_snapshot, get_stocks_workspace
 
@@ -17,6 +19,7 @@ def stocks_workspace(
     regional_order_min: int = Query(default=2, ge=0),
     regional_order_target: int = Query(default=5, ge=0),
     position_filter: str = Query(default="ALL"),
+    db: Session = Depends(get_db),
 ):
     return StocksWorkspaceResponse(
         **get_stocks_workspace(
@@ -24,5 +27,6 @@ def stocks_workspace(
             regional_order_min=regional_order_min,
             regional_order_target=regional_order_target,
             position_filter=position_filter,
+            db=db,
         )
     )

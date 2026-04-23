@@ -1,6 +1,7 @@
 from app.models.bids import BidChange, CampaignComment
 from app.models.campaign import Campaign, CampaignDailyMetric, CampaignProduct
 from app.models.organization import MarketplaceCredential, Organization
+from app.models.shipment_history import ShipmentHistory
 from app.models.storage import StorageSnapshotCache
 from app.models.trends import TrendsSnapshotCache
 from app.models.unit_economics import UnitEconomicsOverride
@@ -15,6 +16,7 @@ __all__ = [
     "MarketplaceCredential",
     "OrganizationMembership",
     "Organization",
+    "ShipmentHistory",
     "StorageSnapshotCache",
     "TrendsSnapshotCache",
     "UnitEconomicsOverride",
