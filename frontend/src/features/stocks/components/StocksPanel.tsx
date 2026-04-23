@@ -58,9 +58,10 @@ export function StocksPanel({ workspace, highlightMode }: StocksPanelProps) {
       return {};
     }
     const step = Math.max(1, Math.ceil(quantity / 5));
-    const alpha = Math.min(0.62, 0.16 + step * 0.06);
+    const alpha = Math.min(0.9, 0.12 + step * 0.12);
+    const alphaSoft = Math.max(0.16, alpha - 0.22);
     return {
-      backgroundImage: `linear-gradient(135deg, rgba(184, 92, 56, ${alpha}) 0%, rgba(184, 92, 56, ${Math.max(0.12, alpha - 0.08)}) 100%)`,
+      backgroundImage: `linear-gradient(135deg, rgba(184, 92, 56, ${alpha}) 0%, rgba(152, 58, 30, ${alphaSoft}) 100%)`,
     };
   }
 
