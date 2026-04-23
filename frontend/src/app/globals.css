@@ -408,7 +408,7 @@ a {
 .stocks-matrix-wrap {
   overflow: auto;
   max-width: 100%;
-  height: clamp(300px, calc(100vh - 560px), 620px);
+  height: clamp(600px, calc(100vh - 220px), 1000px);
   border: 1px solid var(--line);
   border-radius: 14px;
   scrollbar-gutter: stable both-edges;
