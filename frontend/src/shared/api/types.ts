@@ -165,6 +165,48 @@ export type StocksSnapshot = {
   rows: StockRow[];
 };
 
+export type StocksWorkspaceSettings = {
+  regional_order_min: number;
+  regional_order_target: number;
+  position_filter: string;
+};
+
+export type StocksWorkspaceSummary = {
+  article_count: number;
+  city_count: number;
+  candidate_count: number;
+  approved_count: number;
+};
+
+export type StocksWorkspaceCell = {
+  city: string;
+  stock: number;
+  need60: number;
+  in_transit: number;
+  total_with_transit: number;
+  turnover_grade: string;
+  is_candidate: boolean;
+  display_value: string;
+};
+
+export type StocksWorkspaceRow = {
+  article: string;
+  title: string;
+  cells: StocksWorkspaceCell[];
+};
+
+export type StocksWorkspace = {
+  company: string;
+  seller_client_id: string;
+  sku_count: number;
+  stocks_updated_at: string | null;
+  shipments_updated_at: string | null;
+  settings: StocksWorkspaceSettings;
+  summary: StocksWorkspaceSummary;
+  columns: string[];
+  rows: StocksWorkspaceRow[];
+};
+
 export type StorageRiskRow = {
   city: string;
   article: string;

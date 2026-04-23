@@ -12,6 +12,7 @@ import {
   RunningCampaign,
   StorageSnapshot,
   StocksSnapshot,
+  StocksWorkspace,
   TrendsSnapshot,
   TokenResponse,
   UnitEconomicsProducts,
@@ -182,6 +183,28 @@ export function applyBid(payload: ApplyBidPayload): Promise<ApplyBidResponse> {
 export function getStocksSnapshot(company?: string): Promise<StocksSnapshot> {
   const query = company ? `?company=${encodeURIComponent(company)}` : "";
   return requestJson<StocksSnapshot>(`/stocks/snapshot${query}`);
+}
+
+export function getStocksWorkspace(params: {
+  company?: string;
+  regionalOrderMin?: number;
+  regionalOrderTarget?: number;
+  positionFilter?: string;
+}): Promise<StocksWorkspace> {
+  const search = new URLSearchParams();
+  if (params.company) {
+    search.set("company", params.company);
+  }
+  if (params.regionalOrderMin !== undefined) {
+    search.set("regional_order_min", String(params.regionalOrderMin));
+  }
+  if (params.regionalOrderTarget !== undefined) {
+    search.set("regional_order_target", String(params.regionalOrderTarget));
+  }
+  if (params.positionFilter) {
+    search.set("position_filter", params.positionFilter);
+  }
+  return requestJson<StocksWorkspace>(`/stocks/workspace?${search.toString()}`);
 }
 
 export function getStorageSnapshot(company?: string): Promise<StorageSnapshot> {

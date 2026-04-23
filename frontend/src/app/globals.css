@@ -281,6 +281,139 @@ a {
   font: inherit;
 }
 
+.stocks-controls {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 0.8fr 0.9fr auto;
+  gap: 12px;
+  margin-bottom: 18px;
+  align-items: end;
+}
+
+.stocks-controls label {
+  display: grid;
+  gap: 8px;
+  font-size: 0.92rem;
+}
+
+.stocks-controls span,
+.stocks-meta {
+  color: var(--muted);
+}
+
+.stocks-controls select,
+.stocks-controls input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--ink);
+  font: inherit;
+}
+
+.stocks-toggle {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.stocks-toggle input {
+  width: 18px;
+  height: 18px;
+}
+
+.stocks-controls-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.stocks-primary-button,
+.stocks-secondary-button {
+  padding: 12px 16px;
+  border-radius: 14px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.stocks-primary-button {
+  border: none;
+  background: var(--accent);
+  color: white;
+}
+
+.stocks-secondary-button {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--ink);
+}
+
+.stocks-summary-grid {
+  margin-bottom: 12px;
+}
+
+.stocks-meta {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 14px;
+  font-size: 0.9rem;
+}
+
+.stocks-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 16px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.stocks-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stocks-legend i {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(28, 26, 23, 0.08);
+}
+
+.stocks-matrix-wrap {
+  overflow-x: auto;
+}
+
+.stocks-matrix-table {
+  min-width: max-content;
+}
+
+.stocks-matrix-table th,
+.stocks-matrix-table td {
+  min-width: 124px;
+  white-space: nowrap;
+}
+
+.stocks-sticky-cell {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 220px !important;
+  background: var(--surface);
+}
+
+.stocks-sticky-cell p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  white-space: normal;
+}
+
+.stocks-candidate-cell {
+  box-shadow: inset 0 0 0 2px rgba(184, 92, 56, 0.35);
+  font-weight: 700;
+}
+
 .bid-form {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -588,6 +721,15 @@ a {
 
   .filters-grid {
     grid-template-columns: 1fr;
+  }
+
+  .stocks-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .stocks-controls-actions,
+  .stocks-meta {
+    flex-direction: column;
   }
 
   .bid-form {

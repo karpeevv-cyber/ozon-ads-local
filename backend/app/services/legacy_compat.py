@@ -137,6 +137,93 @@ def build_stocks_rows(
     return rows, len(skus)
 
 
+def find_stocks_cache_files(seller_client_id: str, preferred_version: str = "v2") -> list[Path]:
+    search_roots = [BACKEND_DATA_DIR, REPO_ROOT]
+    out: list[Path] = []
+    for root in search_roots:
+        exact = root / f"stocks_cache_{preferred_version}_{seller_client_id}.pkl"
+        if exact.exists() and exact not in out:
+            out.append(exact)
+        other = sorted(
+            root.glob(f"stocks_cache_v*_{seller_client_id}.pkl"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        for path in other:
+            if path not in out:
+                out.append(path)
+    return out
+
+
+def load_stocks_cache_payload(
+    seller_client_id: str,
+    preferred_version: str = "v2",
+) -> tuple[list[dict], datetime | None, int]:
+    for cache_file in find_stocks_cache_files(seller_client_id, preferred_version):
+        try:
+            with cache_file.open("rb") as file:
+                payload = pickle.load(file) or {}
+        except Exception:
+            continue
+        rows = payload.get("rows", []) or []
+        ts = payload.get("ts")
+        sku_count = int(payload.get("sku_count", 0) or 0)
+        if isinstance(rows, list):
+            return rows, ts if isinstance(ts, datetime) else None, sku_count
+    return [], None, 0
+
+
+def save_stocks_cache_payload(
+    seller_client_id: str,
+    *,
+    rows: list[dict],
+    sku_count: int,
+    version: str = "v2",
+) -> datetime:
+    ts = datetime.now()
+    cache_path = BACKEND_DATA_DIR / f"stocks_cache_{version}_{seller_client_id}.pkl"
+    with cache_path.open("wb") as file:
+        pickle.dump(
+            {
+                "rows": rows,
+                "ts": ts,
+                "sku_count": int(sku_count),
+                "rows_count": len(rows),
+            },
+            file,
+        )
+    return ts
+
+
+def build_stocks_rows_cached(
+    *,
+    seller_client_id: str,
+    seller_api_key: str,
+    version: str = "v2",
+    max_age_hours: int = 24,
+) -> tuple[list[dict], int, datetime | None]:
+    rows, ts, sku_count = load_stocks_cache_payload(seller_client_id, preferred_version=version)
+    if rows and ts is not None:
+        age_seconds = (datetime.now() - ts).total_seconds()
+        if age_seconds <= max_age_hours * 3600:
+            return rows, sku_count, ts
+
+    rows, sku_count = build_stocks_rows(
+        seller_client_id=seller_client_id,
+        seller_api_key=seller_api_key,
+    )
+    try:
+        ts = save_stocks_cache_payload(
+            seller_client_id,
+            rows=rows,
+            sku_count=sku_count,
+            version=version,
+        )
+    except Exception:
+        ts = datetime.now()
+    return rows, sku_count, ts
+
+
 def find_storage_cache_files(seller_client_id: str, preferred_version: str) -> list[Path]:
     search_roots = [BACKEND_DATA_DIR, REPO_ROOT]
     out: list[Path] = []

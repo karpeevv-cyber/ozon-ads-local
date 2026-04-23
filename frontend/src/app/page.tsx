@@ -18,7 +18,7 @@ import {
   getRecentBidChanges,
   getRunningCampaigns,
   getStorageSnapshot,
-  getStocksSnapshot,
+  getStocksWorkspace,
   getTrendsSnapshot,
   getUnitEconomicsProducts,
   getUnitEconomicsSummary,
@@ -33,6 +33,10 @@ type HomePageProps = {
     date_from?: string;
     date_to?: string;
     tab?: string;
+    stocks_regional_order_min?: string;
+    stocks_regional_order_target?: string;
+    stocks_position_filter?: string;
+    stocks_review_mode?: string;
   }>;
 };
 
@@ -259,8 +263,22 @@ async function renderTabContent(params: {
   dateFrom: string;
   dateTo: string;
   companies: CompanyConfig[];
+  stocksRegionalOrderMin: number;
+  stocksRegionalOrderTarget: number;
+  stocksPositionFilter: string;
+  stocksReviewMode: boolean;
 }) {
-  const { activeTab, selectedCompany, dateFrom, dateTo, companies } = params;
+  const {
+    activeTab,
+    selectedCompany,
+    dateFrom,
+    dateTo,
+    companies,
+    stocksRegionalOrderMin,
+    stocksRegionalOrderTarget,
+    stocksPositionFilter,
+    stocksReviewMode,
+  } = params;
 
   switch (activeTab) {
     case "main": {
@@ -327,8 +345,13 @@ async function renderTabContent(params: {
       return <FinancePanel summary={summary} />;
     }
     case "stocks": {
-      const snapshot = await getStocksSnapshot(selectedCompany);
-      return <StocksPanel snapshot={snapshot} />;
+      const workspace = await getStocksWorkspace({
+        company: selectedCompany,
+        regionalOrderMin: stocksRegionalOrderMin,
+        regionalOrderTarget: stocksRegionalOrderTarget,
+        positionFilter: stocksPositionFilter,
+      });
+      return <StocksPanel workspace={workspace} reviewMode={stocksReviewMode} />;
     }
     case "storage": {
       const snapshot = await getStorageSnapshot(selectedCompany);
@@ -381,6 +404,10 @@ async function TabContent(params: {
   dateFrom: string;
   dateTo: string;
   companies: CompanyConfig[];
+  stocksRegionalOrderMin: number;
+  stocksRegionalOrderTarget: number;
+  stocksPositionFilter: string;
+  stocksReviewMode: boolean;
 }) {
   try {
     return await renderTabContent(params);
@@ -417,7 +444,18 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const dateFrom = resolvedSearchParams.date_from || defaultRange.dateFrom;
   const dateTo = resolvedSearchParams.date_to || defaultRange.dateTo;
   const activeTab = resolveTab(resolvedSearchParams.tab);
-  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}`;
+  const stocksRegionalOrderMin = Math.max(0, Number.parseInt(resolvedSearchParams.stocks_regional_order_min || "2", 10) || 2);
+  const stocksRegionalOrderTarget = Math.max(
+    stocksRegionalOrderMin,
+    Number.parseInt(resolvedSearchParams.stocks_regional_order_target || "5", 10) || 5,
+  );
+  const stocksPositionFilter = ["ALL", "CORE", "ADDITIONAL"].includes(
+    String(resolvedSearchParams.stocks_position_filter || "").toUpperCase(),
+  )
+    ? String(resolvedSearchParams.stocks_position_filter || "ALL").toUpperCase()
+    : "ALL";
+  const stocksReviewMode = String(resolvedSearchParams.stocks_review_mode || "1") !== "0";
+  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}:${stocksRegionalOrderMin}:${stocksRegionalOrderTarget}:${stocksPositionFilter}:${stocksReviewMode ? "1" : "0"}`;
   return (
     <AppShell
       filters={
@@ -436,6 +474,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           dateFrom={dateFrom}
           dateTo={dateTo}
           companies={companies}
+          stocksRegionalOrderMin={stocksRegionalOrderMin}
+          stocksRegionalOrderTarget={stocksRegionalOrderTarget}
+          stocksPositionFilter={stocksPositionFilter}
+          stocksReviewMode={stocksReviewMode}
         />
       </Suspense>
     </AppShell>
