@@ -380,12 +380,19 @@ a {
   border: 1px solid rgba(28, 26, 23, 0.08);
 }
 
+.stocks-panel-section {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
 .stocks-matrix-wrap {
   overflow-x: auto;
 }
 
 .stocks-panel-full {
-  grid-column: span 12;
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: none;
 }
 
 .stocks-matrix-table {

@@ -33,7 +33,7 @@ function formatTimestamp(value: string | null) {
 
 export function StocksPanel({ workspace, reviewMode }: StocksPanelProps) {
   return (
-    <section className="dashboard-grid section-grid">
+    <section className="dashboard-grid section-grid stocks-panel-section">
       <article className="panel-card panel-card-wide section-card stocks-panel-full">
         <div className="panel-header">
           <div>
