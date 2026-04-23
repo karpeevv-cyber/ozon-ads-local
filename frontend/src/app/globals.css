@@ -286,7 +286,7 @@ a {
 
 .stocks-controls {
   display: grid;
-  grid-template-columns: minmax(180px, 1.2fr) 112px 112px minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(180px, 1.2fr) 112px 112px minmax(220px, 1fr) 170px auto;
   gap: 10px;
   margin-bottom: 10px;
   align-items: end;
@@ -338,6 +338,17 @@ a {
 .stocks-check input {
   width: 16px;
   height: 16px;
+}
+
+.stocks-toggle {
+  display: grid !important;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.stocks-toggle input {
+  width: 18px;
+  height: 18px;
 }
 
 .stocks-controls-actions {
@@ -396,31 +407,6 @@ a {
   border: 1px solid rgba(28, 26, 23, 0.08);
 }
 
-.stocks-kpi-row {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.stocks-kpi-chip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: var(--surface-strong);
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-
-.stocks-kpi-chip strong {
-  color: var(--ink);
-  font-size: 1.02rem;
-}
-
 .stocks-matrix-wrap {
   overflow: auto;
   max-width: 100%;
@@ -477,14 +463,6 @@ a {
 
 .stocks-matrix-table td > span {
   display: block;
-}
-
-.stocks-cell-risk {
-  display: block;
-  margin-top: 2px;
-  color: rgba(28, 26, 23, 0.72);
-  font-size: 0.66rem;
-  letter-spacing: 0.01em;
 }
 
 .stocks-city-head {
@@ -823,10 +801,6 @@ a {
 
   .stocks-controls {
     grid-template-columns: 1fr;
-  }
-
-  .stocks-kpi-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .stocks-controls-actions,

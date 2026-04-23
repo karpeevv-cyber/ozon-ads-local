@@ -8,6 +8,7 @@ type StocksControlsProps = {
   regionalOrderTarget: number;
   positionFilter: string;
   highlightLevels: string[];
+  reviewMode: boolean;
 };
 
 export function StocksControls({
@@ -15,6 +16,7 @@ export function StocksControls({
   regionalOrderTarget,
   positionFilter,
   highlightLevels,
+  reviewMode,
 }: StocksControlsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -23,6 +25,7 @@ export function StocksControls({
   const [draftTarget, setDraftTarget] = useState(String(regionalOrderTarget));
   const [draftPositionFilter, setDraftPositionFilter] = useState(positionFilter);
   const [draftHighlightLevels, setDraftHighlightLevels] = useState<string[]>(highlightLevels);
+  const [draftReviewMode, setDraftReviewMode] = useState(reviewMode);
 
   function toggleHighlightLevel(level: string, checked: boolean) {
     setDraftHighlightLevels((prev) => {
@@ -45,6 +48,7 @@ export function StocksControls({
     } else {
       params.delete("stocks_highlight_levels");
     }
+    params.set("stocks_review_mode", draftReviewMode ? "1" : "0");
     params.set("tab", "stocks");
     return params;
   }
@@ -120,6 +124,15 @@ export function StocksControls({
           <span>Paid in 60d</span>
         </label>
       </fieldset>
+      <label className="stocks-toggle">
+        <span>Highlight candidates</span>
+        <input
+          type="checkbox"
+          checked={draftReviewMode}
+          onChange={(event) => setDraftReviewMode(event.target.checked)}
+          disabled={isPending}
+        />
+      </label>
       <div className="stocks-controls-actions">
         <button type="submit" className="stocks-primary-button" disabled={isPending}>
           Apply

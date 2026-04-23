@@ -37,6 +37,7 @@ type HomePageProps = {
     stocks_regional_order_target?: string;
     stocks_position_filter?: string;
     stocks_highlight_levels?: string;
+    stocks_review_mode?: string;
   }>;
 };
 
@@ -267,6 +268,7 @@ async function renderTabContent(params: {
   stocksRegionalOrderTarget: number;
   stocksPositionFilter: string;
   stocksHighlightLevels: string[];
+  stocksReviewMode: boolean;
 }) {
   const {
     activeTab,
@@ -278,6 +280,7 @@ async function renderTabContent(params: {
     stocksRegionalOrderTarget,
     stocksPositionFilter,
     stocksHighlightLevels,
+    stocksReviewMode,
   } = params;
 
   switch (activeTab) {
@@ -351,7 +354,13 @@ async function renderTabContent(params: {
         regionalOrderTarget: stocksRegionalOrderTarget,
         positionFilter: stocksPositionFilter,
       });
-      return <StocksPanel workspace={workspace} highlightLevels={stocksHighlightLevels} />;
+      return (
+        <StocksPanel
+          workspace={workspace}
+          highlightLevels={stocksHighlightLevels}
+          reviewMode={stocksReviewMode}
+        />
+      );
     }
     case "storage": {
       const snapshot = await getStorageSnapshot(selectedCompany);
@@ -408,6 +417,7 @@ async function TabContent(params: {
   stocksRegionalOrderTarget: number;
   stocksPositionFilter: string;
   stocksHighlightLevels: string[];
+  stocksReviewMode: boolean;
 }) {
   try {
     return await renderTabContent(params);
@@ -459,7 +469,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter((value, index, arr) => allowedHighlightLevels.has(value) && arr.indexOf(value) === index);
-  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}:${stocksRegionalOrderMin}:${stocksRegionalOrderTarget}:${stocksPositionFilter}:${stocksHighlightLevels.join("|")}`;
+  const stocksReviewMode = String(resolvedSearchParams.stocks_review_mode || "1") !== "0";
+  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}:${stocksRegionalOrderMin}:${stocksRegionalOrderTarget}:${stocksPositionFilter}:${stocksHighlightLevels.join("|")}:${stocksReviewMode ? "1" : "0"}`;
   return (
     <AppShell
       filters={
@@ -482,6 +493,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           stocksRegionalOrderTarget={stocksRegionalOrderTarget}
           stocksPositionFilter={stocksPositionFilter}
           stocksHighlightLevels={stocksHighlightLevels}
+          stocksReviewMode={stocksReviewMode}
         />
       </Suspense>
     </AppShell>

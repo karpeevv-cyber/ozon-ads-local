@@ -5,6 +5,7 @@ import { StocksControls } from "@/features/stocks/components/StocksControls";
 type StocksPanelProps = {
   workspace: StocksWorkspace;
   highlightLevels: string[];
+  reviewMode: boolean;
 };
 
 function formatTimestamp(value: string | null) {
@@ -39,7 +40,7 @@ function formatShipmentDate(value: string | null) {
   }).format(date);
 }
 
-export function StocksPanel({ workspace, highlightLevels }: StocksPanelProps) {
+export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPanelProps) {
   function qtyToBucket(quantity: number): number {
     if (quantity < 5) return 0;
     if (quantity < 10) return 1;
@@ -90,7 +91,6 @@ export function StocksPanel({ workspace, highlightLevels }: StocksPanelProps) {
             <p className="eyebrow">Stocks</p>
             <h3>Inventory matrix by city</h3>
           </div>
-          <span className="status-badge">{workspace.sku_count} sku</span>
         </div>
 
         <StocksControls
@@ -98,22 +98,8 @@ export function StocksPanel({ workspace, highlightLevels }: StocksPanelProps) {
           regionalOrderTarget={workspace.settings.regional_order_target}
           positionFilter={workspace.settings.position_filter}
           highlightLevels={highlightLevels}
+          reviewMode={reviewMode}
         />
-
-        <div className="stocks-kpi-row">
-          <span className="stocks-kpi-chip">
-            Articles <strong>{workspace.summary.article_count}</strong>
-          </span>
-          <span className="stocks-kpi-chip">
-            Cities <strong>{workspace.summary.city_count}</strong>
-          </span>
-          <span className="stocks-kpi-chip">
-            Candidates <strong>{workspace.summary.candidate_count}</strong>
-          </span>
-          <span className="stocks-kpi-chip">
-            Approved <strong>{workspace.summary.approved_count}</strong>
-          </span>
-        </div>
 
         <div className="stocks-meta">
           <span>Stocks cache: {formatTimestamp(workspace.stocks_updated_at)}</span>
@@ -142,7 +128,15 @@ export function StocksPanel({ workspace, highlightLevels }: StocksPanelProps) {
                       <strong>{row.article}</strong>
                     </td>
                     {row.cells.map((cell) => {
-                      const style = storageHighlightStyle(cell);
+                      const style: CSSProperties = {
+                        ...storageHighlightStyle(cell),
+                        ...(reviewMode && cell.is_candidate
+                          ? {
+                              boxShadow: "inset 0 0 0 2px rgba(184, 92, 56, 0.44)",
+                              fontWeight: 700,
+                            }
+                          : {}),
+                      };
                       const shipmentTooltip = cell.shipment_events.length
                         ? cell.shipment_events
                             .map((event) => {
@@ -170,9 +164,6 @@ export function StocksPanel({ workspace, highlightLevels }: StocksPanelProps) {
                           title={title}
                         >
                           <span>{cell.display_value}</span>
-                          <small className="stocks-cell-risk">
-                            P:{cell.paid_storage_qty} | 30:{cell.paid_storage_soon_30_qty} | 60:{cell.paid_storage_soon_60_qty}
-                          </small>
                         </td>
                       );
                     })}
