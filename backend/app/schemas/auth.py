@@ -1,5 +1,7 @@
 from pydantic import BaseModel, EmailStr
 
+from app.schemas.profile import CompanyProfileResponse
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -17,3 +19,4 @@ class CurrentUserResponse(BaseModel):
     full_name: str
     is_active: bool
     is_admin: bool
+    companies: list[CompanyProfileResponse] = []

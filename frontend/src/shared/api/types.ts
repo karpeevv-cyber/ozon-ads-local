@@ -1,5 +1,6 @@
 export type CompanyConfig = {
   name: string;
+  display_name?: string;
   perf_client_id: string;
   perf_client_secret: string;
   seller_client_id: string;
@@ -105,7 +106,36 @@ export type CurrentUser = {
   full_name: string;
   is_active: boolean;
   is_admin: boolean;
+  companies: CompanyProfile[];
 };
+
+export type CompanyProfile = {
+  id: number;
+  name: string;
+  display_name: string;
+  is_active: boolean;
+  role: string;
+  perf_client_id: string;
+  perf_client_secret_masked: string;
+  seller_client_id: string;
+  seller_api_key_masked: string;
+};
+
+export type CompanyProfileList = {
+  companies: CompanyProfile[];
+};
+
+export type CompanyProfilePayload = {
+  name: string;
+  display_name?: string;
+  perf_client_id?: string;
+  perf_client_secret?: string;
+  seller_client_id?: string;
+  seller_api_key?: string;
+  is_active?: boolean;
+};
+
+export type CompanyProfileUpdatePayload = Partial<CompanyProfilePayload>;
 
 export type BidChangeRecord = {
   ts_iso: string;

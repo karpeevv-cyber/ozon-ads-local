@@ -4,6 +4,10 @@ import {
   CampaignReport,
   CampaignCommentRecord,
   CompanyConfig,
+  CompanyProfile,
+  CompanyProfileList,
+  CompanyProfilePayload,
+  CompanyProfileUpdatePayload,
   CurrentUser,
   BidChangeRecord,
   FinanceSummary,
@@ -97,6 +101,28 @@ export async function putJson<T>(path: string, body: unknown, token?: string): P
   return (await response.json()) as T;
 }
 
+export async function patchJson<T>(path: string, body: unknown, token?: string): Promise<T> {
+  const apiUrl = `${getApiBaseUrl()}${path}`;
+  const timeoutMs = typeof window === "undefined" ? 120000 : 25000;
+  const timeout = withTimeout(timeoutMs);
+  const response = await fetch(apiUrl, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+    signal: timeout.signal,
+  }).finally(timeout.cleanup);
+
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status} ${response.statusText} for ${apiUrl}`);
+  }
+
+  return (await response.json()) as T;
+}
+
 export async function getAuthedJson<T>(path: string, token: string): Promise<T> {
   const apiUrl = `${getApiBaseUrl()}${path}`;
   const timeoutMs = typeof window === "undefined" ? 120000 : 25000;
@@ -165,6 +191,22 @@ export function login(payload: LoginPayload): Promise<TokenResponse> {
 
 export function getCurrentUser(token: string): Promise<CurrentUser> {
   return getAuthedJson<CurrentUser>("/auth/me", token);
+}
+
+export function getProfileCompanies(token: string): Promise<CompanyProfileList> {
+  return getAuthedJson<CompanyProfileList>("/profile/companies", token);
+}
+
+export function createProfileCompany(payload: CompanyProfilePayload, token: string): Promise<CompanyProfile> {
+  return postJson<CompanyProfile>("/profile/companies", payload, token);
+}
+
+export function updateProfileCompany(
+  companyId: number,
+  payload: CompanyProfileUpdatePayload,
+  token: string,
+): Promise<CompanyProfile> {
+  return patchJson<CompanyProfile>(`/profile/companies/${companyId}`, payload, token);
 }
 
 export function getRecentBidChanges(): Promise<BidChangeRecord[]> {

@@ -4,6 +4,7 @@ import { BidApplyCard } from "@/features/bids/components/BidApplyCard";
 import { CampaignFilters } from "@/features/campaigns/components/CampaignFilters";
 import { FinancePanel } from "@/features/finance/components/FinancePanel";
 import { MainDashboard } from "@/features/main/components/MainDashboard";
+import { ProfilePanel } from "@/features/profile/components/ProfilePanel";
 import { StocksPanel } from "@/features/stocks/components/StocksPanel";
 import { StoragePanel } from "@/features/storage/components/StoragePanel";
 import { TrendsPanel } from "@/features/trends/components/TrendsPanel";
@@ -52,7 +53,8 @@ type SupportedTab =
   | "stocks"
   | "storage"
   | "search-trends"
-  | "formulas";
+  | "formulas"
+  | "profile";
 
 const supportedTabs = new Set<SupportedTab>([
   "main",
@@ -66,6 +68,7 @@ const supportedTabs = new Set<SupportedTab>([
   "storage",
   "search-trends",
   "formulas",
+  "profile",
 ]);
 
 function resolveTab(value?: string): SupportedTab {
@@ -382,6 +385,8 @@ async function renderTabContent(params: {
           copy="This section is reserved for formula logic and decision calculators. The navigation is ready; the feature module still needs to be extracted into the new stack."
         />
       );
+    case "profile":
+      return <ProfilePanel />;
     default:
       return null;
   }

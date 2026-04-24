@@ -671,6 +671,95 @@ a {
   font-size: 1.35rem;
 }
 
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.profile-card {
+  grid-column: span 12;
+}
+
+.ghost-button {
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.profile-companies {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.company-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(220px, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.company-row-active {
+  border-color: rgba(125, 47, 27, 0.32);
+  background: linear-gradient(180deg, rgba(184, 92, 56, 0.12), rgba(255, 255, 255, 0.58));
+}
+
+.company-row span {
+  display: grid;
+  gap: 3px;
+}
+
+.company-row small {
+  color: var(--muted);
+}
+
+.profile-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.profile-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+}
+
+.profile-form input {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--ink);
+  font: inherit;
+}
+
+.profile-check {
+  grid-template-columns: auto auto;
+  justify-content: start;
+  align-items: center;
+}
+
+.profile-check input {
+  width: 18px;
+  height: 18px;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -813,6 +902,11 @@ a {
   }
 
   .bid-form {
+    grid-template-columns: 1fr;
+  }
+
+  .company-row,
+  .profile-form {
     grid-template-columns: 1fr;
   }
 }

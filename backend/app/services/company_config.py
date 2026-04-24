@@ -4,6 +4,11 @@ import json
 import os
 from pathlib import Path
 
+from sqlalchemy.orm import joinedload
+
+from app.db.session import SessionLocal
+from app.models.organization import Organization
+
 
 def default_company_from_env() -> dict[str, str]:
     return {
@@ -136,7 +141,7 @@ def load_company_configs(env_path: str = ".env") -> dict[str, dict[str, str]]:
 
 
 def resolve_company_config(name: str | None, env_path: str = ".env") -> tuple[str, dict[str, str]]:
-    configs = load_company_configs(env_path=env_path)
+    configs = load_runtime_company_configs(env_path=env_path)
     if not configs:
         return ("default", default_company_from_env())
 
@@ -145,3 +150,38 @@ def resolve_company_config(name: str | None, env_path: str = ".env") -> tuple[st
 
     first_name = sorted(configs.keys())[0]
     return (first_name, configs[first_name])
+
+
+def _config_from_organization(organization: Organization) -> dict[str, str]:
+    credential = None
+    for item in organization.credentials:
+        if item.provider == "ozon" and item.is_active:
+            credential = item
+            break
+    if credential is None and organization.credentials:
+        credential = organization.credentials[0]
+    if credential is None:
+        return default_company_from_env()
+    return {
+        "perf_client_id": credential.perf_client_id,
+        "perf_client_secret": credential.perf_client_secret,
+        "seller_client_id": credential.seller_client_id,
+        "seller_api_key": credential.seller_api_key,
+    }
+
+
+def load_runtime_company_configs(env_path: str = ".env") -> dict[str, dict[str, str]]:
+    db = SessionLocal()
+    try:
+        organizations = (
+            db.query(Organization)
+            .options(joinedload(Organization.credentials))
+            .filter(Organization.is_active.is_(True))
+            .order_by(Organization.slug.asc())
+            .all()
+        )
+        if organizations:
+            return {organization.slug: _config_from_organization(organization) for organization in organizations}
+    finally:
+        db.close()
+    return load_company_configs(env_path=env_path)

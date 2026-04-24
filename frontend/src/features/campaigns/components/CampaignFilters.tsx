@@ -42,7 +42,7 @@ export function CampaignFilters({
           >
             {companies.map((company) => (
               <option key={company.name} value={company.name}>
-                {company.name}
+                {company.display_name || company.name}
               </option>
             ))}
           </select>

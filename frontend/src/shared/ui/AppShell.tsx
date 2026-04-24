@@ -22,6 +22,7 @@ const navItems = [
   { id: "storage", label: "Storage" },
   { id: "search-trends", label: "Search Trends" },
   { id: "formulas", label: "Formulas" },
+  { id: "profile", label: "Profile" },
 ];
 
 export function AppShell({ filters, children }: AppShellProps) {

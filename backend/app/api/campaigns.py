@@ -13,7 +13,7 @@ from app.services.campaign_reporting import (
     fetch_ads_stats_by_campaign_from_credentials,
     load_products_parallel,
 )
-from app.services.company_config import default_company_from_env, load_company_configs, resolve_company_config
+from app.services.company_config import default_company_from_env, load_runtime_company_configs, resolve_company_config
 from app.services.integrations.ozon_ads import get_running_campaigns
 from app.services.integrations.ozon_ads import perf_token
 from app.services.integrations.ozon_seller import seller_analytics_sku_day
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 @router.get("/companies", response_model=list[CompanyConfigResponse])
 def list_companies() -> list[CompanyConfigResponse]:
-    configs = load_company_configs()
+    configs = load_runtime_company_configs()
     if not configs:
         return [CompanyConfigResponse(name="default", **default_company_from_env())]
     return [CompanyConfigResponse(name=name, **data) for name, data in sorted(configs.items())]
