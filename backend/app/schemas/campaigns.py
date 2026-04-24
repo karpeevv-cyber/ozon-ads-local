@@ -91,6 +91,8 @@ class MainOverviewResponse(BaseModel):
     date_from: str
     date_to: str
     target_drr_pct: float
+    cache_hit: bool = False
+    cached_at: str | None = None
     chart_rows: list[MainOverviewChartRowResponse]
     daily_rows: list[MainOverviewDailyRowResponse]
     weekly_rows: list[MainOverviewWeeklyRowResponse]

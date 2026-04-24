@@ -173,6 +173,7 @@ export function getMainOverview(params: {
   dateFrom: string;
   dateTo: string;
   targetDrrPct?: number;
+  forceRefresh?: boolean;
 }): Promise<MainOverview> {
   const search = new URLSearchParams({
     date_from: params.dateFrom,
@@ -181,6 +182,9 @@ export function getMainOverview(params: {
   });
   if (params.company) {
     search.set("company", params.company);
+  }
+  if (params.forceRefresh) {
+    search.set("force_refresh", "1");
   }
   return requestJson<MainOverview>(`/campaigns/main-overview?${search.toString()}`);
 }

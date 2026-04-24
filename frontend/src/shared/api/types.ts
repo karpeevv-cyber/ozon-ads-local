@@ -85,6 +85,8 @@ export type MainOverview = {
   date_from: string;
   date_to: string;
   target_drr_pct: number;
+  cache_hit: boolean;
+  cached_at: string | null;
   chart_rows: MainOverviewChartRow[];
   daily_rows: MainOverviewDailyRow[];
   weekly_rows: MainOverviewWeeklyRow[];

@@ -8,6 +8,7 @@ from app.models import (
     CampaignComment,
     CampaignDailyMetric,
     CampaignProduct,
+    MainOverviewCache,
     MarketplaceCredential,
     Organization,
     ShipmentEvent,

@@ -1,4 +1,5 @@
 import { MainOverview } from "@/shared/api/types";
+import { MainRefreshButton } from "@/features/main/components/MainRefreshButton";
 
 type MainDashboardProps = {
   overview: MainOverview;
@@ -79,7 +80,10 @@ function RevenueChart({ overview }: MainDashboardProps) {
           <p className="eyebrow">Main</p>
           <h3>Выручка по дням</h3>
         </div>
-        <span className="status-badge">{overview.date_from} to {overview.date_to}</span>
+        <div className="main-header-actions">
+          <MainRefreshButton />
+          <span className="status-badge">{overview.date_from} to {overview.date_to}</span>
+        </div>
       </div>
       <div className="chart-summary-grid">
         <div>

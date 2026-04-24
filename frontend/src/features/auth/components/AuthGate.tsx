@@ -106,7 +106,8 @@ export function AuthGate({ children }: AuthGateProps) {
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((value) => !value)}
           >
-            {user.full_name || user.email}
+            <span aria-hidden="true">⚙</span>
+            <span className="sr-only">Open settings</span>
           </button>
           {menuOpen ? (
             <div className="user-menu-popover" role="menu">

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
 
 import pandas as pd
+from sqlalchemy.orm import Session
 
 from app.services.bid_log import load_bid_changes_df, load_campaign_comments_df
 from app.services.campaign_reporting import compute_daily_breakdown, fetch_ads_daily_totals
@@ -10,6 +12,8 @@ from app.services.company_config import resolve_company_config
 from app.services.integrations.ozon_ads import get_running_campaigns, perf_token
 from app.services.integrations.ozon_seller import seller_analytics_sku_day
 from app.services.unit_economics import get_unit_economics_summary
+from app.db.bootstrap import create_all
+from app.models.main_overview_cache import MainOverviewCache
 
 
 def _to_float(value) -> float:
@@ -385,3 +389,68 @@ def get_main_overview(*, company: str | None, date_from: str, date_to: str, targ
         if not weekly_df.empty
         else [],
     }
+
+
+def get_main_overview_cached(
+    *,
+    company: str | None,
+    date_from: str,
+    date_to: str,
+    target_drr_pct: float = 20.0,
+    force_refresh: bool = False,
+    db: Session | None = None,
+) -> dict:
+    company_name, _config = resolve_company_config(company)
+    cache_key_target = f"{float(target_drr_pct):.4f}"
+    if db is None:
+        payload = get_main_overview(
+            company=company,
+            date_from=date_from,
+            date_to=date_to,
+            target_drr_pct=target_drr_pct,
+        )
+        payload["cache_hit"] = False
+        payload["cached_at"] = None
+        return payload
+
+    create_all()
+    row = (
+        db.query(MainOverviewCache)
+        .filter(MainOverviewCache.company_name == company_name)
+        .filter(MainOverviewCache.date_from == str(date_from))
+        .filter(MainOverviewCache.date_to == str(date_to))
+        .filter(MainOverviewCache.target_drr_pct == cache_key_target)
+        .first()
+    )
+    if row is not None and not force_refresh:
+        try:
+            payload = json.loads(row.payload_json or "{}")
+        except Exception:
+            payload = {}
+        if payload:
+            payload["cache_hit"] = True
+            payload["cached_at"] = row.updated_at.isoformat() if row.updated_at else None
+            return payload
+
+    payload = get_main_overview(
+        company=company,
+        date_from=date_from,
+        date_to=date_to,
+        target_drr_pct=target_drr_pct,
+    )
+    payload["cache_hit"] = False
+    payload["cached_at"] = datetime.utcnow().isoformat()
+    cache_payload = json.dumps(payload, ensure_ascii=False, default=str)
+    if row is None:
+        row = MainOverviewCache(
+            company_name=company_name,
+            date_from=str(date_from),
+            date_to=str(date_to),
+            target_drr_pct=cache_key_target,
+            payload_json=cache_payload,
+        )
+        db.add(row)
+    else:
+        row.payload_json = cache_payload
+    db.commit()
+    return payload

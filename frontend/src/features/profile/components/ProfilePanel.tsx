@@ -144,11 +144,7 @@ export function ProfilePanel() {
           </div>
           <span className="status-badge">{user?.is_admin ? "admin" : "member"}</span>
         </div>
-        <div className="summary-grid">
-          <div>
-            <span>Name</span>
-            <strong>{user?.full_name || "-"}</strong>
-          </div>
+        <div className="summary-grid profile-summary-grid">
           <div>
             <span>Email</span>
             <strong>{user?.email || "-"}</strong>

@@ -1,6 +1,7 @@
 import logging
 import requests
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 
 from app.schemas.campaigns import (
     CampaignReportResponse,
@@ -17,7 +18,8 @@ from app.services.company_config import default_company_from_env, load_runtime_c
 from app.services.integrations.ozon_ads import get_running_campaigns
 from app.services.integrations.ozon_ads import perf_token
 from app.services.integrations.ozon_seller import seller_analytics_sku_day
-from app.services.main_overview import get_main_overview
+from app.services.main_overview import get_main_overview_cached
+from app.db.session import get_db
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 logger = logging.getLogger(__name__)
@@ -123,14 +125,18 @@ def main_overview(
     date_from: str = Query(...),
     date_to: str = Query(...),
     target_drr_pct: float = Query(default=20.0),
+    force_refresh: bool = Query(default=False),
+    db: Session = Depends(get_db),
 ) -> MainOverviewResponse:
     company_name, _config = resolve_company_config(company)
     try:
-        payload = get_main_overview(
+        payload = get_main_overview_cached(
             company=company,
             date_from=date_from,
             date_to=date_to,
             target_drr_pct=float(target_drr_pct),
+            force_refresh=force_refresh,
+            db=db,
         )
     except requests.HTTPError as exc:
         if exc.response is None or exc.response.status_code != 429:
@@ -141,6 +147,8 @@ def main_overview(
             "date_from": date_from,
             "date_to": date_to,
             "target_drr_pct": float(target_drr_pct),
+            "cache_hit": False,
+            "cached_at": None,
             "chart_rows": [],
             "daily_rows": [],
             "weekly_rows": [],
@@ -152,6 +160,8 @@ def main_overview(
             "date_from": date_from,
             "date_to": date_to,
             "target_drr_pct": float(target_drr_pct),
+            "cache_hit": False,
+            "cached_at": None,
             "chart_rows": [],
             "daily_rows": [],
             "weekly_rows": [],
