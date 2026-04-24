@@ -208,6 +208,17 @@ export type StocksWorkspaceSummary = {
   approved_count: number;
 };
 
+export type StocksWorkspaceTimings = {
+  resolve_company_ms: number;
+  stocks_cache_ms: number;
+  shipment_pairs_ms: number;
+  shipment_rebuild_ms: number;
+  dataframe_ms: number;
+  shipment_events_ms: number;
+  matrix_ms: number;
+  total_ms: number;
+};
+
 export type StocksWorkspaceCell = {
   shipment_events: {
     quantity: number;
@@ -246,6 +257,7 @@ export type StocksWorkspace = {
   shipments_updated_at: string | null;
   settings: StocksWorkspaceSettings;
   summary: StocksWorkspaceSummary;
+  timings: StocksWorkspaceTimings;
   columns: string[];
   rows: StocksWorkspaceRow[];
 };

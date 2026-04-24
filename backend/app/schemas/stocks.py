@@ -33,6 +33,17 @@ class StocksWorkspaceSummaryResponse(BaseModel):
     approved_count: int
 
 
+class StocksWorkspaceTimingResponse(BaseModel):
+    resolve_company_ms: float = 0
+    stocks_cache_ms: float = 0
+    shipment_pairs_ms: float = 0
+    shipment_rebuild_ms: float = 0
+    dataframe_ms: float = 0
+    shipment_events_ms: float = 0
+    matrix_ms: float = 0
+    total_ms: float = 0
+
+
 class StocksWorkspaceCellResponse(BaseModel):
     class ShipmentEventItem(BaseModel):
         quantity: int
@@ -72,5 +83,6 @@ class StocksWorkspaceResponse(BaseModel):
     shipments_updated_at: str | None
     settings: StocksWorkspaceSettingsResponse
     summary: StocksWorkspaceSummaryResponse
+    timings: StocksWorkspaceTimingResponse = Field(default_factory=StocksWorkspaceTimingResponse)
     columns: list[str]
     rows: list[StocksWorkspaceRowResponse]

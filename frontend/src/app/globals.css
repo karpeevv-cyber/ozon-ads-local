@@ -383,9 +383,26 @@ a {
 
 .stocks-meta {
   display: flex;
+  flex-wrap: wrap;
   gap: 14px;
   margin-bottom: 8px;
   font-size: 0.82rem;
+}
+
+.stocks-timing-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.stocks-timing-strip span {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.42);
 }
 
 .stocks-legend {

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+from time import perf_counter
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -15,6 +17,8 @@ from app.services.shipment_history import (
     load_shipment_pairs,
     rebuild_shipment_history_from_api,
 )
+
+logger = logging.getLogger(__name__)
 
 
 TRANSIT_DAYS_MAP = {
@@ -146,7 +150,17 @@ def get_stocks_workspace(
     position_filter: str = "ALL",
     db: Session | None = None,
 ) -> dict:
+    started_at = perf_counter()
+    timings: dict[str, float] = {}
+
+    def mark(key: str, checkpoint: float) -> float:
+        now = perf_counter()
+        timings[key] = round((now - checkpoint) * 1000, 2)
+        return now
+
+    checkpoint = perf_counter()
     company_name, config = resolve_company_config(company)
+    checkpoint = mark("resolve_company_ms", checkpoint)
     seller_client_id = (config.get("seller_client_id") or "").strip()
     seller_api_key = (config.get("seller_api_key") or "").strip()
 
@@ -175,38 +189,61 @@ def get_stocks_workspace(
                 "candidate_count": 0,
                 "approved_count": 0,
             },
+            "timings": {**timings, "total_ms": round((perf_counter() - started_at) * 1000, 2)},
             "columns": [],
             "rows": [],
         }
 
+    checkpoint = perf_counter()
     base_rows, sku_count, stocks_ts = build_stocks_rows_cached(
         seller_client_id=seller_client_id,
         seller_api_key=seller_api_key,
     )
+    checkpoint = mark("stocks_cache_ms", checkpoint)
     filtered_rows = _position_filter_rows(base_rows, normalized_position_filter)
+
+    checkpoint = perf_counter()
     shipments_pairs, shipments_ts = _build_shipments_lookup(
         seller_client_id,
         company_name=company_name,
         db=db,
     )
+    checkpoint = mark("shipment_pairs_ms", checkpoint)
     if db is not None and not shipments_pairs:
         try:
+            rebuild_checkpoint = perf_counter()
             rebuild_shipment_history_from_api(
                 db,
                 company_name=company_name,
                 seller_client_id=seller_client_id,
                 seller_api_key=seller_api_key,
             )
+            timings["shipment_rebuild_ms"] = round((perf_counter() - rebuild_checkpoint) * 1000, 2)
             shipments_pairs, shipments_ts = _build_shipments_lookup(
                 seller_client_id,
                 company_name=company_name,
                 db=db,
             )
         except Exception:
+            logger.exception("stocks workspace shipment rebuild failed", extra={"company": company_name})
             shipments_pairs, shipments_ts = set(), None
+    else:
+        timings["shipment_rebuild_ms"] = 0
 
+    checkpoint = perf_counter()
     df = pd.DataFrame(filtered_rows)
     if df.empty:
+        timings["dataframe_ms"] = round((perf_counter() - checkpoint) * 1000, 2)
+        timings["total_ms"] = round((perf_counter() - started_at) * 1000, 2)
+        logger.info(
+            "stocks workspace built",
+            extra={
+                "company": company_name,
+                "rows": 0,
+                "columns": 0,
+                "timings": timings,
+            },
+        )
         return {
             "company": company_name,
             "seller_client_id": seller_client_id,
@@ -224,6 +261,7 @@ def get_stocks_workspace(
                 "candidate_count": 0,
                 "approved_count": 0,
             },
+            "timings": timings,
             "columns": [],
             "rows": [],
         }
@@ -282,7 +320,9 @@ def get_stocks_workspace(
             [(str(article), city_key) in shipments_pairs for article in candidate_mask.index],
             index=candidate_mask.index,
         )
+    checkpoint = mark("dataframe_ms", checkpoint)
 
+    events_checkpoint = perf_counter()
     shipment_events_by_cell = load_shipment_events_map(
         db,
         company_name=company_name,
@@ -291,7 +331,9 @@ def get_stocks_workspace(
         city_keys={_normalize_city(str(city)) for city in stock.columns.astype(str).tolist()},
         per_cell_limit=6,
     )
+    timings["shipment_events_ms"] = round((perf_counter() - events_checkpoint) * 1000, 2)
 
+    matrix_checkpoint = perf_counter()
     matrix_rows: list[dict] = []
     candidate_count = 0
     now_utc = datetime.utcnow()
@@ -375,6 +417,17 @@ def get_stocks_workspace(
                 "cells": cells,
             }
         )
+    timings["matrix_ms"] = round((perf_counter() - matrix_checkpoint) * 1000, 2)
+    timings["total_ms"] = round((perf_counter() - started_at) * 1000, 2)
+    logger.info(
+        "stocks workspace built",
+        extra={
+            "company": company_name,
+            "rows": len(matrix_rows),
+            "columns": len(ordered_clusters),
+            "timings": timings,
+        },
+    )
 
     return {
         "company": company_name,
@@ -393,6 +446,7 @@ def get_stocks_workspace(
             "candidate_count": candidate_count,
             "approved_count": 0,
         },
+        "timings": timings,
         "columns": ordered_clusters,
         "rows": matrix_rows,
     }

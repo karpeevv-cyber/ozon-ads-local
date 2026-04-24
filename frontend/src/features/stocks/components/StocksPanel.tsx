@@ -40,6 +40,16 @@ function formatShipmentDate(value: string | null) {
   }).format(date);
 }
 
+function formatMs(value: number | undefined) {
+  if (value === undefined || Number.isNaN(value)) {
+    return "-";
+  }
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(2)}s`;
+  }
+  return `${Math.round(value)}ms`;
+}
+
 export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPanelProps) {
   function qtyToBucket(quantity: number): number {
     if (quantity <= 0) return 0;
@@ -105,6 +115,16 @@ export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPa
         <div className="stocks-meta">
           <span>Stocks cache: {formatTimestamp(workspace.stocks_updated_at)}</span>
           <span>Shipments cache: {formatTimestamp(workspace.shipments_updated_at)}</span>
+          <span title="Total backend build time for this Stocks workspace">
+            Build: {formatMs(workspace.timings?.total_ms)}
+          </span>
+        </div>
+
+        <div className="stocks-timing-strip">
+          <span>stocks {formatMs(workspace.timings?.stocks_cache_ms)}</span>
+          <span>shipments {formatMs(workspace.timings?.shipment_pairs_ms)}</span>
+          <span>events {formatMs(workspace.timings?.shipment_events_ms)}</span>
+          <span>matrix {formatMs(workspace.timings?.matrix_ms)}</span>
         </div>
 
         {workspace.rows.length === 0 || workspace.columns.length === 0 ? (
