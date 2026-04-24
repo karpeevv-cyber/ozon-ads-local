@@ -236,13 +236,11 @@ def get_stocks_workspace(
         timings["dataframe_ms"] = round((perf_counter() - checkpoint) * 1000, 2)
         timings["total_ms"] = round((perf_counter() - started_at) * 1000, 2)
         logger.info(
-            "stocks workspace built",
-            extra={
-                "company": company_name,
-                "rows": 0,
-                "columns": 0,
-                "timings": timings,
-            },
+            "stocks workspace built company=%s rows=%s columns=%s timings=%s",
+            company_name,
+            0,
+            0,
+            timings,
         )
         return {
             "company": company_name,
@@ -420,13 +418,11 @@ def get_stocks_workspace(
     timings["matrix_ms"] = round((perf_counter() - matrix_checkpoint) * 1000, 2)
     timings["total_ms"] = round((perf_counter() - started_at) * 1000, 2)
     logger.info(
-        "stocks workspace built",
-        extra={
-            "company": company_name,
-            "rows": len(matrix_rows),
-            "columns": len(ordered_clusters),
-            "timings": timings,
-        },
+        "stocks workspace built company=%s rows=%s columns=%s timings=%s",
+        company_name,
+        len(matrix_rows),
+        len(ordered_clusters),
+        timings,
     )
 
     return {
