@@ -344,6 +344,8 @@ a {
   display: grid !important;
   grid-template-columns: 1fr auto;
   align-items: center;
+  align-self: start;
+  margin-top: 0;
 }
 
 .stocks-toggle input {
@@ -354,6 +356,8 @@ a {
 .stocks-controls-actions {
   display: flex;
   gap: 8px;
+  align-self: start;
+  margin-top: 0;
 }
 
 .stocks-primary-button,
