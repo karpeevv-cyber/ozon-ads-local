@@ -20,7 +20,7 @@ export function StocksControls({
 }: StocksControlsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const [draftMin, setDraftMin] = useState(String(regionalOrderMin));
   const [draftTarget, setDraftTarget] = useState(String(regionalOrderTarget));
   const [draftPositionFilter, setDraftPositionFilter] = useState(positionFilter);
@@ -46,7 +46,7 @@ export function StocksControls({
     if (draftHighlightLevels.length > 0) {
       params.set("stocks_highlight_levels", draftHighlightLevels.join(","));
     } else {
-      params.delete("stocks_highlight_levels");
+      params.set("stocks_highlight_levels", "none");
     }
     params.set("stocks_review_mode", draftReviewMode ? "1" : "0");
     params.set("tab", "stocks");
@@ -68,7 +68,6 @@ export function StocksControls({
         <select
           value={draftPositionFilter}
           onChange={(event) => setDraftPositionFilter(event.target.value)}
-          disabled={isPending}
         >
           <option value="ALL">All</option>
           <option value="CORE">Core</option>
@@ -83,7 +82,6 @@ export function StocksControls({
           step="1"
           value={draftMin}
           onChange={(event) => setDraftMin(event.target.value)}
-          disabled={isPending}
         />
       </label>
       <label>
@@ -94,10 +92,9 @@ export function StocksControls({
           step="1"
           value={draftTarget}
           onChange={(event) => setDraftTarget(event.target.value)}
-          disabled={isPending}
         />
       </label>
-      <fieldset className="stocks-highlight-group" disabled={isPending}>
+      <fieldset className="stocks-highlight-group">
         <legend>Highlight levels</legend>
         <label className="stocks-check">
           <input
@@ -130,11 +127,10 @@ export function StocksControls({
           type="checkbox"
           checked={draftReviewMode}
           onChange={(event) => setDraftReviewMode(event.target.checked)}
-          disabled={isPending}
         />
       </label>
       <div className="stocks-controls-actions">
-        <button type="submit" className="stocks-primary-button" disabled={isPending}>
+        <button type="submit" className="stocks-primary-button">
           Apply
         </button>
       </div>
