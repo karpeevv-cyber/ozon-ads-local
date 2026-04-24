@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ReactNode, useEffect, useState } from "react";
 
 import { LoginCard } from "@/features/auth/components/LoginCard";
@@ -14,6 +15,7 @@ export function AuthGate({ children }: AuthGateProps) {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   function readStoredToken(): string | null {
     try {
@@ -73,6 +75,13 @@ export function AuthGate({ children }: AuthGateProps) {
       });
   }
 
+  function handleLogout() {
+    clearStoredToken();
+    setToken(null);
+    setUser(null);
+    setMenuOpen(false);
+  }
+
   if (loading) {
     return (
       <div className="loading-card skeleton-card" aria-busy="true" aria-live="polite">
@@ -89,8 +98,27 @@ export function AuthGate({ children }: AuthGateProps) {
   return (
     <>
       <div className="session-bar">
-        <span>{user.full_name || user.email}</span>
-        <span>{user.is_admin ? "admin" : "member"}</span>
+        <div className="user-menu">
+          <button
+            className="user-menu-trigger"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((value) => !value)}
+          >
+            {user.full_name || user.email}
+          </button>
+          {menuOpen ? (
+            <div className="user-menu-popover" role="menu">
+              <Link className="user-menu-item" href="/?tab=profile" role="menuitem" onClick={() => setMenuOpen(false)}>
+                Profile
+              </Link>
+              <button className="user-menu-item" type="button" role="menuitem" onClick={handleLogout}>
+                Logout
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
       {children}
     </>
