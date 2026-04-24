@@ -63,23 +63,21 @@ export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPa
     if (highlightLevels.length === 0) {
       return {};
     }
-    const nowQty = cell.paid_storage_qty || 0;
-    const in30Qty = cell.paid_storage_soon_30_qty || 0;
-    const in60Qty = cell.paid_storage_soon_60_qty || 0;
-    let bucket = 0;
-    if (highlightLevels.length === 1) {
-      const mode = highlightLevels[0];
-      const qty = mode === "paid_now" ? nowQty : mode === "paid_30" ? in30Qty : in60Qty;
-      bucket = qtyToBucket(qty);
-    } else {
-      const score = qtyToBucket(nowQty) * 3 + qtyToBucket(in30Qty) * 2 + qtyToBucket(in60Qty);
-      if (score >= 15) bucket = 5;
-      else if (score >= 10) bucket = 4;
-      else if (score >= 6) bucket = 3;
-      else if (score >= 3) bucket = 2;
-      else if (score >= 1) bucket = 1;
-      else bucket = 0;
+    const nowQty = Math.max(0, cell.paid_storage_qty || 0);
+    const in30Qty = Math.max(0, cell.paid_storage_soon_30_qty || 0);
+    // "60 days" is treated as the 31-60 day window to avoid double counting with 30-day level.
+    const in60Qty = Math.max(0, (cell.paid_storage_soon_60_qty || 0) - in30Qty);
+    let totalByActiveFilters = 0;
+    if (highlightLevels.includes("paid_now")) {
+      totalByActiveFilters += nowQty;
     }
+    if (highlightLevels.includes("paid_30")) {
+      totalByActiveFilters += in30Qty;
+    }
+    if (highlightLevels.includes("paid_60")) {
+      totalByActiveFilters += in60Qty;
+    }
+    const bucket = qtyToBucket(totalByActiveFilters);
     const fill = bucketToFill(bucket);
     return {
       backgroundColor: fill,
