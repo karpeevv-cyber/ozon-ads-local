@@ -18,7 +18,7 @@ from app.services.shipment_history import (
     rebuild_shipment_history_from_api,
 )
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 
 TRANSIT_DAYS_MAP = {
