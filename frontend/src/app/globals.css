@@ -984,15 +984,11 @@ a {
   stroke-width: 2;
 }
 
-.line-chart-value,
-.line-chart-label {
+.line-chart-label,
+.line-chart-y-label {
   fill: var(--muted);
   font-family: Georgia, "Times New Roman", serif;
   font-size: 13px;
-}
-
-.line-chart-value {
-  font-weight: 700;
 }
 
 @media (max-width: 1100px) {

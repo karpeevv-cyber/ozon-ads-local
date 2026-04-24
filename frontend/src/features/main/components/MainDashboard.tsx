@@ -49,16 +49,21 @@ function RevenueChart({ overview }: MainDashboardProps) {
   const averageRevenue = totalRevenue / rows.length;
 
   const chartWidth = 1200;
-  const chartHeight = 300;
-  const leftPad = 18;
-  const rightPad = 18;
-  const topPad = 18;
-  const bottomPad = 42;
+  const chartHeight = 340;
+  const leftPad = 76;
+  const rightPad = 26;
+  const topPad = 22;
+  const bottomPad = 66;
   const innerWidth = chartWidth - leftPad - rightPad;
   const innerHeight = chartHeight - topPad - bottomPad;
   const stepX = rows.length > 1 ? innerWidth / (rows.length - 1) : 0;
   const range = maxRevenue - minRevenue || 1;
-  const labelStep = rows.length > 24 ? 4 : rows.length > 16 ? 3 : rows.length > 10 ? 2 : 1;
+  const labelStep = rows.length > 28 ? 5 : rows.length > 21 ? 4 : rows.length > 14 ? 3 : rows.length > 8 ? 2 : 1;
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+    const value = minRevenue + (maxRevenue - minRevenue) * (1 - ratio);
+    const y = topPad + innerHeight * ratio;
+    return { value, y };
+  });
 
   const points = rows.map((row, index) => {
     const revenue = Number(row.total_revenue || 0);
@@ -82,7 +87,6 @@ function RevenueChart({ overview }: MainDashboardProps) {
         </div>
         <div className="main-header-actions">
           <MainRefreshButton />
-          <span className="status-badge">{overview.date_from} to {overview.date_to}</span>
         </div>
       </div>
       <div className="chart-summary-grid">
@@ -113,27 +117,35 @@ function RevenueChart({ overview }: MainDashboardProps) {
               <stop offset="100%" stopColor="#ff7d61" stopOpacity="0.02" />
             </linearGradient>
           </defs>
-          {[0, 0.5, 1].map((ratio) => {
-            const y = topPad + innerHeight * ratio;
-            return <line className="line-chart-grid" key={ratio} x1={leftPad} x2={chartWidth - rightPad} y1={y} y2={y} />;
-          })}
+          {yTicks.map((tick) => (
+            <g key={tick.y}>
+              <line className="line-chart-grid" x1={leftPad} x2={chartWidth - rightPad} y1={tick.y} y2={tick.y} />
+              <text className="line-chart-y-label" x={leftPad - 12} y={tick.y + 4} textAnchor="end">
+                {formatInt(tick.value)}
+              </text>
+            </g>
+          ))}
           <line className="line-chart-axis" x1={leftPad} x2={chartWidth - rightPad} y1={floorY} y2={floorY} />
+          <line className="line-chart-axis" x1={leftPad} x2={leftPad} y1={topPad} y2={floorY} />
           <path className="line-chart-area" d={areaPath} />
           <path className="line-chart-path" d={linePath} />
           {points.map((point, index) => {
             const showLabel = index % labelStep === 0 || index === points.length - 1;
             return (
               <g key={point.day}>
-                <circle className="line-chart-dot" cx={point.x} cy={point.y} r="4" />
+                <circle className="line-chart-dot" cx={point.x} cy={point.y} r="4">
+                  <title>{`${formatDay(point.day)}: ${formatMoney(point.revenue)}`}</title>
+                </circle>
                 {showLabel ? (
-                  <>
-                    <text className="line-chart-value" x={point.x} y={Math.max(14, point.y - 12)} textAnchor="middle">
-                      {formatInt(point.revenue)}
-                    </text>
-                    <text className="line-chart-label" x={point.x} y={chartHeight - 12} textAnchor="middle">
-                      {formatDay(point.day)}
-                    </text>
-                  </>
+                  <text
+                    className="line-chart-label"
+                    x={point.x}
+                    y={chartHeight - 18}
+                    textAnchor="end"
+                    transform={`rotate(-35 ${point.x} ${chartHeight - 18})`}
+                  >
+                    {formatDay(point.day)}
+                  </text>
                 ) : null}
               </g>
             );
@@ -153,7 +165,6 @@ function WeeklyTable({ overview }: MainDashboardProps) {
           <p className="eyebrow">Main</p>
           <h3>Итоги по неделям (за период)</h3>
         </div>
-        <span className="status-badge">{rows.length} weeks</span>
       </div>
       <div className="table-wrap">
         <table className="data-table">
@@ -220,7 +231,6 @@ function DailyTable({ overview }: MainDashboardProps) {
           <p className="eyebrow">Main</p>
           <h3>Итоги по дням (за период)</h3>
         </div>
-        <span className="status-badge">{rows.length} days</span>
       </div>
       <div className="table-wrap">
         <table className="data-table">
