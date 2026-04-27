@@ -3,7 +3,7 @@ export function getDefaultDateRange() {
   const dateFrom = new Date(dateTo);
   const day = dateTo.getDay();
   const daysSinceMonday = day === 0 ? 6 : day - 1;
-  dateFrom.setDate(dateTo.getDate() - daysSinceMonday - 21);
+  dateFrom.setDate(dateTo.getDate() - daysSinceMonday - 28);
 
   return {
     dateFrom: toIsoDate(dateFrom),
