@@ -984,6 +984,48 @@ a {
   stroke-width: 2;
 }
 
+.line-chart-point {
+  cursor: default;
+}
+
+.line-chart-hit-area {
+  fill: transparent;
+}
+
+.line-chart-point:hover .line-chart-dot {
+  fill: #c85f39;
+  stroke: #fff8ef;
+  stroke-width: 3;
+}
+
+.line-chart-tooltip {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.line-chart-point:hover .line-chart-tooltip {
+  opacity: 1;
+}
+
+.line-chart-tooltip rect {
+  fill: rgba(31, 26, 20, 0.94);
+  stroke: rgba(255, 248, 239, 0.22);
+  stroke-width: 1;
+  filter: drop-shadow(0 10px 18px rgba(55, 42, 28, 0.22));
+}
+
+.line-chart-tooltip text {
+  fill: #f8efe2;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+}
+
+.line-chart-tooltip-value {
+  font-size: 16px;
+  font-weight: 700;
+}
+
 .line-chart-label,
 .line-chart-y-label {
   fill: var(--muted);

@@ -69,7 +69,11 @@ function RevenueChart({ overview }: MainDashboardProps) {
     const revenue = Number(row.total_revenue || 0);
     const x = leftPad + stepX * index;
     const y = topPad + (1 - (revenue - minRevenue) / range) * innerHeight;
-    return { day: row.day, revenue, x, y };
+    const tooltipWidth = 150;
+    const tooltipHeight = 58;
+    const tooltipX = Math.min(Math.max(x - tooltipWidth / 2, leftPad), chartWidth - rightPad - tooltipWidth);
+    const tooltipY = y - tooltipHeight - 16 < topPad ? y + 16 : y - tooltipHeight - 16;
+    return { day: row.day, revenue, x, y, tooltipX, tooltipY, tooltipWidth, tooltipHeight };
   });
 
   const linePath = points
@@ -132,10 +136,18 @@ function RevenueChart({ overview }: MainDashboardProps) {
           {points.map((point, index) => {
             const showLabel = index % labelStep === 0 || index === points.length - 1;
             return (
-              <g key={point.day}>
-                <circle className="line-chart-dot" cx={point.x} cy={point.y} r="4">
-                  <title>{`${formatDay(point.day)}: ${formatMoney(point.revenue)}`}</title>
-                </circle>
+              <g className="line-chart-point" key={point.day}>
+                <circle className="line-chart-hit-area" cx={point.x} cy={point.y} r="13" />
+                <circle className="line-chart-dot" cx={point.x} cy={point.y} r="4" />
+                <g className="line-chart-tooltip" transform={`translate(${point.tooltipX} ${point.tooltipY})`}>
+                  <rect width={point.tooltipWidth} height={point.tooltipHeight} rx="14" />
+                  <text x="14" y="22">
+                    {formatDay(point.day)}
+                  </text>
+                  <text className="line-chart-tooltip-value" x="14" y="43">
+                    {formatMoney(point.revenue)}
+                  </text>
+                </g>
                 {showLabel ? (
                   <text
                     className="line-chart-label"
