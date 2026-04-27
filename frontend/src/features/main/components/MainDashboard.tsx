@@ -58,7 +58,7 @@ function RevenueChart({ overview }: MainDashboardProps) {
   const innerHeight = chartHeight - topPad - bottomPad;
   const stepX = rows.length > 1 ? innerWidth / (rows.length - 1) : 0;
   const range = maxRevenue - minRevenue || 1;
-  const labelStep = rows.length > 28 ? 5 : rows.length > 21 ? 4 : rows.length > 14 ? 3 : rows.length > 8 ? 2 : 1;
+  const labelStep = rows.length > 28 ? 6 : rows.length > 21 ? 5 : rows.length > 14 ? 3 : rows.length > 8 ? 2 : 1;
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
     const value = minRevenue + (maxRevenue - minRevenue) * (1 - ratio);
     const y = topPad + innerHeight * ratio;
@@ -153,8 +153,7 @@ function RevenueChart({ overview }: MainDashboardProps) {
                     className="line-chart-label"
                     x={point.x}
                     y={chartHeight - 18}
-                    textAnchor="end"
-                    transform={`rotate(-35 ${point.x} ${chartHeight - 18})`}
+                    textAnchor="middle"
                   >
                     {formatDay(point.day)}
                   </text>
