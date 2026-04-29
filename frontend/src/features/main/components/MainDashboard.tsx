@@ -42,6 +42,7 @@ const WEEKLY_METRIC_KEYS = [
 ] satisfies Array<keyof WeeklyRow>;
 
 const LOWER_IS_BETTER = new Set<string>(["total_drr_pct", "money_spent", "money_spent_per_day", "bid_changes_cnt"]);
+const SPEND_METRICS = new Set<string>(["money_spent", "money_spent_per_day"]);
 
 function formatDay(value: string) {
   const date = new Date(value);
@@ -88,6 +89,10 @@ function getIntensity(metric: string, value: number, domain?: { min: number; max
 }
 
 function getMetricTone(metric: string, value: number, intensity: number, direction: MetricDirection): MetricTone {
+  if (SPEND_METRICS.has(metric)) {
+    return "neutral";
+  }
+
   if (metric === "total_drr_pct") {
     if (value <= 15) {
       return "good";
@@ -126,7 +131,7 @@ function MetricCell({
   const intensity = getIntensity(metric, value, domain[metric]);
   const tone = getMetricTone(metric, value, intensity, direction);
   const style = {
-    "--metric-fill": `${Math.round(intensity * 100)}%`,
+    "--metric-fill-scale": intensity.toFixed(4),
     "--metric-alpha": (0.16 + intensity * 0.24).toFixed(2),
   } as CSSProperties;
 
@@ -349,7 +354,8 @@ function WeeklyTable({ overview }: MainDashboardProps) {
 
 function DailyTable({ overview }: MainDashboardProps) {
   const rows = overview.daily_rows;
-  const metricDomain = buildMetricDomain(rows, DAILY_METRIC_KEYS);
+  const visibleRows = rows.slice(0, 14);
+  const metricDomain = buildMetricDomain(visibleRows, DAILY_METRIC_KEYS);
 
   return (
     <article className="panel-card panel-card-wide section-card">
@@ -385,7 +391,7 @@ function DailyTable({ overview }: MainDashboardProps) {
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
+              visibleRows.map((row) => (
                 <tr key={row.day}>
                   <td>{formatDay(row.day)}</td>
                   <MetricCell metric="total_revenue" value={row.total_revenue} formatted={formatMoney(row.total_revenue)} domain={metricDomain} />

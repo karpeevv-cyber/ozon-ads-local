@@ -937,12 +937,14 @@ a {
   position: absolute;
   inset: 6px 7px;
   right: auto;
-  width: var(--metric-fill);
+  width: calc(100% - 14px);
   z-index: 0;
   border-radius: 8px;
   content: "";
   opacity: var(--metric-alpha);
   pointer-events: none;
+  transform: scaleX(var(--metric-fill-scale));
+  transform-origin: left center;
 }
 
 .metric-cell span {
