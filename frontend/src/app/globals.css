@@ -904,6 +904,10 @@ a {
   vertical-align: top;
 }
 
+.data-table td {
+  white-space: nowrap;
+}
+
 .data-table thead th {
   border-top: none;
   color: var(--muted);
@@ -920,6 +924,53 @@ a {
 .comment-cell {
   min-width: 220px;
   white-space: pre-wrap;
+}
+
+.metric-cell {
+  position: relative;
+  min-width: 104px;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-cell::before {
+  position: absolute;
+  inset: 6px 7px;
+  z-index: 0;
+  border-radius: 8px;
+  content: "";
+  pointer-events: none;
+}
+
+.metric-cell span {
+  position: relative;
+  z-index: 1;
+}
+
+.metric-cell-bar::before {
+  right: auto;
+  width: var(--metric-fill);
+  opacity: var(--metric-alpha);
+}
+
+.metric-cell-heat::before {
+  opacity: var(--metric-alpha);
+}
+
+.metric-cell-good::before {
+  background: #2fbf71;
+}
+
+.metric-cell-warn::before {
+  background: #f4b740;
+}
+
+.metric-cell-bad::before {
+  background: #e55d5d;
+}
+
+.metric-cell-neutral::before {
+  background: #7b8794;
 }
 
 .chart-summary-grid {

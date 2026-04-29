@@ -1,9 +1,61 @@
-import { MainOverview } from "@/shared/api/types";
+import type { CSSProperties } from "react";
+import type { MainOverview } from "@/shared/api/types";
 import { MainRefreshButton } from "@/features/main/components/MainRefreshButton";
 
 type MainDashboardProps = {
   overview: MainOverview;
 };
+
+type MetricDirection = "higher" | "lower" | "neutral";
+type MetricVariant = "bar" | "heat";
+type MetricTone = "good" | "warn" | "bad" | "neutral";
+type MetricDomain = Record<string, { min: number; max: number }>;
+type DailyRow = MainOverview["daily_rows"][number];
+type WeeklyRow = MainOverview["weekly_rows"][number];
+
+const DAILY_METRIC_KEYS = [
+  "total_revenue",
+  "total_drr_pct",
+  "money_spent",
+  "views",
+  "clicks",
+  "ordered_units",
+  "ctr",
+  "cr",
+  "organic_pct",
+  "bid_changes_cnt",
+] satisfies Array<keyof DailyRow>;
+
+const WEEKLY_METRIC_KEYS = [
+  "total_revenue",
+  "total_drr_pct",
+  "ebitda",
+  "ebitda_pct",
+  "total_revenue_per_day",
+  "money_spent_per_day",
+  "views_per_day",
+  "clicks_per_day",
+  "ordered_units_per_day",
+  "ctr",
+  "cr",
+  "organic_pct",
+  "bid_changes_cnt",
+] satisfies Array<keyof WeeklyRow>;
+
+const LOWER_IS_BETTER = new Set<string>(["total_drr_pct", "money_spent", "money_spent_per_day", "bid_changes_cnt"]);
+const BAR_METRICS = new Set<string>([
+  "total_revenue",
+  "total_revenue_per_day",
+  "money_spent",
+  "money_spent_per_day",
+  "views",
+  "views_per_day",
+  "clicks",
+  "clicks_per_day",
+  "ordered_units",
+  "ordered_units_per_day",
+  "bid_changes_cnt",
+]);
 
 function formatDay(value: string) {
   const date = new Date(value);
@@ -23,6 +75,73 @@ function formatMoney(value: number) {
 
 function formatPct(value: number) {
   return `${Number(value ?? 0).toFixed(1)}%`;
+}
+
+function buildMetricDomain<T extends Record<string, unknown>>(rows: T[], keys: readonly (keyof T & string)[]): MetricDomain {
+  return keys.reduce<MetricDomain>((acc, key) => {
+    const values = rows.map((row) => Number(row[key] ?? 0)).filter(Number.isFinite);
+    acc[key] = {
+      min: values.length > 0 ? Math.min(...values) : 0,
+      max: values.length > 0 ? Math.max(...values) : 0,
+    };
+    return acc;
+  }, {});
+}
+
+function getMetricDirection(key: string): MetricDirection {
+  return LOWER_IS_BETTER.has(key) ? "lower" : "higher";
+}
+
+function getMetricVariant(key: string): MetricVariant {
+  return BAR_METRICS.has(key) ? "bar" : "heat";
+}
+
+function getIntensity(value: number, domain?: { min: number; max: number }) {
+  if (!domain || domain.max === domain.min) {
+    return 0;
+  }
+  return Math.min(1, Math.max(0, (Number(value || 0) - domain.min) / (domain.max - domain.min)));
+}
+
+function getMetricTone(intensity: number, direction: MetricDirection): MetricTone {
+  if (direction === "neutral") {
+    return "neutral";
+  }
+  const score = direction === "lower" ? 1 - intensity : intensity;
+  if (score >= 0.67) {
+    return "good";
+  }
+  if (score >= 0.34) {
+    return "warn";
+  }
+  return "bad";
+}
+
+function MetricCell({
+  metric,
+  value,
+  formatted,
+  domain,
+}: {
+  metric: string;
+  value: number;
+  formatted: string;
+  domain: MetricDomain;
+}) {
+  const direction = getMetricDirection(metric);
+  const variant = getMetricVariant(metric);
+  const intensity = getIntensity(value, domain[metric]);
+  const tone = getMetricTone(intensity, direction);
+  const style = {
+    "--metric-fill": `${Math.max(6, Math.round(intensity * 100))}%`,
+    "--metric-alpha": (0.16 + intensity * 0.24).toFixed(2),
+  } as CSSProperties;
+
+  return (
+    <td className={`metric-cell metric-cell-${variant} metric-cell-${tone}`} style={style} title={formatted}>
+      <span>{formatted}</span>
+    </td>
+  );
 }
 
 function RevenueChart({ overview }: MainDashboardProps) {
@@ -169,6 +288,8 @@ function RevenueChart({ overview }: MainDashboardProps) {
 
 function WeeklyTable({ overview }: MainDashboardProps) {
   const rows = overview.weekly_rows;
+  const metricDomain = buildMetricDomain(rows, WEEKLY_METRIC_KEYS);
+
   return (
     <article className="panel-card panel-card-wide section-card">
       <div className="panel-header">
@@ -209,19 +330,19 @@ function WeeklyTable({ overview }: MainDashboardProps) {
               rows.map((row) => (
                 <tr key={row.week}>
                   <td>{formatDay(row.week)}</td>
-                  <td>{formatMoney(row.total_revenue)}</td>
-                  <td>{formatPct(row.total_drr_pct)}</td>
-                  <td>{formatMoney(row.ebitda)}</td>
-                  <td>{formatPct(row.ebitda_pct)}</td>
-                  <td>{formatMoney(row.total_revenue_per_day)}</td>
-                  <td>{formatMoney(row.money_spent_per_day)}</td>
-                  <td>{formatInt(row.views_per_day)}</td>
-                  <td>{formatInt(row.clicks_per_day)}</td>
-                  <td>{formatInt(row.ordered_units_per_day)}</td>
-                  <td>{formatPct(row.ctr)}</td>
-                  <td>{formatPct(row.cr)}</td>
-                  <td>{formatPct(row.organic_pct)}</td>
-                  <td>{formatInt(row.bid_changes_cnt)}</td>
+                  <MetricCell metric="total_revenue" value={row.total_revenue} formatted={formatMoney(row.total_revenue)} domain={metricDomain} />
+                  <MetricCell metric="total_drr_pct" value={row.total_drr_pct} formatted={formatPct(row.total_drr_pct)} domain={metricDomain} />
+                  <MetricCell metric="ebitda" value={row.ebitda} formatted={formatMoney(row.ebitda)} domain={metricDomain} />
+                  <MetricCell metric="ebitda_pct" value={row.ebitda_pct} formatted={formatPct(row.ebitda_pct)} domain={metricDomain} />
+                  <MetricCell metric="total_revenue_per_day" value={row.total_revenue_per_day} formatted={formatMoney(row.total_revenue_per_day)} domain={metricDomain} />
+                  <MetricCell metric="money_spent_per_day" value={row.money_spent_per_day} formatted={formatMoney(row.money_spent_per_day)} domain={metricDomain} />
+                  <MetricCell metric="views_per_day" value={row.views_per_day} formatted={formatInt(row.views_per_day)} domain={metricDomain} />
+                  <MetricCell metric="clicks_per_day" value={row.clicks_per_day} formatted={formatInt(row.clicks_per_day)} domain={metricDomain} />
+                  <MetricCell metric="ordered_units_per_day" value={row.ordered_units_per_day} formatted={formatInt(row.ordered_units_per_day)} domain={metricDomain} />
+                  <MetricCell metric="ctr" value={row.ctr} formatted={formatPct(row.ctr)} domain={metricDomain} />
+                  <MetricCell metric="cr" value={row.cr} formatted={formatPct(row.cr)} domain={metricDomain} />
+                  <MetricCell metric="organic_pct" value={row.organic_pct} formatted={formatPct(row.organic_pct)} domain={metricDomain} />
+                  <MetricCell metric="bid_changes_cnt" value={row.bid_changes_cnt} formatted={formatInt(row.bid_changes_cnt)} domain={metricDomain} />
                   <td className="comment-cell">{row.comment || ""}</td>
                 </tr>
               ))
@@ -235,6 +356,8 @@ function WeeklyTable({ overview }: MainDashboardProps) {
 
 function DailyTable({ overview }: MainDashboardProps) {
   const rows = overview.daily_rows;
+  const metricDomain = buildMetricDomain(rows, DAILY_METRIC_KEYS);
+
   return (
     <article className="panel-card panel-card-wide section-card">
       <div className="panel-header">
@@ -272,16 +395,16 @@ function DailyTable({ overview }: MainDashboardProps) {
               rows.map((row) => (
                 <tr key={row.day}>
                   <td>{formatDay(row.day)}</td>
-                  <td>{formatMoney(row.total_revenue)}</td>
-                  <td>{formatPct(row.total_drr_pct)}</td>
-                  <td>{formatMoney(row.money_spent)}</td>
-                  <td>{formatInt(row.views)}</td>
-                  <td>{formatInt(row.clicks)}</td>
-                  <td>{formatInt(row.ordered_units)}</td>
-                  <td>{formatPct(row.ctr)}</td>
-                  <td>{formatPct(row.cr)}</td>
-                  <td>{formatPct(row.organic_pct)}</td>
-                  <td>{formatInt(row.bid_changes_cnt)}</td>
+                  <MetricCell metric="total_revenue" value={row.total_revenue} formatted={formatMoney(row.total_revenue)} domain={metricDomain} />
+                  <MetricCell metric="total_drr_pct" value={row.total_drr_pct} formatted={formatPct(row.total_drr_pct)} domain={metricDomain} />
+                  <MetricCell metric="money_spent" value={row.money_spent} formatted={formatMoney(row.money_spent)} domain={metricDomain} />
+                  <MetricCell metric="views" value={row.views} formatted={formatInt(row.views)} domain={metricDomain} />
+                  <MetricCell metric="clicks" value={row.clicks} formatted={formatInt(row.clicks)} domain={metricDomain} />
+                  <MetricCell metric="ordered_units" value={row.ordered_units} formatted={formatInt(row.ordered_units)} domain={metricDomain} />
+                  <MetricCell metric="ctr" value={row.ctr} formatted={formatPct(row.ctr)} domain={metricDomain} />
+                  <MetricCell metric="cr" value={row.cr} formatted={formatPct(row.cr)} domain={metricDomain} />
+                  <MetricCell metric="organic_pct" value={row.organic_pct} formatted={formatPct(row.organic_pct)} domain={metricDomain} />
+                  <MetricCell metric="bid_changes_cnt" value={row.bid_changes_cnt} formatted={formatInt(row.bid_changes_cnt)} domain={metricDomain} />
                   <td className="comment-cell">{row.comment || ""}</td>
                 </tr>
               ))
