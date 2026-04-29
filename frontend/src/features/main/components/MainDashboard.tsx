@@ -78,8 +78,9 @@ function getMetricDirection(key: string): MetricDirection {
   return LOWER_IS_BETTER.has(key) ? "lower" : "higher";
 }
 
-function getIntensity(value: number, domain?: { min: number; max: number }) {
-  const max = Math.max(0, Number(domain?.max || 0));
+function getIntensity(metric: string, value: number, domain?: { min: number; max: number }) {
+  const periodMax = Math.max(0, Number(domain?.max || 0));
+  const max = metric === "total_drr_pct" ? Math.min(periodMax, 50) : periodMax;
   if (max === 0) {
     return 0;
   }
@@ -122,7 +123,7 @@ function MetricCell({
   domain: MetricDomain;
 }) {
   const direction = getMetricDirection(metric);
-  const intensity = getIntensity(value, domain[metric]);
+  const intensity = getIntensity(metric, value, domain[metric]);
   const tone = getMetricTone(metric, value, intensity, direction);
   const style = {
     "--metric-fill": `${Math.round(intensity * 100)}%`,
