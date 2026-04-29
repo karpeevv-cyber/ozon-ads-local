@@ -6,25 +6,7 @@ type CampaignOverviewProps = {
   report: CampaignReport;
 };
 
-function maskValue(value: string) {
-  if (!value) {
-    return "not set";
-  }
-  if (value.length <= 6) {
-    return "configured";
-  }
-  return `${value.slice(0, 3)}...${value.slice(-3)}`;
-}
-
 export function CampaignOverview({ companies, campaigns, report }: CampaignOverviewProps) {
-  const configuredCompanies = companies.filter(
-    (company) =>
-      company.perf_client_id ||
-      company.perf_client_secret ||
-      company.seller_client_id ||
-      company.seller_api_key,
-  );
-
   const reportRows = report.rows.filter((row) => row.campaign_id !== "GRAND_TOTAL");
   const grandTotal = report.rows.find((row) => row.campaign_id === "GRAND_TOTAL");
 
@@ -41,8 +23,8 @@ export function CampaignOverview({ companies, campaigns, report }: CampaignOverv
         </div>
         <div className="hero-metrics">
           <div>
-            <span className="metric-label">Configured companies</span>
-            <strong>{configuredCompanies.length}</strong>
+            <span className="metric-label">Companies</span>
+            <strong>{companies.length}</strong>
           </div>
           <div>
             <span className="metric-label">Running campaigns</span>
@@ -91,22 +73,17 @@ export function CampaignOverview({ companies, campaigns, report }: CampaignOverv
         <div className="panel-header">
           <div>
             <p className="eyebrow">Organizations</p>
-            <h3>Credential inventory</h3>
+            <h3>Company list</h3>
           </div>
         </div>
         <div className="list-stack">
           {companies.map((company) => (
             <div className="list-row" key={company.name}>
               <div>
-                <strong>{company.name}</strong>
-                <p>
-                  Perf {maskValue(company.perf_client_id)} / Seller{" "}
-                  {maskValue(company.seller_client_id)}
-                </p>
+                <strong>{company.display_name || company.name}</strong>
+                <p>{company.name}</p>
               </div>
-              <span className="status-badge">
-                {company.perf_client_id && company.seller_client_id ? "ready" : "incomplete"}
-              </span>
+              <span className="status-badge">available</span>
             </div>
           ))}
         </div>

@@ -5,10 +5,7 @@ from pydantic import BaseModel, Field
 
 class CompanyConfigResponse(BaseModel):
     name: str
-    perf_client_id: str = ""
-    perf_client_secret: str = ""
-    seller_client_id: str = ""
-    seller_api_key: str = ""
+    display_name: str | None = None
 
 
 class CampaignSummaryResponse(BaseModel):

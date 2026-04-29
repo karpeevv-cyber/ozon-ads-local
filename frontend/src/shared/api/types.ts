@@ -1,10 +1,6 @@
 export type CompanyConfig = {
   name: string;
   display_name?: string;
-  perf_client_id: string;
-  perf_client_secret: string;
-  seller_client_id: string;
-  seller_api_key: string;
 };
 
 export type RunningCampaign = {
