@@ -86,7 +86,17 @@ function getIntensity(value: number, domain?: { min: number; max: number }) {
   return Math.min(1, Math.max(0, Number(value || 0) / max));
 }
 
-function getMetricTone(intensity: number, direction: MetricDirection): MetricTone {
+function getMetricTone(metric: string, value: number, intensity: number, direction: MetricDirection): MetricTone {
+  if (metric === "total_drr_pct") {
+    if (value <= 15) {
+      return "good";
+    }
+    if (value <= 25) {
+      return "warn";
+    }
+    return "bad";
+  }
+
   if (direction === "neutral") {
     return "neutral";
   }
@@ -113,7 +123,7 @@ function MetricCell({
 }) {
   const direction = getMetricDirection(metric);
   const intensity = getIntensity(value, domain[metric]);
-  const tone = getMetricTone(intensity, direction);
+  const tone = getMetricTone(metric, value, intensity, direction);
   const style = {
     "--metric-fill": `${Math.round(intensity * 100)}%`,
     "--metric-alpha": (0.16 + intensity * 0.24).toFixed(2),
