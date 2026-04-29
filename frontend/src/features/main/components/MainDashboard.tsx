@@ -79,10 +79,11 @@ function getMetricDirection(key: string): MetricDirection {
 }
 
 function getIntensity(value: number, domain?: { min: number; max: number }) {
-  if (!domain || domain.max === domain.min) {
+  const max = Math.max(0, Number(domain?.max || 0));
+  if (max === 0) {
     return 0;
   }
-  return Math.min(1, Math.max(0, (Number(value || 0) - domain.min) / (domain.max - domain.min)));
+  return Math.min(1, Math.max(0, Number(value || 0) / max));
 }
 
 function getMetricTone(intensity: number, direction: MetricDirection): MetricTone {
@@ -114,7 +115,7 @@ function MetricCell({
   const intensity = getIntensity(value, domain[metric]);
   const tone = getMetricTone(intensity, direction);
   const style = {
-    "--metric-fill": `${Math.max(6, Math.round(intensity * 100))}%`,
+    "--metric-fill": `${Math.round(intensity * 100)}%`,
     "--metric-alpha": (0.16 + intensity * 0.24).toFixed(2),
   } as CSSProperties;
 
