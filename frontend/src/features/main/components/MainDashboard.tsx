@@ -7,7 +7,6 @@ type MainDashboardProps = {
 };
 
 type MetricDirection = "higher" | "lower" | "neutral";
-type MetricVariant = "bar" | "heat";
 type MetricTone = "good" | "warn" | "bad" | "neutral";
 type MetricDomain = Record<string, { min: number; max: number }>;
 type DailyRow = MainOverview["daily_rows"][number];
@@ -43,19 +42,6 @@ const WEEKLY_METRIC_KEYS = [
 ] satisfies Array<keyof WeeklyRow>;
 
 const LOWER_IS_BETTER = new Set<string>(["total_drr_pct", "money_spent", "money_spent_per_day", "bid_changes_cnt"]);
-const BAR_METRICS = new Set<string>([
-  "total_revenue",
-  "total_revenue_per_day",
-  "money_spent",
-  "money_spent_per_day",
-  "views",
-  "views_per_day",
-  "clicks",
-  "clicks_per_day",
-  "ordered_units",
-  "ordered_units_per_day",
-  "bid_changes_cnt",
-]);
 
 function formatDay(value: string) {
   const date = new Date(value);
@@ -92,10 +78,6 @@ function getMetricDirection(key: string): MetricDirection {
   return LOWER_IS_BETTER.has(key) ? "lower" : "higher";
 }
 
-function getMetricVariant(key: string): MetricVariant {
-  return BAR_METRICS.has(key) ? "bar" : "heat";
-}
-
 function getIntensity(value: number, domain?: { min: number; max: number }) {
   if (!domain || domain.max === domain.min) {
     return 0;
@@ -129,7 +111,6 @@ function MetricCell({
   domain: MetricDomain;
 }) {
   const direction = getMetricDirection(metric);
-  const variant = getMetricVariant(metric);
   const intensity = getIntensity(value, domain[metric]);
   const tone = getMetricTone(intensity, direction);
   const style = {
@@ -138,7 +119,7 @@ function MetricCell({
   } as CSSProperties;
 
   return (
-    <td className={`metric-cell metric-cell-${variant} metric-cell-${tone}`} style={style} title={formatted}>
+    <td className={`metric-cell metric-cell-${tone}`} style={style} title={formatted}>
       <span>{formatted}</span>
     </td>
   );

@@ -936,25 +936,18 @@ a {
 .metric-cell::before {
   position: absolute;
   inset: 6px 7px;
+  right: auto;
+  width: var(--metric-fill);
   z-index: 0;
   border-radius: 8px;
   content: "";
+  opacity: var(--metric-alpha);
   pointer-events: none;
 }
 
 .metric-cell span {
   position: relative;
   z-index: 1;
-}
-
-.metric-cell-bar::before {
-  right: auto;
-  width: var(--metric-fill);
-  opacity: var(--metric-alpha);
-}
-
-.metric-cell-heat::before {
-  opacity: var(--metric-alpha);
 }
 
 .metric-cell-good::before {
