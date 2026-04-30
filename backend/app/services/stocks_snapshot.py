@@ -85,6 +85,13 @@ def _is_moscow_or_spb(cluster_name: str) -> bool:
     )
 
 
+def _city_key_to_label(city_key: str) -> str:
+    text = str(city_key or "").strip()
+    if not text:
+        return "UNKNOWN"
+    return "-".join(part.capitalize() for part in text.split("-"))
+
+
 def _position_filter_rows(rows: list[dict], position_filter: str) -> list[dict]:
     if position_filter == "ALL":
         return rows
@@ -292,8 +299,19 @@ def get_stocks_workspace(
         aggfunc=lambda values: next((str(item) for item in values if item), ""),
     ).reindex_like(df_pivot)
 
+    transit_lookup = load_shipment_transit_map(
+        db,
+        company_name=company_name,
+        seller_client_id=seller_client_id,
+        articles={str(article) for article in df_pivot.index.astype(str).tolist()},
+    )
+
     cluster_totals = df_pivot.fillna(0).sum(axis=0) + df_transit.fillna(0).sum(axis=0)
     ordered_clusters = cluster_totals.sort_values(ascending=False).index.astype(str).tolist()
+    existing_city_keys = {_normalize_city(str(city)) for city in ordered_clusters}
+    transit_city_keys = {city_key for (_article, city_key), qty in transit_lookup.items() if int(qty or 0) > 0}
+    for city_key in sorted(transit_city_keys - existing_city_keys):
+        ordered_clusters.append(_city_key_to_label(city_key))
 
     df_pivot = df_pivot.reindex(columns=ordered_clusters).loc[:, lambda frame: ~frame.columns.duplicated()]
     df_ads = df_ads.reindex(columns=ordered_clusters).loc[:, lambda frame: ~frame.columns.duplicated()]
@@ -305,13 +323,6 @@ def get_stocks_workspace(
     total_with_transit = stock + transit
     need60 = df_ads.fillna(0) * 60.0
 
-    transit_lookup = load_shipment_transit_map(
-        db,
-        company_name=company_name,
-        seller_client_id=seller_client_id,
-        articles={str(article) for article in stock.index.astype(str).tolist()},
-        city_keys={_normalize_city(str(city)) for city in stock.columns.astype(str).tolist()},
-    )
     if transit_lookup:
         for article in stock.index.astype(str).tolist():
             for city in stock.columns.astype(str).tolist():

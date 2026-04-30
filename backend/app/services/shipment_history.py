@@ -393,21 +393,22 @@ def load_shipment_transit_map(
     company_name: str,
     seller_client_id: str,
     articles: set[str],
-    city_keys: set[str],
+    city_keys: set[str] | None = None,
 ) -> dict[tuple[str, str], int]:
-    if db is None or not seller_client_id or not articles or not city_keys:
+    if db is None or not seller_client_id or not articles:
         return {}
     create_all()
     from app.models.shipment_transit import ShipmentTransit
 
-    rows = (
+    query = (
         db.query(ShipmentTransit)
         .filter(ShipmentTransit.company_name == str(company_name or ""))
         .filter(ShipmentTransit.seller_client_id == str(seller_client_id or ""))
         .filter(ShipmentTransit.article.in_(sorted(articles)))
-        .filter(ShipmentTransit.city_key.in_(sorted(city_keys)))
-        .all()
     )
+    if city_keys:
+        query = query.filter(ShipmentTransit.city_key.in_(sorted(city_keys)))
+    rows = query.all()
     out: dict[tuple[str, str], int] = {}
     for item in rows:
         article = str(item.article or "").strip()
