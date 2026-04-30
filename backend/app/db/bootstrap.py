@@ -13,6 +13,7 @@ from app.models import (
     Organization,
     ShipmentEvent,
     ShipmentHistory,
+    ShipmentTransit,
     StorageSnapshotCache,
     TrendsSnapshotCache,
     UnitEconomicsOverride,

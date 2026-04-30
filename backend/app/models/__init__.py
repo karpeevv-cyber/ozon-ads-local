@@ -4,6 +4,7 @@ from app.models.main_overview_cache import MainOverviewCache
 from app.models.organization import MarketplaceCredential, Organization
 from app.models.shipment_event import ShipmentEvent
 from app.models.shipment_history import ShipmentHistory
+from app.models.shipment_transit import ShipmentTransit
 from app.models.storage import StorageSnapshotCache
 from app.models.trends import TrendsSnapshotCache
 from app.models.unit_economics import UnitEconomicsOverride
@@ -21,6 +22,7 @@ __all__ = [
     "Organization",
     "ShipmentEvent",
     "ShipmentHistory",
+    "ShipmentTransit",
     "StorageSnapshotCache",
     "TrendsSnapshotCache",
     "UnitEconomicsOverride",

@@ -15,6 +15,7 @@ from app.services.legacy_compat import (
 from app.services.shipment_history import (
     load_shipment_events_map,
     load_shipment_pairs,
+    load_shipment_transit_map,
     rebuild_shipment_history_from_api,
 )
 
@@ -54,6 +55,8 @@ def _normalize_city(value: str) -> str:
         return "МОСКВА"
     if "САНКТ-ПЕТЕРБУРГ" in text or "СЗО" in text:
         return "САНКТ-ПЕТЕРБУРГ"
+    if "РОСТОВ-НА-ДОНУ" in text or "ROSTOVONDON" in compact:
+        return "РОСТОВ"
     for prefix in ("ГРИВНО", "НОГИНСК", "ПУШКИНО", "ХОРУГВИНО", "ПЕТРОВСКОЕ"):
         if text.startswith(prefix):
             return "МОСКВА"
@@ -301,6 +304,22 @@ def get_stocks_workspace(
     transit = df_transit.fillna(0)
     total_with_transit = stock + transit
     need60 = df_ads.fillna(0) * 60.0
+
+    transit_lookup = load_shipment_transit_map(
+        db,
+        company_name=company_name,
+        seller_client_id=seller_client_id,
+        articles={str(article) for article in stock.index.astype(str).tolist()},
+        city_keys={_normalize_city(str(city)) for city in stock.columns.astype(str).tolist()},
+    )
+    if transit_lookup:
+        for article in stock.index.astype(str).tolist():
+            for city in stock.columns.astype(str).tolist():
+                city_key = _normalize_city(str(city))
+                supply_transit_qty = int(transit_lookup.get((article, city_key), 0) or 0)
+                if supply_transit_qty > float(transit.at[article, city]):
+                    transit.at[article, city] = supply_transit_qty
+        total_with_transit = stock + transit
 
     for column in need60.columns:
         days = TRANSIT_DAYS_MAP.get(str(column).strip().lower(), 0)

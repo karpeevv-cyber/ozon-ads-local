@@ -26,6 +26,13 @@ SUPPLY_ORDER_STATES = [
     "OVERDUE",
 ]
 
+ACTIVE_SUPPLY_ORDER_STATES = {
+    "READY_TO_SUPPLY",
+    "ACCEPTED_AT_SUPPLY_WAREHOUSE",
+    "IN_TRANSIT",
+    "ACCEPTANCE_AT_STORAGE_WAREHOUSE",
+}
+
 
 def normalize_city(value: str) -> str:
     text = str(value or "").strip().upper().replace("Ё", "Е")
@@ -44,6 +51,8 @@ def normalize_city(value: str) -> str:
         return "МОСКВА"
     if "САНКТ-ПЕТЕРБУРГ" in text or "СЗО" in text:
         return "САНКТ-ПЕТЕРБУРГ"
+    if "РОСТОВ-НА-ДОНУ" in text or "ROSTOVONDON" in compact:
+        return "РОСТОВ"
     for prefix in ("ГРИВНО", "НОГИНСК", "ПУШКИНО", "ХОРУГВИНО", "ПЕТРОВСКОЕ"):
         if text.startswith(prefix):
             return "МОСКВА"
@@ -196,6 +205,42 @@ def _sync_shipment_events(
         )
 
 
+def _sync_shipment_transit(
+    db: Session,
+    *,
+    company_name: str,
+    seller_client_id: str,
+    rows: list[dict],
+) -> None:
+    from app.models.shipment_transit import ShipmentTransit
+
+    (
+        db.query(ShipmentTransit)
+        .filter(ShipmentTransit.company_name == str(company_name or ""))
+        .filter(ShipmentTransit.seller_client_id == str(seller_client_id or ""))
+        .delete(synchronize_session=False)
+    )
+
+    if rows:
+        db.bulk_save_objects(
+            [
+                ShipmentTransit(
+                    company_name=str(company_name or ""),
+                    seller_client_id=str(seller_client_id or ""),
+                    article=str(item.get("article") or "").strip(),
+                    city_key=str(item.get("city_key") or "").strip(),
+                    city=str(item.get("city") or "").strip(),
+                    quantity=max(0, _to_int(item.get("quantity") or 0)),
+                    order_id=str(item.get("order_id") or "").strip(),
+                    supply_id=str(item.get("supply_id") or "").strip(),
+                    bundle_id=str(item.get("bundle_id") or "").strip(),
+                )
+                for item in rows
+                if str(item.get("article") or "").strip() and str(item.get("city_key") or "").strip()
+            ]
+        )
+
+
 def _sync_shipment_history_from_events(
     db: Session,
     *,
@@ -342,6 +387,38 @@ def load_shipment_events_map(
     return out
 
 
+def load_shipment_transit_map(
+    db: Session,
+    *,
+    company_name: str,
+    seller_client_id: str,
+    articles: set[str],
+    city_keys: set[str],
+) -> dict[tuple[str, str], int]:
+    if db is None or not seller_client_id or not articles or not city_keys:
+        return {}
+    create_all()
+    from app.models.shipment_transit import ShipmentTransit
+
+    rows = (
+        db.query(ShipmentTransit)
+        .filter(ShipmentTransit.company_name == str(company_name or ""))
+        .filter(ShipmentTransit.seller_client_id == str(seller_client_id or ""))
+        .filter(ShipmentTransit.article.in_(sorted(articles)))
+        .filter(ShipmentTransit.city_key.in_(sorted(city_keys)))
+        .all()
+    )
+    out: dict[tuple[str, str], int] = {}
+    for item in rows:
+        article = str(item.article or "").strip()
+        city_key = str(item.city_key or "").strip()
+        if not article or not city_key:
+            continue
+        key = (article, city_key)
+        out[key] = out.get(key, 0) + int(item.quantity or 0)
+    return out
+
+
 def _completed_order_ids(
     *,
     seller_client_id: str,
@@ -462,6 +539,12 @@ def rebuild_shipment_history_from_api(
             seller_client_id=seller_client_id,
             events=[],
         )
+        _sync_shipment_transit(
+            db,
+            company_name=company_name,
+            seller_client_id=seller_client_id,
+            rows=[],
+        )
         _sync_shipment_history_from_events(
             db,
             company_name=company_name,
@@ -478,11 +561,13 @@ def rebuild_shipment_history_from_api(
     )
 
     events: list[dict] = []
+    transit_rows: list[dict] = []
     bundle_cache: dict[tuple[str, str, str], list[dict]] = {}
     for order in orders:
         if not isinstance(order, dict):
             continue
         order_id = str(order.get("order_id") or "").strip()
+        order_state = str(order.get("state") or "").strip().upper()
         dropoff = order.get("drop_off_warehouse") or {}
         dropoff_id = str(dropoff.get("warehouse_id") or "").strip()
         if not dropoff_id:
@@ -495,6 +580,7 @@ def rebuild_shipment_history_from_api(
             storage_id = str(storage.get("warehouse_id") or "").strip()
             storage_name = str(storage.get("name") or "").strip()
             bundle_id = str(supply.get("bundle_id") or "").strip()
+            supply_id = str(supply.get("supply_id") or "").strip()
             if not storage_id or not bundle_id:
                 continue
             city = storage_name or storage_id
@@ -535,12 +621,30 @@ def rebuild_shipment_history_from_api(
                         "bundle_id": bundle_id,
                     }
                 )
+                if order_state in ACTIVE_SUPPLY_ORDER_STATES:
+                    transit_rows.append(
+                        {
+                            "article": article,
+                            "city_key": city_key,
+                            "city": city,
+                            "quantity": quantity,
+                            "order_id": order_id,
+                            "supply_id": supply_id,
+                            "bundle_id": bundle_id,
+                        }
+                    )
 
     _sync_shipment_events(
         db,
         company_name=company_name,
         seller_client_id=seller_client_id,
         events=events,
+    )
+    _sync_shipment_transit(
+        db,
+        company_name=company_name,
+        seller_client_id=seller_client_id,
+        rows=transit_rows,
     )
     _sync_shipment_history_from_events(
         db,
