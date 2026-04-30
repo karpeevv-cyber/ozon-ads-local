@@ -43,7 +43,7 @@ function withTimeout(ms: number): { signal: AbortSignal; cleanup: () => void } {
 
 async function requestJson<T>(path: string): Promise<T> {
   const apiUrl = `${getApiBaseUrl()}${path}`;
-  const timeoutMs = typeof window === "undefined" ? 120000 : 25000;
+  const timeoutMs = typeof window === "undefined" ? 600000 : 25000;
   const timeout = withTimeout(timeoutMs);
   const response = await fetch(apiUrl, {
     cache: "no-store",
@@ -236,6 +236,7 @@ export function getStocksWorkspace(params: {
   regionalOrderMin?: number;
   regionalOrderTarget?: number;
   positionFilter?: string;
+  forceRefresh?: boolean;
 }): Promise<StocksWorkspace> {
   const search = new URLSearchParams();
   if (params.company) {
@@ -249,6 +250,9 @@ export function getStocksWorkspace(params: {
   }
   if (params.positionFilter) {
     search.set("position_filter", params.positionFilter);
+  }
+  if (params.forceRefresh) {
+    search.set("force_refresh", "1");
   }
   return requestJson<StocksWorkspace>(`/stocks/workspace?${search.toString()}`);
 }

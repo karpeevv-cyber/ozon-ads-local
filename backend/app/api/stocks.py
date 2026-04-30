@@ -19,6 +19,7 @@ def stocks_workspace(
     regional_order_min: int = Query(default=2, ge=0),
     regional_order_target: int = Query(default=5, ge=0),
     position_filter: str = Query(default="ALL"),
+    force_refresh: bool = Query(default=False),
     db: Session = Depends(get_db),
 ):
     return StocksWorkspaceResponse(
@@ -27,6 +28,7 @@ def stocks_workspace(
             regional_order_min=regional_order_min,
             regional_order_target=regional_order_target,
             position_filter=position_filter,
+            force_refresh=force_refresh,
             db=db,
         )
     )

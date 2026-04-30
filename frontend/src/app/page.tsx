@@ -39,6 +39,7 @@ type HomePageProps = {
     stocks_position_filter?: string;
     stocks_highlight_levels?: string;
     stocks_review_mode?: string;
+    stocks_refresh?: string;
     main_refresh?: string;
   }>;
 };
@@ -274,6 +275,7 @@ async function renderTabContent(params: {
   stocksHighlightLevels: string[];
   stocksReviewMode: boolean;
   mainRefresh: boolean;
+  stocksRefresh: boolean;
 }) {
   const {
     activeTab,
@@ -287,6 +289,7 @@ async function renderTabContent(params: {
     stocksHighlightLevels,
     stocksReviewMode,
     mainRefresh,
+    stocksRefresh,
   } = params;
 
   switch (activeTab) {
@@ -360,6 +363,7 @@ async function renderTabContent(params: {
         regionalOrderMin: stocksRegionalOrderMin,
         regionalOrderTarget: stocksRegionalOrderTarget,
         positionFilter: stocksPositionFilter,
+        forceRefresh: stocksRefresh,
       });
       return (
         <StocksPanel
@@ -428,6 +432,7 @@ async function TabContent(params: {
   stocksHighlightLevels: string[];
   stocksReviewMode: boolean;
   mainRefresh: boolean;
+  stocksRefresh: boolean;
 }) {
   try {
     return await renderTabContent(params);
@@ -480,7 +485,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     .map((value) => value.trim().toLowerCase())
     .filter((value, index, arr) => allowedHighlightLevels.has(value) && arr.indexOf(value) === index);
   const stocksReviewMode = String(resolvedSearchParams.stocks_review_mode || "1") !== "0";
-  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}:${stocksRegionalOrderMin}:${stocksRegionalOrderTarget}:${stocksPositionFilter}:${stocksHighlightLevels.join("|")}:${stocksReviewMode ? "1" : "0"}:${resolvedSearchParams.main_refresh || ""}`;
+  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}:${stocksRegionalOrderMin}:${stocksRegionalOrderTarget}:${stocksPositionFilter}:${stocksHighlightLevels.join("|")}:${stocksReviewMode ? "1" : "0"}:${resolvedSearchParams.main_refresh || ""}:${resolvedSearchParams.stocks_refresh || ""}`;
   return (
     <AppShell
       filters={
@@ -505,6 +510,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           stocksHighlightLevels={stocksHighlightLevels}
           stocksReviewMode={stocksReviewMode}
           mainRefresh={Boolean(resolvedSearchParams.main_refresh)}
+          stocksRefresh={Boolean(resolvedSearchParams.stocks_refresh)}
         />
       </Suspense>
     </AppShell>

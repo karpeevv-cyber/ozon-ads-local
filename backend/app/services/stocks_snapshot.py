@@ -160,6 +160,7 @@ def get_stocks_workspace(
     regional_order_min: int = 2,
     regional_order_target: int = 5,
     position_filter: str = "ALL",
+    force_refresh: bool = False,
     db: Session | None = None,
 ) -> dict:
     started_at = perf_counter()
@@ -210,9 +211,23 @@ def get_stocks_workspace(
     base_rows, sku_count, stocks_ts = build_stocks_rows_cached(
         seller_client_id=seller_client_id,
         seller_api_key=seller_api_key,
+        max_age_hours=0 if force_refresh else 24,
     )
     checkpoint = mark("stocks_cache_ms", checkpoint)
     filtered_rows = _position_filter_rows(base_rows, normalized_position_filter)
+
+    if force_refresh and db is not None:
+        try:
+            rebuild_checkpoint = perf_counter()
+            rebuild_shipment_history_from_api(
+                db,
+                company_name=company_name,
+                seller_client_id=seller_client_id,
+                seller_api_key=seller_api_key,
+            )
+            timings["shipment_rebuild_ms"] = round((perf_counter() - rebuild_checkpoint) * 1000, 2)
+        except Exception:
+            logger.exception("stocks workspace forced shipment rebuild failed", extra={"company": company_name})
 
     checkpoint = perf_counter()
     shipments_pairs, shipments_ts = _build_shipments_lookup(
@@ -240,7 +255,7 @@ def get_stocks_workspace(
             logger.exception("stocks workspace shipment rebuild failed", extra={"company": company_name})
             shipments_pairs, shipments_ts = set(), None
     else:
-        timings["shipment_rebuild_ms"] = 0
+        timings.setdefault("shipment_rebuild_ms", 0)
 
     checkpoint = perf_counter()
     df = pd.DataFrame(filtered_rows)

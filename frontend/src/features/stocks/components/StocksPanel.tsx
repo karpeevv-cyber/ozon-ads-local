@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { StocksWorkspace } from "@/shared/api/types";
 import { StocksControls } from "@/features/stocks/components/StocksControls";
+import { StocksRefreshButton } from "@/features/stocks/components/StocksRefreshButton";
 
 type StocksPanelProps = {
   workspace: StocksWorkspace;
@@ -101,6 +102,9 @@ export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPa
           <div>
             <p className="eyebrow">Stocks</p>
             <h3>Inventory matrix by city</h3>
+          </div>
+          <div className="main-header-actions">
+            <StocksRefreshButton />
           </div>
         </div>
 
