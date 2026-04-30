@@ -12,6 +12,20 @@ from app.services.integrations.ozon_seller import (
     seller_supply_order_list,
 )
 
+SUPPLY_ORDER_STATES = [
+    "DATA_FILLING",
+    "READY_TO_SUPPLY",
+    "ACCEPTED_AT_SUPPLY_WAREHOUSE",
+    "IN_TRANSIT",
+    "ACCEPTANCE_AT_STORAGE_WAREHOUSE",
+    "REPORTS_CONFIRMATION_AWAITING",
+    "REPORT_REJECTED",
+    "COMPLETED",
+    "REJECTED_AT_SUPPLY_WAREHOUSE",
+    "CANCELLED",
+    "OVERDUE",
+]
+
 
 def normalize_city(value: str) -> str:
     text = str(value or "").strip().upper().replace("Ё", "Е")
@@ -335,18 +349,12 @@ def _completed_order_ids(
     limit: int = 100,
     max_pages: int = 200,
 ) -> list[str]:
-    states = [
-        "ACCEPTED_AT_SUPPLY_WAREHOUSE",
-        "IN_TRANSIT",
-        "ACCEPTANCE_AT_STORAGE_WAREHOUSE",
-        "COMPLETED",
-    ]
     out: list[str] = []
     last_id = ""
     seen_last: set[str] = set()
     for _ in range(max_pages):
         response = seller_supply_order_list(
-            filter={"states": states},
+            filter={"states": SUPPLY_ORDER_STATES},
             last_id=last_id,
             limit=limit,
             sort_by="ORDER_CREATION",

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from app.db.session import SessionLocal
-from app.services.company_config import default_company_from_env, load_company_configs
+from app.services.company_config import default_company_from_env, load_runtime_company_configs
 from app.services.legacy_compat import build_stocks_rows_cached
 from app.services.shipment_history import rebuild_shipment_history_from_api
 
@@ -14,7 +14,7 @@ logger = logging.getLogger("uvicorn.error")
 
 
 def _iter_company_credentials() -> list[tuple[str, str, str]]:
-    configs = load_company_configs()
+    configs = load_runtime_company_configs()
     if configs:
         items = sorted(configs.items())
     else:
