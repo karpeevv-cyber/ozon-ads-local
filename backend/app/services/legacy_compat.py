@@ -8,6 +8,7 @@ import pandas as pd
 from app.services.integrations.ozon_seller import (
     seller_analytics_stocks,
     seller_product_info_list,
+    seller_product_info_stocks,
     seller_product_list,
 )
 from app.services.storage_paths import BACKEND_DATA_DIR, REPO_ROOT
@@ -78,6 +79,62 @@ def load_sku_title_map(
     return sku_title
 
 
+def load_offer_fbo_present_map(
+    offer_ids: list[str],
+    *,
+    seller_client_id: str,
+    seller_api_key: str,
+) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for batch in chunked([offer_id for offer_id in offer_ids if str(offer_id).strip()], 1000):
+        resp = seller_product_info_stocks(
+            offer_ids=batch,
+            client_id=seller_client_id,
+            api_key=seller_api_key,
+        )
+        for item in resp.get("items", []) or []:
+            offer_id = str(item.get("offer_id") or "").strip()
+            if not offer_id:
+                continue
+            present = 0
+            for stock_item in item.get("stocks", []) or []:
+                if str(stock_item.get("type") or "").lower() == "fbo":
+                    present += int(float(stock_item.get("present") or 0))
+            out[offer_id] = present
+    return out
+
+
+def apply_current_stock_totals(rows: list[dict], fbo_present_by_offer: dict[str, int]) -> None:
+    by_offer: dict[str, list[dict]] = {}
+    for row in rows:
+        offer_id = str(row.get("offer_id") or row.get("article") or "").strip()
+        if not offer_id:
+            continue
+        by_offer.setdefault(offer_id, []).append(row)
+
+    for offer_id, offer_rows in by_offer.items():
+        target_total = int(fbo_present_by_offer.get(offer_id, 0) or 0)
+        current_total = int(round(sum(float(row.get("available_stock_count") or 0) for row in offer_rows)))
+        delta = max(0, target_total - current_total)
+        if delta <= 0:
+            continue
+        transit_rows = sorted(
+            [row for row in offer_rows if float(row.get("transit_stock_count") or 0) > 0],
+            key=lambda row: float(row.get("transit_stock_count") or 0),
+            reverse=True,
+        )
+        for row in transit_rows:
+            if delta <= 0:
+                break
+            transit_qty = float(row.get("transit_stock_count") or 0)
+            moved_qty = min(delta, int(round(transit_qty)))
+            if moved_qty <= 0:
+                continue
+            row["available_stock_count"] = float(row.get("available_stock_count") or 0) + moved_qty
+            row["transit_stock_count"] = max(0.0, transit_qty - moved_qty)
+            delta -= moved_qty
+
+
 def build_stocks_rows(
     *,
     seller_client_id: str,
@@ -134,6 +191,12 @@ def build_stocks_rows(
                     "transit_stock_count": float(item.get("transit_stock_count", 0) or 0),
                 }
             )
+    fbo_present_by_offer = load_offer_fbo_present_map(
+        [str(row.get("offer_id") or row.get("article") or "") for row in rows],
+        seller_client_id=seller_client_id,
+        seller_api_key=seller_api_key,
+    )
+    apply_current_stock_totals(rows, fbo_present_by_offer)
     return rows, len(skus)
 
 

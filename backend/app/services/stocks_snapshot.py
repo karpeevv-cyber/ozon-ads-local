@@ -353,15 +353,12 @@ def get_stocks_workspace(
     need60 = df_ads.fillna(0) * 60.0
 
     if use_supply_transit:
-        analytics_transit = transit.copy()
         transit.loc[:, :] = 0
         for article in stock.index.astype(str).tolist():
             for city in stock.columns.astype(str).tolist():
                 city_key = _normalize_city(str(city))
                 supply_transit_qty = int(transit_lookup.get((article, city_key), 0) or 0)
                 transit.at[article, city] = supply_transit_qty
-                if supply_transit_qty <= 0:
-                    stock.at[article, city] = float(stock.at[article, city]) + float(analytics_transit.at[article, city])
         total_with_transit = stock + transit
     elif transit_lookup:
         for article in stock.index.astype(str).tolist():

@@ -287,6 +287,28 @@ def seller_product_info_list(
     return response.json()
 
 
+def seller_product_info_stocks(
+    *,
+    offer_ids: list[str],
+    client_id: str | None = None,
+    api_key: str | None = None,
+):
+    url = f"{SELLER_BASE}/v4/product/info/stocks"
+    headers = {
+        "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
+        "Api-Key": api_key or must_env("SELLER_API_KEY"),
+    }
+    body = {
+        "filter": {
+            "offer_id": [str(value) for value in offer_ids if str(value).strip()],
+            "visibility": "ALL",
+        },
+        "limit": 1000,
+    }
+    response = _post_with_backoff(url, headers=headers, body=body, timeout=60)
+    return response.json()
+
+
 def seller_analytics_stocks(
     *,
     skus: list[str],
