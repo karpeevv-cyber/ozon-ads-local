@@ -55,6 +55,8 @@ def _normalize_city(value: str) -> str:
         return "МОСКВА"
     if "САНКТ-ПЕТЕРБУРГ" in text or "СЗО" in text:
         return "САНКТ-ПЕТЕРБУРГ"
+    if "ХАБАРОВСК" in text:
+        return "ДАЛЬНИЙ"
     if "РОСТОВ-НА-ДОНУ" in text or "ROSTOVONDON" in compact:
         return "РОСТОВ"
     for prefix in ("ГРИВНО", "НОГИНСК", "ПУШКИНО", "ХОРУГВИНО", "ПЕТРОВСКОЕ"):
