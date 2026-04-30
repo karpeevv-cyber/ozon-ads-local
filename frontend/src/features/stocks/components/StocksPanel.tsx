@@ -18,6 +18,7 @@ function formatTimestamp(value: string | null) {
     return value;
   }
   return new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Europe/Moscow",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",

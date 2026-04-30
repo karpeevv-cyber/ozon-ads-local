@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 from time import perf_counter
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 from sqlalchemy.orm import Session
@@ -20,6 +21,7 @@ from app.services.shipment_history import (
 )
 
 logger = logging.getLogger("uvicorn.error")
+MOSCOW_TZ = ZoneInfo("Europe/Moscow")
 
 
 TRANSIT_DAYS_MAP = {
@@ -92,6 +94,14 @@ def _city_key_to_label(city_key: str) -> str:
     if not text:
         return "UNKNOWN"
     return "-".join(part.capitalize() for part in text.split("-"))
+
+
+def _format_cache_ts(value: datetime | None, *, naive_tz) -> str | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=naive_tz)
+    return value.isoformat()
 
 
 def _position_filter_rows(rows: list[dict], position_filter: str) -> list[dict]:
@@ -273,8 +283,8 @@ def get_stocks_workspace(
             "company": company_name,
             "seller_client_id": seller_client_id,
             "sku_count": sku_count,
-            "stocks_updated_at": stocks_ts.isoformat() if stocks_ts else None,
-            "shipments_updated_at": shipments_ts.isoformat() if shipments_ts else None,
+            "stocks_updated_at": _format_cache_ts(stocks_ts, naive_tz=MOSCOW_TZ),
+            "shipments_updated_at": _format_cache_ts(shipments_ts, naive_tz=timezone.utc),
             "settings": {
                 "regional_order_min": regional_order_min,
                 "regional_order_target": regional_order_target,
@@ -322,8 +332,10 @@ def get_stocks_workspace(
         seller_client_id=seller_client_id,
         articles={str(article) for article in df_pivot.index.astype(str).tolist()},
     )
+    use_supply_transit = db is not None and shipments_ts is not None
 
-    cluster_totals = df_pivot.fillna(0).sum(axis=0) + df_transit.fillna(0).sum(axis=0)
+    transit_for_totals = pd.DataFrame(0, index=df_pivot.index, columns=df_pivot.columns) if use_supply_transit else df_transit.fillna(0)
+    cluster_totals = df_pivot.fillna(0).sum(axis=0) + transit_for_totals.sum(axis=0)
     ordered_clusters = cluster_totals.sort_values(ascending=False).index.astype(str).tolist()
     existing_city_keys = {_normalize_city(str(city)) for city in ordered_clusters}
     transit_city_keys = {city_key for (_article, city_key), qty in transit_lookup.items() if int(qty or 0) > 0}
@@ -340,7 +352,14 @@ def get_stocks_workspace(
     total_with_transit = stock + transit
     need60 = df_ads.fillna(0) * 60.0
 
-    if transit_lookup:
+    if use_supply_transit:
+        transit.loc[:, :] = 0
+        for article in stock.index.astype(str).tolist():
+            for city in stock.columns.astype(str).tolist():
+                city_key = _normalize_city(str(city))
+                transit.at[article, city] = int(transit_lookup.get((article, city_key), 0) or 0)
+        total_with_transit = stock + transit
+    elif transit_lookup:
         for article in stock.index.astype(str).tolist():
             for city in stock.columns.astype(str).tolist():
                 city_key = _normalize_city(str(city))
@@ -476,8 +495,8 @@ def get_stocks_workspace(
         "company": company_name,
         "seller_client_id": seller_client_id,
         "sku_count": sku_count,
-        "stocks_updated_at": stocks_ts.isoformat() if stocks_ts else None,
-        "shipments_updated_at": shipments_ts.isoformat() if shipments_ts else None,
+        "stocks_updated_at": _format_cache_ts(stocks_ts, naive_tz=MOSCOW_TZ),
+        "shipments_updated_at": _format_cache_ts(shipments_ts, naive_tz=timezone.utc),
         "settings": {
             "regional_order_min": regional_order_min,
             "regional_order_target": regional_order_target,
