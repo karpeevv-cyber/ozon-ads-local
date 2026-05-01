@@ -617,7 +617,7 @@ def _city_from_macrolocal_cluster(
                         return city
         except Exception:
             pass
-    return MACROLOCAL_CLUSTER_CITY_FALLBACKS.get(cluster_id, f"MACROLOCAL_{cluster_id}")
+    return MACROLOCAL_CLUSTER_CITY_FALLBACKS.get(cluster_id, "UNKNOWN")
 
 
 def _bundle_items_cache_path(seller_client_id: str) -> Path:

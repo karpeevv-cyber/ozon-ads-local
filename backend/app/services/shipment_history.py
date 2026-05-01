@@ -578,7 +578,7 @@ def _city_from_macrolocal_cluster(
         except Exception:
             pass
 
-    return MACROLOCAL_CLUSTER_CITY_FALLBACKS.get(cluster_id, f"MACROLOCAL_{cluster_id}")
+    return MACROLOCAL_CLUSTER_CITY_FALLBACKS.get(cluster_id, "UNKNOWN")
 
 
 def rebuild_shipment_history_from_api(
