@@ -592,6 +592,8 @@ a {
 
 .finance-table-wrap {
   overflow-x: visible;
+  overflow-y: auto;
+  max-height: 640px;
 }
 
 .finance-table {
