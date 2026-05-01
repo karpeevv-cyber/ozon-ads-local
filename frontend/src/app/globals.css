@@ -601,7 +601,7 @@ a {
 
 .finance-table th,
 .finance-table td {
-  padding: 6px 4px;
+  padding: 6px 3px;
   font-size: clamp(0.58rem, 0.63vw, 0.72rem);
   line-height: 1.15;
   text-align: right;
@@ -616,12 +616,14 @@ a {
 }
 
 .finance-table thead th {
-  font-size: clamp(0.5rem, 0.56vw, 0.66rem);
+  padding: 4px 2px;
+  font-size: clamp(0.38rem, 0.39vw, 0.46rem) !important;
   font-weight: 600;
-  line-height: 1.05;
-  letter-spacing: 0;
-  text-transform: none;
-  overflow-wrap: normal;
+  line-height: 1;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  white-space: normal;
+  overflow-wrap: anywhere;
   word-break: normal;
   hyphens: none;
 }
