@@ -34,6 +34,8 @@ ACTIVE_SUPPLY_ORDER_STATES = {
     "ACCEPTANCE_AT_STORAGE_WAREHOUSE",
 }
 
+COMPLETED_SUPPLY_ORDER_STATES = {"COMPLETED"}
+
 MACROLOCAL_CLUSTER_CITY_FALLBACKS = {
     "4039": "МОСКВА",
     "4040": "УФА",
@@ -716,6 +718,7 @@ def rebuild_shipment_history_from_api(
             if not bundle_id:
                 continue
             event_at = _event_time(order, supply)
+            supply_state = str(supply.get("state") or order_state).strip().upper()
             cache_key = (bundle_id, dropoff_id, storage_id or macrolocal_cluster_id)
             items = bundle_cache.get(cache_key)
             if items is None:
@@ -751,17 +754,18 @@ def rebuild_shipment_history_from_api(
                     _to_int(item.get("count")),
                     1,
                 )
-                events.append(
-                    {
-                        "article": article,
-                        "city_key": city_key,
-                        "city": city,
-                        "event_at": event_at,
-                        "quantity": quantity,
-                        "order_id": order_id,
-                        "bundle_id": bundle_id,
-                    }
-                )
+                if order_state in COMPLETED_SUPPLY_ORDER_STATES and supply_state in COMPLETED_SUPPLY_ORDER_STATES:
+                    events.append(
+                        {
+                            "article": article,
+                            "city_key": city_key,
+                            "city": city,
+                            "event_at": event_at,
+                            "quantity": quantity,
+                            "order_id": order_id,
+                            "bundle_id": bundle_id,
+                        }
+                    )
                 if order_state in ACTIVE_SUPPLY_ORDER_STATES:
                     transit_rows.append(
                         {
