@@ -616,9 +616,14 @@ a {
 }
 
 .finance-table thead th {
-  font-size: clamp(0.48rem, 0.52vw, 0.62rem);
-  letter-spacing: 0.03em;
+  font-size: clamp(0.5rem, 0.56vw, 0.66rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: 0;
   text-transform: none;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
 }
 
 .bid-form {
