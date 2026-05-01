@@ -142,6 +142,10 @@ def _norm_city(s: str) -> str:
         return "МОСКВА"
     if "САНКТ-ПЕТЕРБУРГ" in txt or "СЗО" in txt:
         return "САНКТ-ПЕТЕРБУРГ"
+    if "ХАБАРОВСК" in txt or txt == "ДАЛЬНИЙ" or "ДАЛЬНИЙ ВОСТОК" in txt:
+        return "ДАЛЬНИЙ"
+    if txt == "РОСТОВ" or "РОСТОВ-НА-ДОНУ" in txt:
+        return "РОСТОВ"
     if txt.startswith("ГРИВНО") or txt.startswith("НОГИНСК") or txt.startswith("ПУШКИНО") or txt.startswith("ХОРУГВИНО") or txt.startswith("ПЕТРОВСКОЕ"):
         return "МОСКВА"
     for suffix in ("_РФЦ_НОВЫЙ", "_МРФЦ", "_РФЦ", "_РЦ"):
@@ -510,7 +514,17 @@ def _load_orders_by_id(
                 api_key=seller_api_key,
             )
         except Exception:
-            continue
+            resp = {"orders": []}
+            for order_id in batch:
+                try:
+                    single_resp = seller_supply_order_get(
+                        order_ids=[order_id],
+                        client_id=seller_client_id,
+                        api_key=seller_api_key,
+                    )
+                except Exception:
+                    continue
+                resp["orders"].extend(single_resp.get("orders", []) or [])
         for o in (resp.get("orders", []) or []):
             if not isinstance(o, dict):
                 continue

@@ -53,6 +53,10 @@ def normalize_city(value: str) -> str:
         return "САНКТ-ПЕТЕРБУРГ"
     if "ХАБАРОВСК" in text:
         return "ДАЛЬНИЙ"
+    if text == "ДАЛЬНИЙ" or "ДАЛЬНИЙ ВОСТОК" in text:
+        return "ДАЛЬНИЙ"
+    if text == "РОСТОВ":
+        return "РОСТОВ"
     if "РОСТОВ-НА-ДОНУ" in text or "ROSTOVONDON" in compact:
         return "РОСТОВ"
     for prefix in ("ГРИВНО", "НОГИНСК", "ПУШКИНО", "ХОРУГВИНО", "ПЕТРОВСКОЕ"):
@@ -473,11 +477,24 @@ def _orders_by_ids(
 ) -> list[dict]:
     out: list[dict] = []
     for batch in _chunked(order_ids, 50):
-        response = seller_supply_order_get(
-            order_ids=batch,
-            client_id=seller_client_id,
-            api_key=seller_api_key,
-        )
+        try:
+            response = seller_supply_order_get(
+                order_ids=batch,
+                client_id=seller_client_id,
+                api_key=seller_api_key,
+            )
+        except Exception:
+            response = {"orders": []}
+            for order_id in batch:
+                try:
+                    single_response = seller_supply_order_get(
+                        order_ids=[order_id],
+                        client_id=seller_client_id,
+                        api_key=seller_api_key,
+                    )
+                except Exception:
+                    continue
+                response["orders"].extend(single_response.get("orders") or [])
         orders = response.get("orders") or []
         for item in orders:
             if isinstance(item, dict):
