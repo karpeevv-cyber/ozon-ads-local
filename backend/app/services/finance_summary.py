@@ -80,7 +80,7 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
                 cross_docking += value
             if name == "goods_processing_in_shipment":
                 acceptance += value
-            if name == "booking_space_and_staff_for_partial_shipment":
+            if name in {"booking_space_and_staff_for_partial_shipment", "processing_of_identified_surpluses_in_shipment"}:
                 errors += value
             if name == "product_placement_in_ozon_warehouses":
                 storage += value
