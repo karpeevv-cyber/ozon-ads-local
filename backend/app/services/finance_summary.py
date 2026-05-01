@@ -72,7 +72,7 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
         for service in services:
             name = str(service.get("name", "") or "")
             value = float(service.get("amount", {}).get("value", 0) or 0)
-            if name in {"logistics", "courier_client_reinvoice"}:
+            if name in {"logistics", "courier_client_reinvoice", "delivery_to_handover_place_by_ozon"}:
                 logistics += value
             if name == "reverse_logistics":
                 reverse_logistics += value
