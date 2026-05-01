@@ -585,6 +585,42 @@ a {
   background: #fff3bf;
 }
 
+.finance-panel-card {
+  grid-column: span 12;
+  padding: 14px;
+}
+
+.finance-table-wrap {
+  overflow-x: visible;
+}
+
+.finance-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.finance-table th,
+.finance-table td {
+  padding: 6px 4px;
+  font-size: clamp(0.58rem, 0.63vw, 0.72rem);
+  line-height: 1.15;
+  text-align: right;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.finance-table th:first-child,
+.finance-table td:first-child {
+  text-align: left;
+  width: 6.5%;
+}
+
+.finance-table thead th {
+  font-size: clamp(0.48rem, 0.52vw, 0.62rem);
+  letter-spacing: 0.03em;
+  text-transform: none;
+}
+
 .bid-form {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));

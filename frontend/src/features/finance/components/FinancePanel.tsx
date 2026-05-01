@@ -6,26 +6,26 @@ type FinancePanelProps = {
 
 const columns: { key: keyof FinanceSummary["rows"][number]; label: string; isPercent?: boolean }[] = [
   { key: "day", label: "Day" },
-  { key: "opening_balance", label: "Opening" },
-  { key: "closing_balance", label: "Closing" },
-  { key: "change", label: "Change" },
+  { key: "opening_balance", label: "Start" },
+  { key: "closing_balance", label: "End" },
+  { key: "change", label: "Delta" },
   { key: "sales", label: "Sales" },
   { key: "fee", label: "Fee" },
-  { key: "acquiring", label: "Acquiring" },
-  { key: "payments", label: "Payments" },
-  { key: "logistics", label: "Logistics" },
-  { key: "reverse_logistics", label: "Reverse logistics" },
-  { key: "returns", label: "Returns" },
-  { key: "cross_docking", label: "Cross-docking" },
-  { key: "acceptance", label: "Acceptance" },
+  { key: "acquiring", label: "Acq." },
+  { key: "payments", label: "Pays" },
+  { key: "logistics", label: "Log." },
+  { key: "reverse_logistics", label: "Rev. log." },
+  { key: "returns", label: "Ret." },
+  { key: "cross_docking", label: "Cross" },
+  { key: "acceptance", label: "Accept" },
   { key: "errors", label: "Errors" },
   { key: "storage", label: "Storage" },
-  { key: "marketing", label: "Marketing" },
-  { key: "promotion_with_cpo", label: "Marketing CPO" },
-  { key: "points_for_reviews", label: "Review points" },
-  { key: "seller_bonuses", label: "Seller bonuses" },
+  { key: "marketing", label: "Ads" },
+  { key: "promotion_with_cpo", label: "CPO" },
+  { key: "points_for_reviews", label: "Reviews" },
+  { key: "seller_bonuses", label: "Bonuses" },
   { key: "check", label: "Check" },
-  { key: "logistics_pct", label: "Logistics %", isPercent: true },
+  { key: "logistics_pct", label: "Log. %", isPercent: true },
 ];
 
 const highlightedColumns = new Set(["opening_balance", "closing_balance", "change", "sales"]);
@@ -41,7 +41,7 @@ export function FinancePanel({ summary }: FinancePanelProps) {
   const rows = summary.rows;
 
   return (
-    <article className="panel-card panel-card-wide">
+    <article className="panel-card panel-card-wide finance-panel-card">
       <div className="panel-header">
         <div>
           <p className="eyebrow">Finance</p>
@@ -52,8 +52,8 @@ export function FinancePanel({ summary }: FinancePanelProps) {
       <p className="muted-copy">
         Sales total: {summary.totals.sales ?? 0} / Logistics total: {summary.totals.logistics ?? 0}
       </p>
-      <div className="table-wrap">
-        <table className="data-table">
+      <div className="table-wrap finance-table-wrap">
+        <table className="data-table finance-table">
           <thead>
             <tr>
               {columns.map((column) => (
