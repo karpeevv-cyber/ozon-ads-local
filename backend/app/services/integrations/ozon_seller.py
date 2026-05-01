@@ -64,6 +64,8 @@ def _post_with_backoff(
 
             response.raise_for_status()
             return response
+        except requests.HTTPError:
+            raise
         except requests.RequestException as exc:
             last_exc = exc
             time.sleep(backoff)
