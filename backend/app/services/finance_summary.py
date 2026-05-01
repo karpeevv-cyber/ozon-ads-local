@@ -65,6 +65,7 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
         returns_processing = 0.0
         reverse_logistics = 0.0
         cross_docking = 0.0
+        export = 0.0
         acceptance = 0.0
         errors = 0.0
         seller_bonuses = 0.0
@@ -78,6 +79,8 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
                 reverse_logistics += value
             if name == "cross_docking":
                 cross_docking += value
+            if name in {"ozon_warehouse_pickup", "ozon_warehouse_pickup_assortment"}:
+                export += value
             if name == "goods_processing_in_shipment":
                 acceptance += value
             if name in {"booking_space_and_staff_for_partial_shipment", "processing_of_identified_surpluses_in_shipment"}:
@@ -107,6 +110,7 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
             + reverse_logistics
             + returns_processing
             + cross_docking
+            + export
             + acceptance
             + errors
             + storage
@@ -131,6 +135,7 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
                 "reverse_logistics": _ceil_int(reverse_logistics),
                 "returns": _ceil_int(returns_processing),
                 "cross_docking": _ceil_int(cross_docking),
+                "export": _ceil_int(export),
                 "acceptance": _ceil_int(acceptance),
                 "errors": _ceil_int(errors),
                 "storage": _ceil_int(storage),

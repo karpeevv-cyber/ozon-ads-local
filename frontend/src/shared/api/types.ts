@@ -297,6 +297,7 @@ export type FinanceRow = {
   reverse_logistics: number;
   returns: number;
   cross_docking: number;
+  export: number;
   acceptance: number;
   errors: number;
   storage: number;

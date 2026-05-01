@@ -4,28 +4,29 @@ type FinancePanelProps = {
   summary: FinanceSummary;
 };
 
-const columns: { key: keyof FinanceSummary["rows"][number]; label: string; isPercent?: boolean }[] = [
-  { key: "day", label: "day" },
-  { key: "opening_balance", label: "start" },
-  { key: "closing_balance", label: "end" },
-  { key: "change", label: "delta" },
-  { key: "sales", label: "sales" },
-  { key: "fee", label: "fee" },
-  { key: "acquiring", label: "acq." },
-  { key: "payments", label: "pays" },
-  { key: "logistics", label: "log." },
-  { key: "reverse_logistics", label: "rev. log." },
-  { key: "returns", label: "ret." },
-  { key: "cross_docking", label: "cross" },
-  { key: "acceptance", label: "accept" },
-  { key: "errors", label: "errors" },
-  { key: "storage", label: "storage" },
-  { key: "marketing", label: "ads" },
-  { key: "promotion_with_cpo", label: "cpo" },
-  { key: "points_for_reviews", label: "reviews" },
-  { key: "seller_bonuses", label: "bonuses" },
-  { key: "check", label: "check" },
-  { key: "logistics_pct", label: "log. %", isPercent: true },
+const columns: { key: keyof FinanceSummary["rows"][number]; label: string; title: string; isPercent?: boolean }[] = [
+  { key: "day", label: "day", title: "день" },
+  { key: "opening_balance", label: "start", title: "на начало дня" },
+  { key: "closing_balance", label: "end", title: "на конец дня" },
+  { key: "change", label: "delta", title: "изменение" },
+  { key: "sales", label: "sales", title: "продажи" },
+  { key: "fee", label: "fee", title: "комиссия" },
+  { key: "acquiring", label: "acq.", title: "эквайринг" },
+  { key: "payments", label: "pays", title: "выплаты" },
+  { key: "logistics", label: "log.", title: "логистика" },
+  { key: "reverse_logistics", label: "rev. log.", title: "обратная логистика" },
+  { key: "returns", label: "ret.", title: "возвраты" },
+  { key: "cross_docking", label: "cross", title: "кросс-докинг" },
+  { key: "export", label: "export", title: "вывоз со склада" },
+  { key: "acceptance", label: "accept", title: "приемка" },
+  { key: "errors", label: "errors", title: "ошибки" },
+  { key: "storage", label: "storage", title: "Хранение" },
+  { key: "marketing", label: "ads", title: "реклама" },
+  { key: "promotion_with_cpo", label: "cpo", title: "реклама - за заказ" },
+  { key: "points_for_reviews", label: "reviews", title: "баллы за отзывы" },
+  { key: "seller_bonuses", label: "bonuses", title: "бонусы продавца" },
+  { key: "check", label: "check", title: "проверка" },
+  { key: "logistics_pct", label: "log. %", title: "% логистики", isPercent: true },
 ];
 
 const highlightedColumns = new Set(["opening_balance", "closing_balance", "change", "sales"]);
@@ -59,7 +60,7 @@ export function FinancePanel({ summary }: FinancePanelProps) {
           <thead>
             <tr>
               {columns.map((column) => (
-                <th key={column.key}>{column.label}</th>
+                <th key={column.key} title={column.title}>{column.label}</th>
               ))}
             </tr>
           </thead>

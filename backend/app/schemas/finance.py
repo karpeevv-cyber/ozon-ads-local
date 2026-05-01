@@ -14,6 +14,7 @@ class FinanceRowResponse(BaseModel):
     reverse_logistics: int
     returns: int
     cross_docking: int
+    export: int
     acceptance: int
     errors: int
     storage: int
