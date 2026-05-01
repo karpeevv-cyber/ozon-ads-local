@@ -71,6 +71,8 @@ export function FinancePanel({ summary }: FinancePanelProps) {
                   >
                     {column.key === "day"
                       ? "Total"
+                      : column.key === "opening_balance" || column.key === "closing_balance"
+                        ? ""
                       : formatValue(summary.totals[column.key] ?? 0, column.isPercent)}
                   </td>
                 ))}

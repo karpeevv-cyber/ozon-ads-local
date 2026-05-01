@@ -620,6 +620,7 @@ a {
   font-size: clamp(0.64rem, 0.66vw, 0.78rem) !important;
   font-weight: 600;
   line-height: 1;
+  text-align: center;
   letter-spacing: 0 !important;
   text-transform: none !important;
   white-space: normal;
