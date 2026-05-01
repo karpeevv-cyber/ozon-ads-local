@@ -54,9 +54,6 @@ export function FinancePanel({ summary }: FinancePanelProps) {
         </div>
         <span className="status-badge">{rows.length} days</span>
       </div>
-      <p className="muted-copy">
-        Sales total: {summary.totals.sales ?? 0} / Logistics total: {summary.totals.logistics ?? 0}
-      </p>
       <div className="table-wrap finance-table-wrap">
         <table className="data-table finance-table">
           <thead>
