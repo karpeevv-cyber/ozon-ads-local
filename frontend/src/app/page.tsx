@@ -438,6 +438,9 @@ async function TabContent(params: {
     return await renderTabContent(params);
   } catch (error) {
     if (isAbortLikeError(error)) {
+      if (params.activeTab === "stocks" && params.stocksRefresh) {
+        return await renderTabContent({ ...params, stocksRefresh: false });
+      }
       return <TabContentSkeleton />;
     }
     const message =
