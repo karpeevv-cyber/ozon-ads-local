@@ -601,8 +601,8 @@ a {
 
 .finance-table th,
 .finance-table td {
-  padding: 5px 1px;
-  font-size: clamp(0.68rem, 0.72vw, 0.82rem);
+  padding: 4px 1px;
+  font-size: clamp(0.78rem, 0.82vw, 0.95rem);
   line-height: 1.15;
   text-align: right;
   white-space: nowrap;
