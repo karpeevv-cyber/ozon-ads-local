@@ -132,33 +132,29 @@ def _to_int(value: object) -> int:
         return 0
 
 
-def _event_time(order: dict, supply: dict) -> datetime:
-    state = str(order.get("state") or "").strip().upper()
-    if state == "COMPLETED":
-        completed_at = _parse_dt(order.get("state_updated_date"))
-        if completed_at is not None:
-            return completed_at
-
-    timeslot = order.get("timeslot") or {}
-    nested = timeslot.get("timeslot") or {}
-    for key in ("from", "to"):
-        dt = _parse_dt(nested.get(key))
-        if dt is not None:
-            return dt
+def _completed_event_time(order: dict, supply: dict, supply_count: int) -> datetime | None:
+    storage = supply.get("storage_warehouse") or {}
     for key in (
-        "created_date",
+        "arrival_date",
+        "completed_at",
+        "completion_date",
+        "accepted_at",
+        "acceptance_date",
         "state_updated_date",
         "updated_at",
-        "created_at",
     ):
-        dt = _parse_dt(order.get(key))
+        dt = _parse_dt(storage.get(key))
         if dt is not None:
             return dt
-    for key in ("updated_at", "created_at", "date"):
         dt = _parse_dt(supply.get(key))
         if dt is not None:
             return dt
-    return datetime.utcnow()
+
+    # order.state_updated_date is only safe for single-supply orders. For batch
+    # orders it is the order-level date and can differ from each supply's date.
+    if supply_count <= 1:
+        return _parse_dt(order.get("state_updated_date"))
+    return None
 
 
 def sync_shipment_history(
@@ -706,6 +702,7 @@ def rebuild_shipment_history_from_api(
         if not dropoff_id:
             continue
         supplies = order.get("supplies") or []
+        supply_count = len([supply for supply in supplies if isinstance(supply, dict)])
         for supply in supplies:
             if not isinstance(supply, dict):
                 continue
@@ -717,7 +714,7 @@ def rebuild_shipment_history_from_api(
             macrolocal_cluster_id = str(supply.get("macrolocal_cluster_id") or "").strip()
             if not bundle_id:
                 continue
-            event_at = _event_time(order, supply)
+            completed_event_at = _completed_event_time(order, supply, supply_count)
             supply_state = str(supply.get("state") or order_state).strip().upper()
             cache_key = (bundle_id, dropoff_id, storage_id or macrolocal_cluster_id)
             items = bundle_cache.get(cache_key)
@@ -754,13 +751,17 @@ def rebuild_shipment_history_from_api(
                     _to_int(item.get("count")),
                     1,
                 )
-                if order_state in COMPLETED_SUPPLY_ORDER_STATES and supply_state in COMPLETED_SUPPLY_ORDER_STATES:
+                if (
+                    order_state in COMPLETED_SUPPLY_ORDER_STATES
+                    and supply_state in COMPLETED_SUPPLY_ORDER_STATES
+                    and completed_event_at is not None
+                ):
                     events.append(
                         {
                             "article": article,
                             "city_key": city_key,
                             "city": city,
-                            "event_at": event_at,
+                            "event_at": completed_event_at,
                             "quantity": quantity,
                             "order_id": order_id,
                             "bundle_id": bundle_id,
