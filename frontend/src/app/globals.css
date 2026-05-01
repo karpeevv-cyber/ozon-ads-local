@@ -595,28 +595,28 @@ a {
 }
 
 .finance-table {
-  table-layout: fixed;
+  table-layout: auto;
   width: 100%;
 }
 
 .finance-table th,
 .finance-table td {
-  padding: 6px 3px;
-  font-size: clamp(0.58rem, 0.63vw, 0.72rem);
+  padding: 5px 1px;
+  font-size: clamp(0.68rem, 0.72vw, 0.82rem);
   line-height: 1.15;
   text-align: right;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 
 .finance-table th:first-child,
 .finance-table td:first-child {
   text-align: left;
-  width: 6.5%;
+  width: 5.2%;
 }
 
 .finance-table thead th {
-  padding: 4px 2px;
+  padding: 3px 1px;
   font-size: clamp(0.38rem, 0.39vw, 0.46rem) !important;
   font-weight: 600;
   line-height: 1;
