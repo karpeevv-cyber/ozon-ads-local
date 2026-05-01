@@ -585,6 +585,14 @@ a {
   background: #fff3bf;
 }
 
+.finance-total-row td {
+  background: #e8e3da;
+}
+
+.finance-total-row .finance-highlight-cell {
+  background: #ddd6ca;
+}
+
 .finance-panel-card {
   grid-column: span 12;
   padding: 14px;

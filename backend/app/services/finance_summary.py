@@ -150,7 +150,10 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
                 continue
             totals[key] = float(totals.get(key, 0) or 0) + float(value or 0)
     if "logistics_pct" in totals:
-        totals["logistics_pct"] = round(float(totals["logistics_pct"]), 1)
+        totals["logistics_pct"] = round(
+            sum(float(row.get("logistics_pct") or 0) for row in rows) / len(rows),
+            1,
+        ) if rows else 0.0
 
     return {
         "company": company_name,

@@ -37,6 +37,11 @@ function formatValue(value: string | number, isPercent?: boolean) {
   return isPercent ? `${value.toFixed(1)}%` : value;
 }
 
+function formatDate(value: string) {
+  const [year, month, day] = value.split("-");
+  return year && month && day ? `${day}.${month}.${year}` : value;
+}
+
 export function FinancePanel({ summary }: FinancePanelProps) {
   const rows = summary.rows;
 
@@ -63,7 +68,7 @@ export function FinancePanel({ summary }: FinancePanelProps) {
           </thead>
           <tbody>
             {Object.keys(summary.totals).length > 0 ? (
-              <tr>
+              <tr className="finance-total-row">
                 {columns.map((column) => (
                   <td
                     className={highlightedColumns.has(column.key) ? "finance-highlight-cell" : undefined}
@@ -92,7 +97,9 @@ export function FinancePanel({ summary }: FinancePanelProps) {
                       className={highlightedColumns.has(column.key) ? "finance-highlight-cell" : undefined}
                       key={column.key}
                     >
-                      {formatValue(row[column.key], column.isPercent)}
+                      {column.key === "day"
+                        ? formatDate(row.day)
+                        : formatValue(row[column.key], column.isPercent)}
                     </td>
                   ))}
                 </tr>
