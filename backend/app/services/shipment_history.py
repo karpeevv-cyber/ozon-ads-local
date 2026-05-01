@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.db.bootstrap import create_all
 from app.services.integrations.ozon_seller import (
+    seller_analytics_stocks,
     seller_supply_order_bundle_query,
     seller_supply_order_get,
     seller_supply_order_list,
@@ -31,6 +32,12 @@ ACTIVE_SUPPLY_ORDER_STATES = {
     "ACCEPTED_AT_SUPPLY_WAREHOUSE",
     "IN_TRANSIT",
     "ACCEPTANCE_AT_STORAGE_WAREHOUSE",
+}
+
+MACROLOCAL_CLUSTER_CITY_FALLBACKS = {
+    "4039": "МОСКВА",
+    "4040": "УФА",
+    "4071": "РОСТОВ",
 }
 
 
@@ -506,7 +513,7 @@ def _bundle_items(
     *,
     bundle_id: str,
     dropoff_warehouse_id: str,
-    storage_warehouse_id: str,
+    storage_warehouse_id: str = "",
     seller_client_id: str,
     seller_api_key: str,
 ) -> list[dict]:
@@ -516,7 +523,7 @@ def _bundle_items(
         response = seller_supply_order_bundle_query(
             bundle_ids=[bundle_id],
             dropoff_warehouse_id=dropoff_warehouse_id,
-            storage_warehouse_ids=[storage_warehouse_id],
+            storage_warehouse_ids=[storage_warehouse_id] if storage_warehouse_id else [],
             limit=100,
             sort_field="NAME",
             is_asc=True,
@@ -535,6 +542,43 @@ def _bundle_items(
             break
         last_id = next_last_id
     return out
+
+
+def _city_from_macrolocal_cluster(
+    *,
+    macrolocal_cluster_id: str,
+    items: list[dict],
+    seller_client_id: str,
+    seller_api_key: str,
+) -> str:
+    cluster_id = str(macrolocal_cluster_id or "").strip()
+    if not cluster_id:
+        return "UNKNOWN"
+
+    sku = ""
+    for item in items:
+        sku_value = item.get("sku") if isinstance(item, dict) else None
+        if str(sku_value or "").strip().isdigit():
+            sku = str(sku_value).strip()
+            break
+
+    if sku:
+        try:
+            response = seller_analytics_stocks(
+                skus=[sku],
+                cluster_ids=[int(cluster_id)],
+                client_id=seller_client_id,
+                api_key=seller_api_key,
+            )
+            for row in response.get("items", []) or []:
+                if str(row.get("macrolocal_cluster_id") or "").strip() == cluster_id:
+                    city = normalize_city(str(row.get("cluster_name") or ""))
+                    if city and city != "UNKNOWN":
+                        return city
+        except Exception:
+            pass
+
+    return MACROLOCAL_CLUSTER_CITY_FALLBACKS.get(cluster_id, f"MACROLOCAL_{cluster_id}")
 
 
 def rebuild_shipment_history_from_api(
@@ -601,12 +645,11 @@ def rebuild_shipment_history_from_api(
             storage_name = str(storage.get("name") or "").strip()
             bundle_id = str(supply.get("bundle_id") or "").strip()
             supply_id = str(supply.get("supply_id") or "").strip()
-            if not storage_id or not bundle_id:
+            macrolocal_cluster_id = str(supply.get("macrolocal_cluster_id") or "").strip()
+            if not bundle_id:
                 continue
-            city = storage_name or storage_id
-            city_key = normalize_city(city)
             event_at = _event_time(order, supply)
-            cache_key = (bundle_id, dropoff_id, storage_id)
+            cache_key = (bundle_id, dropoff_id, storage_id or macrolocal_cluster_id)
             items = bundle_cache.get(cache_key)
             if items is None:
                 try:
@@ -620,6 +663,17 @@ def rebuild_shipment_history_from_api(
                 except Exception:
                     items = []
                 bundle_cache[cache_key] = items
+            if storage_id:
+                city = storage_name or storage_id
+                city_key = normalize_city(city)
+            else:
+                city_key = _city_from_macrolocal_cluster(
+                    macrolocal_cluster_id=macrolocal_cluster_id,
+                    items=items,
+                    seller_client_id=seller_client_id,
+                    seller_api_key=seller_api_key,
+                )
+                city = city_key
             for item in items:
                 article = str(item.get("offer_id") or "").strip()
                 if not article:

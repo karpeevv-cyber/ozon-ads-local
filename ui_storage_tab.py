@@ -95,13 +95,16 @@ def seller_supply_order_bundle_query(**kwargs):
     body = {
         "bundle_ids": [str(x) for x in (kwargs.get("bundle_ids") or []) if str(x).strip()],
         "is_asc": bool(kwargs.get("is_asc", True)),
-        "item_tags_calculation": {
-            "dropoff_warehouse_id": str(kwargs.get("dropoff_warehouse_id", "") or ""),
-            "storage_warehouse_ids": [str(x) for x in (kwargs.get("storage_warehouse_ids") or []) if str(x).strip()],
-        },
         "limit": int(kwargs.get("limit", 100)),
         "sort_field": str(kwargs.get("sort_field", "NAME")),
     }
+    storage_ids = [str(x) for x in (kwargs.get("storage_warehouse_ids") or []) if str(x).strip()]
+    dropoff_id = str(kwargs.get("dropoff_warehouse_id", "") or "").strip()
+    if dropoff_id and storage_ids:
+        body["item_tags_calculation"] = {
+            "dropoff_warehouse_id": dropoff_id,
+            "storage_warehouse_ids": storage_ids,
+        }
     last_id = str(kwargs.get("last_id", "") or "").strip()
     if last_id:
         body["last_id"] = last_id
@@ -199,6 +202,13 @@ def _map_warehouse_city_to_stock_key(warehouse_city: str, stock_city_keys: set[s
     if best_key and best_score > 0:
         return best_key
     return wh_key
+
+
+MACROLOCAL_CLUSTER_CITY_FALLBACKS = {
+    "4039": "МОСКВА",
+    "4040": "УФА",
+    "4071": "РОСТОВ",
+}
 
 
 def _item_volume_liters_map_for_store(seller_client_id: str | None) -> dict[str, float]:
@@ -538,7 +548,7 @@ def _load_bundle_items(
     *,
     bundle_id: str,
     dropoff_warehouse_id: str,
-    storage_warehouse_id: str,
+    storage_warehouse_id: str = "",
     seller_client_id: str,
     seller_api_key: str,
 ) -> list[dict]:
@@ -553,7 +563,7 @@ def _load_bundle_items(
             resp = seller_supply_order_bundle_query(
                 bundle_ids=[str(bundle_id)],
                 dropoff_warehouse_id=str(dropoff_warehouse_id),
-                storage_warehouse_ids=[str(storage_warehouse_id)],
+                storage_warehouse_ids=[str(storage_warehouse_id)] if str(storage_warehouse_id).strip() else [],
                 limit=100,
                 sort_field="NAME",
                 is_asc=True,
@@ -574,6 +584,40 @@ def _load_bundle_items(
             break
         last_id = next_last_id
     return out
+
+
+def _city_from_macrolocal_cluster(
+    *,
+    macrolocal_cluster_id: str,
+    items: list[dict],
+    seller_client_id: str,
+    seller_api_key: str,
+) -> str:
+    cluster_id = str(macrolocal_cluster_id or "").strip()
+    if not cluster_id:
+        return "UNKNOWN"
+    sku = ""
+    for item in items:
+        sku_value = item.get("sku") if isinstance(item, dict) else None
+        if str(sku_value or "").strip().isdigit():
+            sku = str(sku_value).strip()
+            break
+    if sku:
+        try:
+            response = seller_analytics_stocks(
+                skus=[sku],
+                cluster_ids=[int(cluster_id)],
+                client_id=seller_client_id,
+                api_key=seller_api_key,
+            )
+            for row in response.get("items", []) or []:
+                if str(row.get("macrolocal_cluster_id") or "").strip() == cluster_id:
+                    city = _norm_city(str(row.get("cluster_name") or ""))
+                    if city and city != "UNKNOWN":
+                        return city
+        except Exception:
+            pass
+    return MACROLOCAL_CLUSTER_CITY_FALLBACKS.get(cluster_id, f"MACROLOCAL_{cluster_id}")
 
 
 def _bundle_items_cache_path(seller_client_id: str) -> Path:
@@ -719,15 +763,14 @@ def _build_lots_for_order(
         storage = supply.get("storage_warehouse") or {}
         storage_id = str(storage.get("warehouse_id") or "")
         storage_name = str(storage.get("name") or "").strip()
-        city = storage_name or storage_id or "UNKNOWN"
-        city_key = _norm_city(city)
         bundle_id = str(supply.get("bundle_id") or "").strip()
-        if not bundle_id or not dropoff_id or not storage_id:
+        macrolocal_cluster_id = str(supply.get("macrolocal_cluster_id") or "").strip()
+        if not bundle_id:
             continue
         arrival_dt = _arrival_dt_for_order(order, supply)
         if arrival_dt is None:
             continue
-        bundle_cache_key = (bundle_id, dropoff_id, storage_id)
+        bundle_cache_key = (bundle_id, dropoff_id, storage_id or macrolocal_cluster_id)
         items = bundle_items_cache.get(bundle_cache_key)
         if items is None:
             items = _load_bundle_items(
@@ -738,6 +781,17 @@ def _build_lots_for_order(
                 seller_api_key=seller_api_key,
             )
             bundle_items_cache[bundle_cache_key] = items
+        if storage_id:
+            city = storage_name or storage_id or "UNKNOWN"
+            city_key = _norm_city(city)
+        else:
+            city_key = _city_from_macrolocal_cluster(
+                macrolocal_cluster_id=macrolocal_cluster_id,
+                items=items,
+                seller_client_id=seller_client_id,
+                seller_api_key=seller_api_key,
+            )
+            city = city_key
         for it in items:
             article = str(it.get("offer_id") or "").strip()
             if not article:

@@ -414,13 +414,15 @@ def seller_supply_order_bundle_query(
     body = {
         "bundle_ids": [str(value) for value in bundle_ids if str(value).strip()],
         "is_asc": bool(is_asc),
-        "item_tags_calculation": {
-            "dropoff_warehouse_id": str(dropoff_warehouse_id),
-            "storage_warehouse_ids": [str(value) for value in storage_warehouse_ids if str(value).strip()],
-        },
         "limit": int(limit),
         "sort_field": str(sort_field),
     }
+    storage_ids = [str(value) for value in storage_warehouse_ids if str(value).strip()]
+    if str(dropoff_warehouse_id or "").strip() and storage_ids:
+        body["item_tags_calculation"] = {
+            "dropoff_warehouse_id": str(dropoff_warehouse_id),
+            "storage_warehouse_ids": storage_ids,
+        }
     if str(last_id or "").strip():
         body["last_id"] = str(last_id)
     response = _post_with_backoff(url, headers=headers, body=body, timeout=60)
