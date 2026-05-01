@@ -294,9 +294,17 @@ export type FinanceRow = {
   acquiring: number;
   payments: number;
   logistics: number;
+  reverse_logistics: number;
   returns: number;
+  cross_docking: number;
+  acceptance: number;
+  errors: number;
   storage: number;
   marketing: number;
+  promotion_with_cpo: number;
+  points_for_reviews: number;
+  seller_bonuses: number;
+  check: number;
   logistics_pct: number;
 };
 

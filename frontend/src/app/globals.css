@@ -581,6 +581,10 @@ a {
   font-weight: 700;
 }
 
+.finance-highlight-cell {
+  background: #fff3bf;
+}
+
 .bid-form {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));

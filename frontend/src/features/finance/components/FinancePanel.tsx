@@ -4,8 +4,41 @@ type FinancePanelProps = {
   summary: FinanceSummary;
 };
 
+const columns: { key: keyof FinanceSummary["rows"][number]; label: string; isPercent?: boolean }[] = [
+  { key: "day", label: "Day" },
+  { key: "opening_balance", label: "Opening" },
+  { key: "closing_balance", label: "Closing" },
+  { key: "change", label: "Change" },
+  { key: "sales", label: "Sales" },
+  { key: "fee", label: "Fee" },
+  { key: "acquiring", label: "Acquiring" },
+  { key: "payments", label: "Payments" },
+  { key: "logistics", label: "Logistics" },
+  { key: "reverse_logistics", label: "Reverse logistics" },
+  { key: "returns", label: "Returns" },
+  { key: "cross_docking", label: "Cross-docking" },
+  { key: "acceptance", label: "Acceptance" },
+  { key: "errors", label: "Errors" },
+  { key: "storage", label: "Storage" },
+  { key: "marketing", label: "Marketing" },
+  { key: "promotion_with_cpo", label: "Marketing CPO" },
+  { key: "points_for_reviews", label: "Review points" },
+  { key: "seller_bonuses", label: "Seller bonuses" },
+  { key: "check", label: "Check" },
+  { key: "logistics_pct", label: "Logistics %", isPercent: true },
+];
+
+const highlightedColumns = new Set(["opening_balance", "closing_balance", "change", "sales"]);
+
+function formatValue(value: string | number, isPercent?: boolean) {
+  if (typeof value === "string") {
+    return value;
+  }
+  return isPercent ? `${value.toFixed(1)}%` : value;
+}
+
 export function FinancePanel({ summary }: FinancePanelProps) {
-  const rows = summary.rows.slice(0, 7);
+  const rows = summary.rows;
 
   return (
     <article className="panel-card panel-card-wide">
@@ -23,28 +56,43 @@ export function FinancePanel({ summary }: FinancePanelProps) {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Day</th>
-              <th>Opening</th>
-              <th>Closing</th>
-              <th>Sales</th>
-              <th>Logistics %</th>
+              {columns.map((column) => (
+                <th key={column.key}>{column.label}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
+            {Object.keys(summary.totals).length > 0 ? (
+              <tr>
+                {columns.map((column) => (
+                  <td
+                    className={highlightedColumns.has(column.key) ? "finance-highlight-cell" : undefined}
+                    key={column.key}
+                  >
+                    {column.key === "day"
+                      ? "Total"
+                      : formatValue(summary.totals[column.key] ?? 0, column.isPercent)}
+                  </td>
+                ))}
+              </tr>
+            ) : null}
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="empty-cell">
+                <td colSpan={columns.length} className="empty-cell">
                   No finance rows loaded yet.
                 </td>
               </tr>
             ) : (
               rows.map((row) => (
                 <tr key={row.day}>
-                  <td>{row.day}</td>
-                  <td>{row.opening_balance}</td>
-                  <td>{row.closing_balance}</td>
-                  <td>{row.sales}</td>
-                  <td>{row.logistics_pct}</td>
+                  {columns.map((column) => (
+                    <td
+                      className={highlightedColumns.has(column.key) ? "finance-highlight-cell" : undefined}
+                      key={column.key}
+                    >
+                      {formatValue(row[column.key], column.isPercent)}
+                    </td>
+                  ))}
                 </tr>
               ))
             )}

@@ -11,9 +11,17 @@ class FinanceRowResponse(BaseModel):
     acquiring: int
     payments: int
     logistics: int
+    reverse_logistics: int
     returns: int
+    cross_docking: int
+    acceptance: int
+    errors: int
     storage: int
     marketing: int
+    promotion_with_cpo: int
+    points_for_reviews: int
+    seller_bonuses: int
+    check: int
     logistics_pct: float
 
 
