@@ -14,6 +14,7 @@ from app.services.legacy_compat import (
     build_stocks_rows_cached,
 )
 from app.services.shipment_history import (
+    has_unknown_shipment_city,
     load_shipment_events_map,
     load_shipment_pairs,
     load_shipment_transit_map,
@@ -341,6 +342,12 @@ def get_stocks_workspace(
     transit_city_keys = {city_key for (_article, city_key), qty in transit_lookup.items() if int(qty or 0) > 0}
     for city_key in sorted(transit_city_keys - existing_city_keys):
         ordered_clusters.append(_city_key_to_label(city_key))
+    if has_unknown_shipment_city(
+        db,
+        company_name=company_name,
+        seller_client_id=seller_client_id,
+    ) and "UNKNOWN" not in {_normalize_city(str(city)) for city in ordered_clusters}:
+        ordered_clusters.append("UNKNOWN")
 
     df_pivot = df_pivot.reindex(columns=ordered_clusters).loc[:, lambda frame: ~frame.columns.duplicated()]
     df_ads = df_ads.reindex(columns=ordered_clusters).loc[:, lambda frame: ~frame.columns.duplicated()]

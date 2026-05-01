@@ -338,6 +338,44 @@ def load_shipment_pairs(
     return pairs, ts
 
 
+def has_unknown_shipment_city(
+    db: Session,
+    *,
+    company_name: str,
+    seller_client_id: str,
+) -> bool:
+    if db is None or not seller_client_id:
+        return False
+    create_all()
+    from app.models.shipment_history import ShipmentHistory
+    from app.models.shipment_transit import ShipmentTransit
+
+    common_filters = {
+        "company_name": str(company_name or ""),
+        "seller_client_id": str(seller_client_id or ""),
+    }
+    history_exists = (
+        db.query(ShipmentHistory.id)
+        .filter(ShipmentHistory.company_name == common_filters["company_name"])
+        .filter(ShipmentHistory.seller_client_id == common_filters["seller_client_id"])
+        .filter(ShipmentHistory.city_key == "UNKNOWN")
+        .filter(ShipmentHistory.shipments_count > 0)
+        .first()
+        is not None
+    )
+    if history_exists:
+        return True
+    return (
+        db.query(ShipmentTransit.id)
+        .filter(ShipmentTransit.company_name == common_filters["company_name"])
+        .filter(ShipmentTransit.seller_client_id == common_filters["seller_client_id"])
+        .filter(ShipmentTransit.city_key == "UNKNOWN")
+        .filter(ShipmentTransit.quantity > 0)
+        .first()
+        is not None
+    )
+
+
 def load_shipment_events_map(
     db: Session,
     *,
