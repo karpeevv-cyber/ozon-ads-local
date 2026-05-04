@@ -177,6 +177,8 @@ export function StoragePanel({ snapshot }: StoragePanelProps) {
         <div className="storage-meta">
           <span>As of: {formatDate(snapshot.cache_updated_at)}</span>
           {snapshot.cache_source ? <span>Source: {snapshot.cache_source.split(/[\\/]/).pop()}</span> : null}
+          {snapshot.refresh_started ? <span>Refresh started in background.</span> : null}
+          {!snapshot.refresh_started && snapshot.refresh_in_progress ? <span>Refresh already in progress.</span> : null}
           <span>FIFO: sales consume oldest lots first; fee starts after 120 days.</span>
         </div>
 

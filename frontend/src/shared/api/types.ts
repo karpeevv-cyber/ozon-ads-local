@@ -301,6 +301,8 @@ export type StorageSnapshot = {
   seller_client_id: string;
   cache_updated_at: string | null;
   cache_source: string;
+  refresh_started: boolean;
+  refresh_in_progress: boolean;
   sku_count: number;
   order_count: number;
   ship_lot_count: number;

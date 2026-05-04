@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import sys
+import threading
 import types
 from datetime import datetime, timedelta
 
@@ -10,10 +11,14 @@ import pandas as pd
 from sqlalchemy.orm import Session
 
 from app.db.bootstrap import create_all
+from app.db.session import SessionLocal
 from app.services.company_config import resolve_company_config
 from app.services.legacy_compat import build_fee_risk_forecast_table, load_storage_cache_payload
 from app.services.shipment_history import sync_shipment_history
 from app.services.storage_paths import REPO_ROOT, backend_data_path
+
+_STORAGE_REFRESH_LOCK = threading.Lock()
+_STORAGE_REFRESH_RUNNING: set[str] = set()
 
 
 def _install_streamlit_stub() -> None:
@@ -168,6 +173,55 @@ def _rebuild_storage_payload_from_api(
     return payload, now
 
 
+def _start_storage_refresh_background(
+    *,
+    company_name: str,
+    seller_client_id: str,
+    seller_api_key: str,
+    cache_version: str,
+) -> tuple[bool, bool]:
+    key = f"{company_name}:{seller_client_id}:{cache_version}"
+    with _STORAGE_REFRESH_LOCK:
+        if key in _STORAGE_REFRESH_RUNNING:
+            return False, True
+        _STORAGE_REFRESH_RUNNING.add(key)
+
+    def worker() -> None:
+        db = SessionLocal()
+        try:
+            payload, rebuilt_at = _rebuild_storage_payload_from_api(
+                seller_client_id=seller_client_id,
+                seller_api_key=seller_api_key,
+                cache_version=cache_version,
+            )
+            source_ref = _backend_storage_cache_path(seller_client_id, cache_version)
+            if payload:
+                _save_storage_snapshot_to_db(
+                    db,
+                    company_name=company_name,
+                    seller_client_id=seller_client_id,
+                    version=cache_version,
+                    payload=payload,
+                    source_ref=source_ref,
+                )
+                try:
+                    sync_shipment_history(
+                        db,
+                        company_name=company_name,
+                        seller_client_id=seller_client_id,
+                        lot_rows=list(payload.get("lot_rows", []) or []),
+                    )
+                except Exception:
+                    pass
+        finally:
+            db.close()
+            with _STORAGE_REFRESH_LOCK:
+                _STORAGE_REFRESH_RUNNING.discard(key)
+
+    threading.Thread(target=worker, name=f"storage-refresh-{seller_client_id}", daemon=True).start()
+    return True, True
+
+
 def _load_storage_snapshot_from_db(
     db: Session,
     *,
@@ -271,6 +325,8 @@ def get_storage_snapshot(*, company: str | None = None, force_refresh: bool = Fa
             "seller_client_id": seller_client_id,
             "cache_updated_at": None,
             "cache_source": "",
+            "refresh_started": False,
+            "refresh_in_progress": False,
             "lot_rows": [],
             "risk_rows": [],
             "unknown_stock_rows": [],
@@ -283,24 +339,16 @@ def get_storage_snapshot(*, company: str | None = None, force_refresh: bool = Fa
     payload: dict = {}
     source_ref = ""
     cache_updated_at: str | None = None
+    refresh_started = False
+    refresh_in_progress = False
     if force_refresh:
-        payload, rebuilt_at = _rebuild_storage_payload_from_api(
+        refresh_started, refresh_in_progress = _start_storage_refresh_background(
+            company_name=company_name,
             seller_client_id=seller_client_id,
             seller_api_key=(config.get("seller_api_key") or "").strip(),
             cache_version=cache_version,
         )
-        cache_updated_at = rebuilt_at.isoformat()
-        source_ref = _backend_storage_cache_path(seller_client_id, cache_version)
-        if db is not None and payload:
-            _save_storage_snapshot_to_db(
-                db,
-                company_name=company_name,
-                seller_client_id=seller_client_id,
-                version=cache_version,
-                payload=payload,
-                source_ref=source_ref,
-            )
-    if db is not None and not force_refresh:
+    if db is not None:
         payload, source_ref, cache_updated_at = _load_storage_snapshot_from_db(
             db,
             company_name=company_name,
@@ -351,6 +399,8 @@ def get_storage_snapshot(*, company: str | None = None, force_refresh: bool = Fa
         "seller_client_id": seller_client_id,
         "cache_updated_at": cache_updated_at,
         "cache_source": source_ref,
+        "refresh_started": refresh_started,
+        "refresh_in_progress": refresh_in_progress,
         "lot_rows": df_lots.to_dict("records") if not df_lots.empty else [],
         "risk_rows": df_risk.to_dict("records") if not df_risk.empty else [],
         "unknown_stock_rows": payload.get("unknown_stock_rows", []) if isinstance(payload, dict) else [],

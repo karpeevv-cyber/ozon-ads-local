@@ -18,6 +18,8 @@ class StorageSnapshotResponse(BaseModel):
     seller_client_id: str
     cache_updated_at: str | None = None
     cache_source: str = ""
+    refresh_started: bool = False
+    refresh_in_progress: bool = False
     sku_count: int
     order_count: int
     ship_lot_count: int
