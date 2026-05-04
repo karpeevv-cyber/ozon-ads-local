@@ -191,7 +191,7 @@ def _build_article_drr_lookup(
     date_from: str | None,
     date_to: str | None,
     sku_article_map: dict[str, str],
-) -> dict[str, float | None]:
+) -> dict[str, dict[str, float | int | None]]:
     if db is None or not sku_article_map:
         return {}
 
@@ -240,13 +240,17 @@ def _build_article_drr_lookup(
         }
     )
     if not candidate_campaign_ids:
-        return {article: None for article in article_campaigns}
+        return {
+            article: {"revenue": None, "ordered_units": None, "drr_pct": None}
+            for article in article_campaigns
+        }
 
     metric_rows = (
         db.query(
             CampaignDailyMetric.campaign_id,
             func.sum(CampaignDailyMetric.money_spent),
             func.sum(CampaignDailyMetric.total_revenue),
+            func.sum(CampaignDailyMetric.ordered_units),
         )
         .filter(CampaignDailyMetric.campaign_id.in_(candidate_campaign_ids))
         .filter(CampaignDailyMetric.day >= start, CampaignDailyMetric.day <= end)
@@ -254,22 +258,23 @@ def _build_article_drr_lookup(
         .all()
     )
     metrics_by_campaign = {
-        int(campaign_id): (float(spend or 0.0), float(revenue or 0.0))
-        for campaign_id, spend, revenue in metric_rows
+        int(campaign_id): (float(spend or 0.0), float(revenue or 0.0), int(units or 0))
+        for campaign_id, spend, revenue, units in metric_rows
     }
 
-    drr_by_article: dict[str, float | None] = {}
+    metrics_by_article: dict[str, dict[str, float | int | None]] = {}
     for article, campaign_ids in article_campaigns.items():
         if len(campaign_ids) != 1:
-            drr_by_article[article] = None
+            metrics_by_article[article] = {"revenue": None, "ordered_units": None, "drr_pct": None}
             continue
         campaign_id = next(iter(campaign_ids))
-        spend, revenue = metrics_by_campaign.get(campaign_id, (0.0, 0.0))
-        if revenue <= 0:
-            drr_by_article[article] = None
-        else:
-            drr_by_article[article] = round(spend / revenue * 100.0, 1)
-    return drr_by_article
+        spend, revenue, units = metrics_by_campaign.get(campaign_id, (0.0, 0.0, 0))
+        metrics_by_article[article] = {
+            "revenue": round(revenue, 0),
+            "ordered_units": int(units),
+            "drr_pct": round(spend / revenue * 100.0, 1) if revenue > 0 else None,
+        }
+    return metrics_by_article
 
 
 def _build_article_drr_lookup_from_api(
@@ -278,7 +283,7 @@ def _build_article_drr_lookup_from_api(
     date_from: str | None,
     date_to: str | None,
     sku_article_map: dict[str, str],
-) -> dict[str, float | None]:
+) -> dict[str, dict[str, float | int | None]]:
     if not date_from or not date_to or not sku_article_map:
         return {}
 
@@ -315,7 +320,7 @@ def _build_article_drr_lookup_from_api(
     token = perf_token(client_id=perf_client_id, client_secret=perf_client_secret)
     products_by_campaign_id = load_products_parallel(token, running_ids, page_size=100)
 
-    campaign_drr_by_article: dict[str, list[float | None]] = {}
+    campaign_metrics_by_article: dict[str, list[dict[str, float | int | None]]] = {}
     for campaign in running_campaigns:
         campaign_id = str(campaign.get("id") or "")
         if not campaign_id:
@@ -332,14 +337,24 @@ def _build_article_drr_lookup_from_api(
             continue
         stats_row = stats_by_campaign_id.get(campaign_id, {})
         spend = parse_money(stats_row.get("moneySpent"))
-        revenue, _units = by_sku.get(sku, (0.0, 0))
-        drr = round(float(spend) / float(revenue) * 100.0, 1) if float(revenue or 0.0) > 0 else None
-        campaign_drr_by_article.setdefault(article, []).append(drr)
+        revenue, units = by_sku.get(sku, (0.0, 0))
+        revenue_value = float(revenue or 0.0)
+        campaign_metrics_by_article.setdefault(article, []).append(
+            {
+                "revenue": round(revenue_value, 0),
+                "ordered_units": int(units or 0),
+                "drr_pct": round(float(spend) / revenue_value * 100.0, 1) if revenue_value > 0 else None,
+            }
+        )
 
-    drr_by_article: dict[str, float | None] = {}
-    for article, values in campaign_drr_by_article.items():
-        drr_by_article[article] = values[0] if len(values) == 1 else None
-    return drr_by_article
+    metrics_by_article: dict[str, dict[str, float | int | None]] = {}
+    for article, values in campaign_metrics_by_article.items():
+        metrics_by_article[article] = (
+            values[0]
+            if len(values) == 1
+            else {"revenue": None, "ordered_units": None, "drr_pct": None}
+        )
+    return metrics_by_article
 
 
 def get_stocks_snapshot(*, company: str | None = None) -> dict:
@@ -538,16 +553,16 @@ def get_stocks_workspace(
             for sku, articles in sku_article_options.items()
             if len(articles) == 1
         }
-    article_drr_map = _build_article_drr_lookup(
+    article_metrics_map = _build_article_drr_lookup(
         db,
         company_name=company_name,
         date_from=date_from,
         date_to=date_to,
         sku_article_map=sku_article_map,
     )
-    if not any(value is not None for value in article_drr_map.values()):
+    if not any((value or {}).get("drr_pct") is not None for value in article_metrics_map.values()):
         try:
-            article_drr_map = _build_article_drr_lookup_from_api(
+            article_metrics_map = _build_article_drr_lookup_from_api(
                 config=config,
                 date_from=date_from,
                 date_to=date_to,
@@ -555,7 +570,7 @@ def get_stocks_workspace(
             )
         except Exception:
             logger.exception("stocks workspace article drr lookup failed", extra={"company": company_name})
-            article_drr_map = {}
+            article_metrics_map = {}
 
     df_pivot = df.pivot_table(index="article", columns="cluster", values="available_stock_count", aggfunc="sum").sort_index()
     df_ads = df.pivot_table(index="article", columns="cluster", values="ads_cluster", aggfunc="mean").reindex_like(df_pivot)
@@ -726,7 +741,9 @@ def get_stocks_workspace(
             {
                 "article": article,
                 "title": article_title_map.get(article, ""),
-                "drr_pct": article_drr_map.get(article),
+                "revenue": (article_metrics_map.get(article) or {}).get("revenue"),
+                "ordered_units": (article_metrics_map.get(article) or {}).get("ordered_units"),
+                "drr_pct": (article_metrics_map.get(article) or {}).get("drr_pct"),
                 "cells": cells,
             }
         )

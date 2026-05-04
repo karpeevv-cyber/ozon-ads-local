@@ -72,6 +72,8 @@ class StocksWorkspaceCellResponse(BaseModel):
 class StocksWorkspaceRowResponse(BaseModel):
     article: str
     title: str
+    revenue: float | None = None
+    ordered_units: int | None = None
     drr_pct: float | None = None
     cells: list[StocksWorkspaceCellResponse]
 

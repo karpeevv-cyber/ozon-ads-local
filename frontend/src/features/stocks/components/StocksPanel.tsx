@@ -59,6 +59,13 @@ function formatDrr(value: number | null | undefined) {
   return `${value.toFixed(1)}%`;
 }
 
+function formatMetric(value: number | null | undefined) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "N/A";
+  }
+  return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value);
+}
+
 export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPanelProps) {
   function qtyToBucket(quantity: number): number {
     if (quantity <= 0) return 0;
@@ -159,6 +166,8 @@ export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPa
                 <tr>
                   <th>Article</th>
                   <th title="Total by all cities: stock | need 60 days | in transit">Total</th>
+                  <th title="Total revenue for this article in the selected period">Revenue</th>
+                  <th title="Ordered units for this article in the selected period">Units</th>
                   <th title="Period DRR for the only campaign linked to this article">DRR</th>
                   {workspace.columns.map((column) => (
                     <th key={column} title={column}>
@@ -179,6 +188,8 @@ export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPa
                         return `${total.stock} | ${total.need60} | ${total.inTransit}`;
                       })()}
                     </td>
+                    <td className="stocks-revenue-cell">{formatMetric(row.revenue)}</td>
+                    <td className="stocks-units-cell">{formatMetric(row.ordered_units)}</td>
                     <td className="stocks-drr-cell">{formatDrr(row.drr_pct)}</td>
                     {row.cells.map((cell) => {
                       const style: CSSProperties = {

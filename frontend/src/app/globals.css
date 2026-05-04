@@ -588,6 +588,13 @@ a {
   background: rgba(245, 241, 232, 0.82);
 }
 
+.stocks-revenue-cell,
+.stocks-units-cell {
+  font-weight: 700;
+  text-align: right;
+  background: rgba(245, 241, 232, 0.82);
+}
+
 .stocks-candidate-cell {
   box-shadow: inset 0 0 0 2px rgba(184, 92, 56, 0.35);
   font-weight: 700;
