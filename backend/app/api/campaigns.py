@@ -10,10 +10,14 @@ from app.schemas.campaigns import (
     MainOverviewResponse,
 )
 from app.services.campaign_reporting import (
+    build_active_test_map,
+    build_bid_change_map,
+    build_campaign_comment_maps,
     build_report_rows,
     fetch_ads_stats_by_campaign_from_credentials,
     load_products_parallel,
 )
+from app.services.bid_log import load_bid_changes_df, load_campaign_comments_df
 from app.services.company_config import load_runtime_company_configs, resolve_company_config
 from app.services.integrations.ozon_ads import get_running_campaigns
 from app.services.integrations.ozon_ads import perf_token
@@ -102,11 +106,24 @@ def get_campaign_report(
     )
     token = perf_token(client_id=perf_client_id, client_secret=perf_client_secret)
     products_by_campaign_id = load_products_parallel(token, running_ids, page_size=100)
+    bid_log_df = load_bid_changes_df()
+    comments_df = load_campaign_comments_df()
+    comment_map, comment_all = build_campaign_comment_maps(
+        comments_df,
+        company_name=company_name,
+        date_from=date_from,
+        date_to=date_to,
+    )
     rows, _grand_total = build_report_rows(
         running_campaigns=running_campaigns,
         stats_by_campaign_id=stats_by_campaign_id,
         sales_map=by_sku,
         products_by_campaign_id=products_by_campaign_id,
+        target_drr=float(target_drr_pct) / 100.0,
+        bid_change_map=build_bid_change_map(bid_log_df, date_from=date_from, date_to=date_to),
+        active_test_map=build_active_test_map(bid_log_df),
+        comment_map=comment_map,
+        comment_all=comment_all,
     )
 
     return CampaignReportResponse(

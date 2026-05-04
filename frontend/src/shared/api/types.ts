@@ -12,11 +12,13 @@ export type RunningCampaign = {
 export type CampaignReportRow = {
   campaign_id: string;
   sku: string;
+  article: string;
   title: string;
   money_spent: string;
   views: string;
   clicks: string;
   click_price: string;
+  cpm: string;
   orders_money_ads: string;
   total_revenue: string;
   ordered_units: string;
@@ -24,7 +26,15 @@ export type CampaignReportRow = {
   ctr: number;
   cr: number;
   vor: number;
+  rpc: number;
+  target_cpc: number;
   vpo: number;
+  ipo: number;
+  bid: string;
+  bid_change: string;
+  test: string;
+  comment: string;
+  comment_all: string;
 };
 
 export type CampaignReport = {

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { BidAuditPanel } from "@/features/bids/components/BidAuditPanel";
 import { BidApplyCard } from "@/features/bids/components/BidApplyCard";
+import { AllCampaignsPanel } from "@/features/campaigns/components/AllCampaignsPanel";
 import { CampaignFilters } from "@/features/campaigns/components/CampaignFilters";
 import { FinancePanel } from "@/features/finance/components/FinancePanel";
 import { MainDashboard } from "@/features/main/components/MainDashboard";
@@ -24,7 +25,7 @@ import {
   getUnitEconomicsProducts,
   getUnitEconomicsSummary,
 } from "@/shared/api/client";
-import { CampaignReport, CompanyConfig, RunningCampaign } from "@/shared/api/types";
+import { CompanyConfig, RunningCampaign } from "@/shared/api/types";
 import { AppShell } from "@/shared/ui/AppShell";
 import { getDefaultDateRange } from "@/shared/utils/dates";
 
@@ -152,58 +153,6 @@ function CurrentCampaignsPanel({ campaigns }: { campaigns: RunningCampaign[] }) 
             </div>
           ))
         )}
-      </div>
-    </article>
-  );
-}
-
-function AllCampaignsPanel({ report }: { report: CampaignReport }) {
-  const reportRows = report.rows.filter((row) => row.campaign_id !== "GRAND_TOTAL");
-
-  return (
-    <article className="panel-card panel-card-wide section-card">
-      <div className="panel-header">
-        <div>
-          <p className="eyebrow">All campaigns</p>
-          <h3>Campaign report by period</h3>
-        </div>
-        <span className="status-badge">{reportRows.length} rows</span>
-      </div>
-      <div className="table-wrap">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>SKU</th>
-              <th>Title</th>
-              <th>Spend</th>
-              <th>Revenue</th>
-              <th>DRR %</th>
-              <th>Clicks</th>
-            </tr>
-          </thead>
-          <tbody>
-            {reportRows.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="empty-cell">
-                  No report rows returned by the backend yet.
-                </td>
-              </tr>
-            ) : (
-              reportRows.map((row, index) => (
-                <tr key={`${row.campaign_id}:${row.sku || "all"}:${index}`}>
-                  <td>{row.campaign_id}</td>
-                  <td>{row.sku || "all"}</td>
-                  <td>{row.title || "Untitled campaign"}</td>
-                  <td>{row.money_spent}</td>
-                  <td>{row.total_revenue}</td>
-                  <td>{row.total_drr_pct}</td>
-                  <td>{row.clicks}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
       </div>
     </article>
   );

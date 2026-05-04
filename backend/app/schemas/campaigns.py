@@ -19,11 +19,13 @@ class CampaignSummaryResponse(BaseModel):
 class CampaignReportRowResponse(BaseModel):
     campaign_id: str
     sku: str
+    article: str = ""
     title: str
     money_spent: str
     views: str
     clicks: str
     click_price: str
+    cpm: str = ""
     orders_money_ads: str
     total_revenue: str
     ordered_units: str
@@ -31,7 +33,15 @@ class CampaignReportRowResponse(BaseModel):
     ctr: float
     cr: float
     vor: float
+    rpc: float = 0.0
+    target_cpc: float = 0.0
     vpo: float
+    ipo: float = 0.0
+    bid: str = ""
+    bid_change: str = ""
+    test: str = ""
+    comment: str = ""
+    comment_all: str = ""
 
 
 class CampaignReportResponse(BaseModel):
