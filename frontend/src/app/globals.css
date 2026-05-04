@@ -576,6 +576,12 @@ a {
   letter-spacing: 0.02em;
 }
 
+.stocks-row-total-cell {
+  font-weight: 700;
+  background: rgba(232, 227, 218, 0.72);
+  white-space: nowrap;
+}
+
 .stocks-candidate-cell {
   box-shadow: inset 0 0 0 2px rgba(184, 92, 56, 0.35);
   font-weight: 700;

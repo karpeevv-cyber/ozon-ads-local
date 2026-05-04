@@ -96,6 +96,17 @@ export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPa
     };
   }
 
+  function rowTotals(row: StocksWorkspace["rows"][number]) {
+    return row.cells.reduce(
+      (acc, cell) => ({
+        stock: acc.stock + (cell.stock || 0),
+        need60: acc.need60 + (cell.need60 || 0),
+        inTransit: acc.inTransit + (cell.in_transit || 0),
+      }),
+      { stock: 0, need60: 0, inTransit: 0 },
+    );
+  }
+
   return (
     <section className="section-grid stocks-panel-section">
       <article className="panel-card section-card stocks-panel-card">
@@ -140,6 +151,7 @@ export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPa
               <thead>
                 <tr>
                   <th>Article</th>
+                  <th title="Total by all cities: stock | need 60 days | in transit">Total</th>
                   {workspace.columns.map((column) => (
                     <th key={column} title={column}>
                       <span className="stocks-city-head">{column}</span>
@@ -152,6 +164,12 @@ export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPa
                   <tr key={row.article}>
                     <td className="stocks-sticky-cell">
                       <strong>{row.article}</strong>
+                    </td>
+                    <td className="stocks-row-total-cell">
+                      {(() => {
+                        const total = rowTotals(row);
+                        return `${total.stock} | ${total.need60} | ${total.inTransit}`;
+                      })()}
                     </td>
                     {row.cells.map((cell) => {
                       const style: CSSProperties = {
