@@ -11,7 +11,15 @@ from sqlalchemy.orm import Session
 
 from app.models.campaign import Campaign, CampaignDailyMetric, CampaignProduct
 from app.models.organization import Organization
+from app.services.campaign_reporting import (
+    campaign_display_fields,
+    fetch_ads_stats_by_campaign_from_credentials,
+    load_products_parallel,
+    parse_money,
+)
 from app.services.company_config import resolve_company_config
+from app.services.integrations.ozon_ads import get_running_campaigns, perf_token
+from app.services.integrations.ozon_seller import seller_analytics_sku_day
 from app.services.legacy_compat import (
     build_stocks_rows,
     build_stocks_rows_cached,
@@ -264,6 +272,76 @@ def _build_article_drr_lookup(
     return drr_by_article
 
 
+def _build_article_drr_lookup_from_api(
+    *,
+    config: dict[str, str],
+    date_from: str | None,
+    date_to: str | None,
+    sku_article_map: dict[str, str],
+) -> dict[str, float | None]:
+    if not date_from or not date_to or not sku_article_map:
+        return {}
+
+    perf_client_id = (config.get("perf_client_id") or "").strip() or None
+    perf_client_secret = (config.get("perf_client_secret") or "").strip() or None
+    seller_client_id = (config.get("seller_client_id") or "").strip() or None
+    seller_api_key = (config.get("seller_api_key") or "").strip() or None
+    if not perf_client_id or not perf_client_secret or not seller_client_id or not seller_api_key:
+        return {}
+
+    running_campaigns = get_running_campaigns(
+        client_id=perf_client_id,
+        client_secret=perf_client_secret,
+    )
+    running_ids = [str(campaign.get("id")) for campaign in running_campaigns if campaign.get("id") is not None]
+    if not running_ids:
+        return {}
+
+    by_sku, _by_day, _by_day_sku = seller_analytics_sku_day(
+        str(date_from),
+        str(date_to),
+        limit=1000,
+        client_id=seller_client_id,
+        api_key=seller_api_key,
+    )
+    stats_by_campaign_id = fetch_ads_stats_by_campaign_from_credentials(
+        perf_client_id=perf_client_id,
+        perf_client_secret=perf_client_secret,
+        date_from=str(date_from),
+        date_to=str(date_to),
+        running_ids=running_ids,
+        batch_size=15,
+    )
+    token = perf_token(client_id=perf_client_id, client_secret=perf_client_secret)
+    products_by_campaign_id = load_products_parallel(token, running_ids, page_size=100)
+
+    campaign_drr_by_article: dict[str, list[float | None]] = {}
+    for campaign in running_campaigns:
+        campaign_id = str(campaign.get("id") or "")
+        if not campaign_id:
+            continue
+        out_sku, _out_title, _out_bid, skus = campaign_display_fields(
+            str(campaign.get("title", "") or ""),
+            products_by_campaign_id.get(campaign_id, []) or [],
+        )
+        if len(set(skus)) != 1 or out_sku in {"", "-", "several"}:
+            continue
+        sku = str(out_sku).strip()
+        article = sku_article_map.get(sku)
+        if not article:
+            continue
+        stats_row = stats_by_campaign_id.get(campaign_id, {})
+        spend = parse_money(stats_row.get("moneySpent"))
+        revenue, _units = by_sku.get(sku, (0.0, 0))
+        drr = round(float(spend) / float(revenue) * 100.0, 1) if float(revenue or 0.0) > 0 else None
+        campaign_drr_by_article.setdefault(article, []).append(drr)
+
+    drr_by_article: dict[str, float | None] = {}
+    for article, values in campaign_drr_by_article.items():
+        drr_by_article[article] = values[0] if len(values) == 1 else None
+    return drr_by_article
+
+
 def get_stocks_snapshot(*, company: str | None = None) -> dict:
     company_name, config = resolve_company_config(company)
     seller_client_id = (config.get("seller_client_id") or "").strip()
@@ -467,6 +545,17 @@ def get_stocks_workspace(
         date_to=date_to,
         sku_article_map=sku_article_map,
     )
+    if not any(value is not None for value in article_drr_map.values()):
+        try:
+            article_drr_map = _build_article_drr_lookup_from_api(
+                config=config,
+                date_from=date_from,
+                date_to=date_to,
+                sku_article_map=sku_article_map,
+            )
+        except Exception:
+            logger.exception("stocks workspace article drr lookup failed", extra={"company": company_name})
+            article_drr_map = {}
 
     df_pivot = df.pivot_table(index="article", columns="cluster", values="available_stock_count", aggfunc="sum").sort_index()
     df_ads = df.pivot_table(index="article", columns="cluster", values="ads_cluster", aggfunc="mean").reindex_like(df_pivot)
