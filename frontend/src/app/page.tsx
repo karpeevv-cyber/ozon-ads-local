@@ -40,6 +40,7 @@ type HomePageProps = {
     stocks_highlight_levels?: string;
     stocks_review_mode?: string;
     stocks_refresh?: string;
+    storage_refresh?: string;
     main_refresh?: string;
   }>;
 };
@@ -276,6 +277,7 @@ async function renderTabContent(params: {
   stocksReviewMode: boolean;
   mainRefresh: boolean;
   stocksRefresh: boolean;
+  storageRefresh: boolean;
 }) {
   const {
     activeTab,
@@ -290,6 +292,7 @@ async function renderTabContent(params: {
     stocksReviewMode,
     mainRefresh,
     stocksRefresh,
+    storageRefresh,
   } = params;
 
   switch (activeTab) {
@@ -376,7 +379,7 @@ async function renderTabContent(params: {
       );
     }
     case "storage": {
-      const snapshot = await getStorageSnapshot(selectedCompany);
+      const snapshot = await getStorageSnapshot(selectedCompany, storageRefresh);
       return <StoragePanel snapshot={snapshot} />;
     }
     case "search-trends": {
@@ -435,6 +438,7 @@ async function TabContent(params: {
   stocksReviewMode: boolean;
   mainRefresh: boolean;
   stocksRefresh: boolean;
+  storageRefresh: boolean;
 }) {
   try {
     return await renderTabContent(params);
@@ -442,6 +446,9 @@ async function TabContent(params: {
     if (isAbortLikeError(error)) {
       if (params.activeTab === "stocks" && params.stocksRefresh) {
         return await renderTabContent({ ...params, stocksRefresh: false });
+      }
+      if (params.activeTab === "storage" && params.storageRefresh) {
+        return await renderTabContent({ ...params, storageRefresh: false });
       }
       return <TabContentSkeleton />;
     }
@@ -490,7 +497,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     .map((value) => value.trim().toLowerCase())
     .filter((value, index, arr) => allowedHighlightLevels.has(value) && arr.indexOf(value) === index);
   const stocksReviewMode = String(resolvedSearchParams.stocks_review_mode || "1") !== "0";
-  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}:${stocksRegionalOrderMin}:${stocksRegionalOrderTarget}:${stocksPositionFilter}:${stocksHighlightLevels.join("|")}:${stocksReviewMode ? "1" : "0"}:${resolvedSearchParams.main_refresh || ""}:${resolvedSearchParams.stocks_refresh || ""}`;
+  const storageRefresh = Boolean(resolvedSearchParams.storage_refresh);
+  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}:${stocksRegionalOrderMin}:${stocksRegionalOrderTarget}:${stocksPositionFilter}:${stocksHighlightLevels.join("|")}:${stocksReviewMode ? "1" : "0"}:${resolvedSearchParams.main_refresh || ""}:${resolvedSearchParams.stocks_refresh || ""}:${resolvedSearchParams.storage_refresh || ""}`;
   return (
     <AppShell
       filters={
@@ -516,6 +524,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           stocksReviewMode={stocksReviewMode}
           mainRefresh={Boolean(resolvedSearchParams.main_refresh)}
           stocksRefresh={Boolean(resolvedSearchParams.stocks_refresh)}
+          storageRefresh={storageRefresh}
         />
       </Suspense>
     </AppShell>

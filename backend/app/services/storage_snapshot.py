@@ -19,7 +19,7 @@ def _load_storage_snapshot_from_db(
     company_name: str,
     seller_client_id: str,
     version: str,
-) -> tuple[dict, str]:
+) -> tuple[dict, str, str | None]:
     create_all()
     from app.models.storage import StorageSnapshotCache
 
@@ -32,11 +32,11 @@ def _load_storage_snapshot_from_db(
         .first()
     )
     if row is None:
-        return {}, ""
+        return {}, "", None
     try:
-        return json.loads(row.snapshot_json), str(row.source_ref or "")
+        return json.loads(row.snapshot_json), str(row.source_ref or ""), row.updated_at.isoformat() if row.updated_at else None
     except Exception:
-        return {}, ""
+        return {}, "", None
 
 
 def _save_storage_snapshot_to_db(
@@ -105,7 +105,7 @@ def _ensure_backend_storage_cache_file(
         return source_ref
 
 
-def get_storage_snapshot(*, company: str | None = None, db: Session | None = None) -> dict:
+def get_storage_snapshot(*, company: str | None = None, force_refresh: bool = False, db: Session | None = None) -> dict:
     company_name, config = resolve_company_config(company)
     seller_client_id = (config.get("seller_client_id") or "").strip()
     cache_version = "v12"
@@ -114,6 +114,8 @@ def get_storage_snapshot(*, company: str | None = None, db: Session | None = Non
         return {
             "company": company_name,
             "seller_client_id": seller_client_id,
+            "cache_updated_at": None,
+            "cache_source": "",
             "lot_rows": [],
             "risk_rows": [],
             "unknown_stock_rows": [],
@@ -125,8 +127,9 @@ def get_storage_snapshot(*, company: str | None = None, db: Session | None = Non
 
     payload: dict = {}
     source_ref = ""
-    if db is not None:
-        payload, source_ref = _load_storage_snapshot_from_db(
+    cache_updated_at: str | None = None
+    if db is not None and not force_refresh:
+        payload, source_ref, cache_updated_at = _load_storage_snapshot_from_db(
             db,
             company_name=company_name,
             seller_client_id=seller_client_id,
@@ -140,6 +143,7 @@ def get_storage_snapshot(*, company: str | None = None, db: Session | None = Non
         )
     if not payload:
         payload, _ts, source_path = load_storage_cache_payload(seller_client_id, cache_version)
+        cache_updated_at = _ts.isoformat() if _ts is not None else None
         source_ref = str(source_path) if source_path is not None else ""
         source_ref = _ensure_backend_storage_cache_file(
             seller_client_id=seller_client_id,
@@ -173,6 +177,8 @@ def get_storage_snapshot(*, company: str | None = None, db: Session | None = Non
     return {
         "company": company_name,
         "seller_client_id": seller_client_id,
+        "cache_updated_at": cache_updated_at,
+        "cache_source": source_ref,
         "lot_rows": df_lots.to_dict("records") if not df_lots.empty else [],
         "risk_rows": df_risk.to_dict("records") if not df_risk.empty else [],
         "unknown_stock_rows": payload.get("unknown_stock_rows", []) if isinstance(payload, dict) else [],

@@ -16,6 +16,8 @@ class StorageRiskRowResponse(BaseModel):
 class StorageSnapshotResponse(BaseModel):
     company: str
     seller_client_id: str
+    cache_updated_at: str | None = None
+    cache_source: str = ""
     sku_count: int
     order_count: int
     ship_lot_count: int

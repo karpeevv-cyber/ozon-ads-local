@@ -265,9 +265,16 @@ export function getStocksWorkspace(params: {
   return requestJson<StocksWorkspace>(`/stocks/workspace?${search.toString()}`);
 }
 
-export function getStorageSnapshot(company?: string): Promise<StorageSnapshot> {
-  const query = company ? `?company=${encodeURIComponent(company)}` : "";
-  return requestJson<StorageSnapshot>(`/storage/snapshot${query}`);
+export function getStorageSnapshot(company?: string, forceRefresh = false): Promise<StorageSnapshot> {
+  const search = new URLSearchParams();
+  if (company) {
+    search.set("company", company);
+  }
+  if (forceRefresh) {
+    search.set("force_refresh", "1");
+  }
+  const query = search.toString();
+  return requestJson<StorageSnapshot>(`/storage/snapshot${query ? `?${query}` : ""}`);
 }
 
 export function getFinanceSummary(params: {

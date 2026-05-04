@@ -275,14 +275,37 @@ export type StorageRiskRow = {
   estimated_daily_fee_rub: number;
 };
 
+export type StorageLotRow = {
+  city?: string;
+  warehouse?: string;
+  storage_warehouse_name?: string;
+  article?: string;
+  item_volume_liters?: number | null;
+  shipped_qty?: number;
+  qty_remaining_from_lot?: number;
+  daily_storage_fee_rub?: number;
+  projected_storage_fee_rub?: number;
+  sales_per_day?: number;
+  in_current_stock?: boolean;
+  days_until_fee_start?: number;
+  fee_started?: boolean;
+  fee_from_date?: string;
+  arrival_date?: string;
+  order_id?: string;
+  order_number?: string;
+  bundle_id?: string;
+};
+
 export type StorageSnapshot = {
   company: string;
   seller_client_id: string;
+  cache_updated_at: string | null;
+  cache_source: string;
   sku_count: number;
   order_count: number;
   ship_lot_count: number;
   stock_articles_count: number;
-  lot_rows: Record<string, unknown>[];
+  lot_rows: StorageLotRow[];
   risk_rows: StorageRiskRow[];
   unknown_stock_rows: Record<string, unknown>[];
 };
