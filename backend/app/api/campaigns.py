@@ -21,7 +21,7 @@ from app.services.bid_log import load_bid_changes_df, load_campaign_comments_df
 from app.services.company_config import load_runtime_company_configs, resolve_company_config
 from app.services.integrations.ozon_ads import get_running_campaigns
 from app.services.integrations.ozon_ads import perf_token
-from app.services.integrations.ozon_seller import seller_analytics_sku_day
+from app.services.integrations.ozon_seller import seller_analytics_sku_day, seller_analytics_stocks
 from app.services.main_overview import get_main_overview_cached
 from app.db.session import get_db
 
@@ -106,6 +106,27 @@ def get_campaign_report(
     )
     token = perf_token(client_id=perf_client_id, client_secret=perf_client_secret)
     products_by_campaign_id = load_products_parallel(token, running_ids, page_size=100)
+    campaign_skus = sorted(
+        {
+            str(item.get("sku")).strip()
+            for items in products_by_campaign_id.values()
+            for item in (items or [])
+            if str(item.get("sku") or "").strip().isdigit()
+        }
+    )
+    sku_offer_map: dict[str, str] = {}
+    for index in range(0, len(campaign_skus), 200):
+        batch = campaign_skus[index : index + 200]
+        stocks_response = seller_analytics_stocks(
+            skus=batch,
+            client_id=seller_client_id,
+            api_key=seller_api_key,
+        )
+        for item in stocks_response.get("items", []) or []:
+            sku = item.get("sku")
+            if sku is None:
+                continue
+            sku_offer_map[str(sku)] = str(item.get("offer_id") or "").strip()
     bid_log_df = load_bid_changes_df()
     comments_df = load_campaign_comments_df()
     comment_map, comment_all = build_campaign_comment_maps(
@@ -119,6 +140,7 @@ def get_campaign_report(
         stats_by_campaign_id=stats_by_campaign_id,
         sales_map=by_sku,
         products_by_campaign_id=products_by_campaign_id,
+        sku_offer_map=sku_offer_map,
         target_drr=float(target_drr_pct) / 100.0,
         bid_change_map=build_bid_change_map(bid_log_df, date_from=date_from, date_to=date_to),
         active_test_map=build_active_test_map(bid_log_df),

@@ -452,6 +452,7 @@ def build_report_rows(
     stats_by_campaign_id: dict,
     sales_map: dict,
     products_by_campaign_id: dict,
+    sku_offer_map: dict[str, str] | None = None,
     target_drr: float = 0.2,
     bid_change_map: dict[tuple[str, str], str] | None = None,
     active_test_map: dict[tuple[str, str], bool] | None = None,
@@ -461,6 +462,7 @@ def build_report_rows(
     bid_change_map = bid_change_map or {}
     active_test_map = active_test_map or {}
     comment_map = comment_map or {}
+    sku_offer_map = sku_offer_map or {}
     rows = []
     gt_money_spent = 0.0
     gt_views = 0
@@ -505,7 +507,8 @@ def build_report_rows(
 
         article_values: list[str] = []
         for item in items or []:
-            article = str(item.get("offer_id") or item.get("offerId") or "").strip()
+            sku_value = str(item.get("sku") or "").strip()
+            article = str(sku_offer_map.get(sku_value) or item.get("offer_id") or item.get("offerId") or "").strip()
             if article:
                 article_values.append(article)
         article_values = list(dict.fromkeys(article_values))
