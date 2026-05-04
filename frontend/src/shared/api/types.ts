@@ -244,6 +244,7 @@ export type StocksWorkspaceCell = {
 export type StocksWorkspaceRow = {
   article: string;
   title: string;
+  drr_pct: number | null;
   cells: StocksWorkspaceCell[];
 };
 

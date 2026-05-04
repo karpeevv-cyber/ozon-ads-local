@@ -233,6 +233,8 @@ export function getStocksSnapshot(company?: string): Promise<StocksSnapshot> {
 
 export function getStocksWorkspace(params: {
   company?: string;
+  dateFrom?: string;
+  dateTo?: string;
   regionalOrderMin?: number;
   regionalOrderTarget?: number;
   positionFilter?: string;
@@ -241,6 +243,12 @@ export function getStocksWorkspace(params: {
   const search = new URLSearchParams();
   if (params.company) {
     search.set("company", params.company);
+  }
+  if (params.dateFrom) {
+    search.set("date_from", params.dateFrom);
+  }
+  if (params.dateTo) {
+    search.set("date_to", params.dateTo);
   }
   if (params.regionalOrderMin !== undefined) {
     search.set("regional_order_min", String(params.regionalOrderMin));

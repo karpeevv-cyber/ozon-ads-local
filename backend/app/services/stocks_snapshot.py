@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import logging
 from time import perf_counter
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import pandas as pd
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from app.models.campaign import Campaign, CampaignDailyMetric, CampaignProduct
+from app.models.organization import Organization
 from app.services.company_config import resolve_company_config
 from app.services.legacy_compat import (
     build_stocks_rows,
@@ -164,6 +167,103 @@ def _build_shipments_lookup(
     return pairs, ts
 
 
+def _parse_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value)).date()
+    except ValueError:
+        return None
+
+
+def _build_article_drr_lookup(
+    db: Session | None,
+    *,
+    company_name: str,
+    date_from: str | None,
+    date_to: str | None,
+    sku_article_map: dict[str, str],
+) -> dict[str, float | None]:
+    if db is None or not sku_article_map:
+        return {}
+
+    start = _parse_date(date_from)
+    end = _parse_date(date_to)
+    if start is None or end is None:
+        return {}
+    if start > end:
+        start, end = end, start
+
+    organization = (
+        db.query(Organization)
+        .filter(or_(Organization.slug == company_name, Organization.name == company_name))
+        .first()
+    )
+    if organization is None:
+        return {}
+
+    campaign_skus: dict[int, set[str]] = {}
+    product_rows = (
+        db.query(CampaignProduct.campaign_id, CampaignProduct.sku)
+        .join(Campaign, Campaign.id == CampaignProduct.campaign_id)
+        .filter(Campaign.organization_id == organization.id)
+        .all()
+    )
+    for campaign_id, sku in product_rows:
+        sku_text = str(sku or "").strip()
+        if not sku_text:
+            continue
+        campaign_skus.setdefault(int(campaign_id), set()).add(sku_text)
+
+    article_campaigns: dict[str, set[int]] = {}
+    for campaign_id, skus in campaign_skus.items():
+        if len(skus) != 1:
+            continue
+        sku = next(iter(skus))
+        article = sku_article_map.get(sku)
+        if article:
+            article_campaigns.setdefault(article, set()).add(campaign_id)
+
+    candidate_campaign_ids = sorted(
+        {
+            next(iter(campaign_ids))
+            for campaign_ids in article_campaigns.values()
+            if len(campaign_ids) == 1
+        }
+    )
+    if not candidate_campaign_ids:
+        return {article: None for article in article_campaigns}
+
+    metric_rows = (
+        db.query(
+            CampaignDailyMetric.campaign_id,
+            func.sum(CampaignDailyMetric.money_spent),
+            func.sum(CampaignDailyMetric.total_revenue),
+        )
+        .filter(CampaignDailyMetric.campaign_id.in_(candidate_campaign_ids))
+        .filter(CampaignDailyMetric.day >= start, CampaignDailyMetric.day <= end)
+        .group_by(CampaignDailyMetric.campaign_id)
+        .all()
+    )
+    metrics_by_campaign = {
+        int(campaign_id): (float(spend or 0.0), float(revenue or 0.0))
+        for campaign_id, spend, revenue in metric_rows
+    }
+
+    drr_by_article: dict[str, float | None] = {}
+    for article, campaign_ids in article_campaigns.items():
+        if len(campaign_ids) != 1:
+            drr_by_article[article] = None
+            continue
+        campaign_id = next(iter(campaign_ids))
+        spend, revenue = metrics_by_campaign.get(campaign_id, (0.0, 0.0))
+        if revenue <= 0:
+            drr_by_article[article] = None
+        else:
+            drr_by_article[article] = round(spend / revenue * 100.0, 1)
+    return drr_by_article
+
+
 def get_stocks_snapshot(*, company: str | None = None) -> dict:
     company_name, config = resolve_company_config(company)
     seller_client_id = (config.get("seller_client_id") or "").strip()
@@ -197,6 +297,8 @@ def get_stocks_snapshot(*, company: str | None = None) -> dict:
 def get_stocks_workspace(
     *,
     company: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
     regional_order_min: int = 2,
     regional_order_target: int = 5,
     position_filter: str = "ALL",
@@ -344,6 +446,26 @@ def get_stocks_workspace(
         df.groupby("article")["title"].agg(lambda values: next((str(item) for item in values if str(item).strip()), "")).to_dict()
         if "title" in df.columns
         else {}
+    )
+    sku_article_map: dict[str, str] = {}
+    if "sku" in df.columns:
+        sku_article_options: dict[str, set[str]] = {}
+        for _, item in df[["sku", "article"]].dropna().iterrows():
+            sku_text = str(item.get("sku") or "").strip()
+            article_text = str(item.get("article") or "").strip()
+            if sku_text and article_text:
+                sku_article_options.setdefault(sku_text, set()).add(article_text)
+        sku_article_map = {
+            sku: next(iter(articles))
+            for sku, articles in sku_article_options.items()
+            if len(articles) == 1
+        }
+    article_drr_map = _build_article_drr_lookup(
+        db,
+        company_name=company_name,
+        date_from=date_from,
+        date_to=date_to,
+        sku_article_map=sku_article_map,
     )
 
     df_pivot = df.pivot_table(index="article", columns="cluster", values="available_stock_count", aggfunc="sum").sort_index()
@@ -515,6 +637,7 @@ def get_stocks_workspace(
             {
                 "article": article,
                 "title": article_title_map.get(article, ""),
+                "drr_pct": article_drr_map.get(article),
                 "cells": cells,
             }
         )

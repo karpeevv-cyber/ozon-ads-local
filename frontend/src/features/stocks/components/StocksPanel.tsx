@@ -52,6 +52,13 @@ function formatMs(value: number | undefined) {
   return `${Math.round(value)}ms`;
 }
 
+function formatDrr(value: number | null | undefined) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "N/A";
+  }
+  return `${value.toFixed(1)}%`;
+}
+
 export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPanelProps) {
   function qtyToBucket(quantity: number): number {
     if (quantity <= 0) return 0;
@@ -152,6 +159,7 @@ export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPa
                 <tr>
                   <th>Article</th>
                   <th title="Total by all cities: stock | need 60 days | in transit">Total</th>
+                  <th title="Period DRR for the only campaign linked to this article">DRR</th>
                   {workspace.columns.map((column) => (
                     <th key={column} title={column}>
                       <span className="stocks-city-head">{column}</span>
@@ -171,6 +179,7 @@ export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPa
                         return `${total.stock} | ${total.need60} | ${total.inTransit}`;
                       })()}
                     </td>
+                    <td className="stocks-drr-cell">{formatDrr(row.drr_pct)}</td>
                     {row.cells.map((cell) => {
                       const style: CSSProperties = {
                         ...storageHighlightStyle(cell),

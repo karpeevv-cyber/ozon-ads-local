@@ -360,6 +360,8 @@ async function renderTabContent(params: {
     case "stocks": {
       const workspace = await getStocksWorkspace({
         company: selectedCompany,
+        dateFrom,
+        dateTo,
         regionalOrderMin: stocksRegionalOrderMin,
         regionalOrderTarget: stocksRegionalOrderTarget,
         positionFilter: stocksPositionFilter,
