@@ -33,6 +33,9 @@ def _rebuild_storage_payload_from_api(
 ) -> tuple[dict, datetime]:
     # Reuse the legacy Storage domain logic without importing Streamlit UI runtime.
     _install_streamlit_stub()
+    repo_root = str(REPO_ROOT)
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
     import pickle
     import ui_storage_tab as legacy_storage
 
