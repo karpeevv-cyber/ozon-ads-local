@@ -21,6 +21,7 @@ from app.services.campaign_reporting import (
 from app.services.bid_log import load_bid_changes_df, load_campaign_comments_df
 from app.services.company_config import load_runtime_company_configs, resolve_company_config
 from app.services.current_campaigns import get_current_campaign_detail
+from app.services.campaign_report_cache import get_campaign_report_cache, set_campaign_report_cache
 from app.services.integrations.ozon_ads import get_running_campaigns
 from app.services.integrations.ozon_ads import perf_token
 from app.services.integrations.ozon_seller import seller_analytics_sku_day, seller_analytics_stocks
@@ -70,6 +71,11 @@ def get_campaign_report(
     target_drr_pct: float = Query(default=20.0),
 ) -> CampaignReportResponse:
     company_name, config = resolve_company_config(company)
+    cache_key = (company_name, str(date_from), str(date_to), float(target_drr_pct))
+    cached = get_campaign_report_cache(cache_key)
+    if cached is not None:
+        return CampaignReportResponse(**cached)
+
     perf_client_id = (config.get("perf_client_id") or "").strip() or None
     perf_client_secret = (config.get("perf_client_secret") or "").strip() or None
     seller_client_id = (config.get("seller_client_id") or "").strip() or None
@@ -82,14 +88,16 @@ def get_campaign_report(
     running_ids = [str(campaign.get("id")) for campaign in running_campaigns if campaign.get("id") is not None]
 
     if not running_ids:
-        return CampaignReportResponse(
-            company=company_name,
-            date_from=date_from,
-            date_to=date_to,
-            target_drr_pct=float(target_drr_pct),
-            running_campaigns_count=0,
-            rows=[],
-        )
+        payload = {
+            "company": company_name,
+            "date_from": date_from,
+            "date_to": date_to,
+            "target_drr_pct": float(target_drr_pct),
+            "running_campaigns_count": 0,
+            "rows": [],
+        }
+        set_campaign_report_cache(cache_key, payload)
+        return CampaignReportResponse(**payload)
 
     by_sku, _by_day, _by_day_sku = seller_analytics_sku_day(
         date_from,
@@ -150,14 +158,16 @@ def get_campaign_report(
         comment_all=comment_all,
     )
 
-    return CampaignReportResponse(
-        company=company_name,
-        date_from=date_from,
-        date_to=date_to,
-        target_drr_pct=float(target_drr_pct),
-        running_campaigns_count=len(running_ids),
-        rows=rows,
-    )
+    payload = {
+        "company": company_name,
+        "date_from": date_from,
+        "date_to": date_to,
+        "target_drr_pct": float(target_drr_pct),
+        "running_campaigns_count": len(running_ids),
+        "rows": rows,
+    }
+    set_campaign_report_cache(cache_key, payload)
+    return CampaignReportResponse(**payload)
 
 
 @router.get("/current-detail", response_model=CurrentCampaignResponse)

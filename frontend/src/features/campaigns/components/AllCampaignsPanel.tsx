@@ -1,8 +1,8 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { getCurrentCampaignDetail } from "@/shared/api/client";
 import { CurrentCampaignsPanel } from "@/features/campaigns/components/CurrentCampaignsPanel";
 import { CampaignReport, CampaignReportRow, CurrentCampaignDetail } from "@/shared/api/types";
 
@@ -95,8 +95,9 @@ function metricTone(key: SortKey, value: unknown, max: number): string {
 }
 
 export function AllCampaignsPanel({ report, currentDetail }: { report: CampaignReport; currentDetail: CurrentCampaignDetail }) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const [selectedDetail, setSelectedDetail] = useState(currentDetail);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("article");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -138,11 +139,30 @@ export function AllCampaignsPanel({ report, currentDetail }: { report: CampaignR
     setSortDirection(columns.find((column) => column.key === nextKey)?.numeric ? "desc" : "asc");
   }
 
+  async function loadCampaignDetail(campaignId: string) {
+    setDetailLoading(true);
+    setDetailError("");
+    try {
+      const nextDetail = await getCurrentCampaignDetail({
+        company: report.company,
+        dateFrom: report.date_from,
+        dateTo: report.date_to,
+        campaignId,
+        targetDrrPct: report.target_drr_pct,
+      });
+      setSelectedDetail(nextDetail);
+    } catch (error) {
+      setDetailError(error instanceof Error ? error.message : "Failed to load campaign detail");
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
   function selectCampaign(campaignId: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", "all-campaigns");
-    params.set("current_campaign_id", campaignId);
-    router.push(`/?${params.toString()}`);
+    if (campaignId === selectedDetail.selected_campaign_id || detailLoading) {
+      return;
+    }
+    void loadCampaignDetail(campaignId);
   }
 
   return (
@@ -214,7 +234,7 @@ export function AllCampaignsPanel({ report, currentDetail }: { report: CampaignR
                 reportRows.map((row, index) => (
                   <tr
                     key={`${row.campaign_id}:${row.sku || "all"}:${index}`}
-                    className={row.campaign_id === currentDetail.selected_campaign_id ? "campaign-row-selected" : "campaign-row-clickable"}
+                    className={row.campaign_id === selectedDetail.selected_campaign_id ? "campaign-row-selected" : "campaign-row-clickable"}
                     onClick={() => selectCampaign(row.campaign_id)}
                   >
                     {columns.map((column) => {
@@ -251,7 +271,26 @@ export function AllCampaignsPanel({ report, currentDetail }: { report: CampaignR
           </table>
         </div>
       </article>
-      <CurrentCampaignsPanel detail={currentDetail} embedded />
+      {detailLoading ? (
+        <article className="panel-card panel-card-wide section-card skeleton-card">
+          <div className="skeleton-line skeleton-line-lg" />
+          <div className="skeleton-grid">
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <span className="skeleton-cell" key={idx} />
+            ))}
+          </div>
+        </article>
+      ) : null}
+      {detailError ? (
+        <article className="panel-card panel-card-wide section-card">
+          <p className="muted-copy">{detailError}</p>
+        </article>
+      ) : null}
+      <CurrentCampaignsPanel
+        detail={selectedDetail}
+        embedded
+        onReload={() => selectedDetail.selected_campaign_id ? loadCampaignDetail(selectedDetail.selected_campaign_id) : undefined}
+      />
     </section>
   );
 }

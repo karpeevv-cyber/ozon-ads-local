@@ -198,7 +198,15 @@ function testCommentPayload(detail: CurrentCampaignDetail, targetClicks: string,
   })}`;
 }
 
-export function CurrentCampaignsPanel({ detail, embedded = false }: { detail: CurrentCampaignDetail; embedded?: boolean }) {
+export function CurrentCampaignsPanel({
+  detail,
+  embedded = false,
+  onReload,
+}: {
+  detail: CurrentCampaignDetail;
+  embedded?: boolean;
+  onReload?: () => void | Promise<void>;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [bidRub, setBidRub] = useState(detail.current_bid_rub?.toString() || "");
@@ -219,6 +227,11 @@ export function CurrentCampaignsPanel({ detail, embedded = false }: { detail: Cu
   useEffect(() => {
     setCampaignQuery(detail.selected_campaign_title || "");
   }, [detail.selected_campaign_title]);
+
+  useEffect(() => {
+    setBidRub(detail.current_bid_rub?.toString() || "");
+    setCommentDay(detail.date_to);
+  }, [detail.current_bid_rub, detail.date_to, detail.selected_campaign_id]);
 
   function selectCampaign(campaignId: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -265,7 +278,11 @@ export function CurrentCampaignsPanel({ detail, embedded = false }: { detail: Cu
       });
       setToast("Ставка применена");
       window.setTimeout(() => setToast(""), 2600);
-      router.refresh();
+      if (embedded && onReload) {
+        await onReload();
+      } else {
+        router.refresh();
+      }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Failed to apply bid");
     } finally {
@@ -286,7 +303,11 @@ export function CurrentCampaignsPanel({ detail, embedded = false }: { detail: Cu
       });
       setCommentText("");
       setStatus("Comment saved");
-      router.refresh();
+      if (embedded && onReload) {
+        await onReload();
+      } else {
+        router.refresh();
+      }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Failed to save comment");
     } finally {
