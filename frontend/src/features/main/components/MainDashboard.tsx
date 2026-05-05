@@ -168,7 +168,7 @@ function RevenueChart({ overview }: MainDashboardProps) {
   const chartWidth = 1200;
   const chartHeight = 340;
   const leftPad = 76;
-  const rightPad = 26;
+  const rightPad = 64;
   const topPad = 22;
   const bottomPad = 66;
   const innerWidth = chartWidth - leftPad - rightPad;
@@ -228,7 +228,7 @@ function RevenueChart({ overview }: MainDashboardProps) {
         <svg
           className="line-chart"
           viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-          preserveAspectRatio="none"
+          preserveAspectRatio="xMidYMid meet"
           role="img"
           aria-label="Выручка по дням"
         >
