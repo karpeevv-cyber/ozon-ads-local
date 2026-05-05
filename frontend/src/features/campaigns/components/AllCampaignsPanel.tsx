@@ -21,7 +21,6 @@ const columns: CampaignColumn[] = [
   { key: "article", label: "article" },
   { key: "views", label: "views", numeric: true },
   { key: "clicks", label: "clicks", numeric: true },
-  { key: "click_price", label: "click_price", numeric: true },
   { key: "money_spent", label: "money_spent", numeric: true },
   { key: "total_revenue", label: "revenue", numeric: true },
   { key: "total_drr_pct", label: "drr", numeric: true },
@@ -124,6 +123,8 @@ export function AllCampaignsPanel({ report, currentDetail }: { report: CampaignR
       return String(left[sortKey] ?? "").localeCompare(String(right[sortKey] ?? ""), "ru") * multiplier;
     });
   const fillDomains = {
+    views: buildDomain(reportRows, "views"),
+    clicks: buildDomain(reportRows, "clicks"),
     money_spent: buildDomain(reportRows, "money_spent"),
     total_revenue: buildDomain(reportRows, "total_revenue"),
     ctr: buildDomain(reportRows, "ctr"),
@@ -242,6 +243,8 @@ export function AllCampaignsPanel({ report, currentDetail }: { report: CampaignR
                       const isFillMetric =
                         column.key === "money_spent" ||
                         column.key === "total_revenue" ||
+                        column.key === "views" ||
+                        column.key === "clicks" ||
                         column.key === "ctr" ||
                         column.key === "cr";
                       const domain = isFillMetric ? fillDomains[column.key as keyof typeof fillDomains] : undefined;
