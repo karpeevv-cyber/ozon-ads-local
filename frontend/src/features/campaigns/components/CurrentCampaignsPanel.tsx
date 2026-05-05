@@ -2,7 +2,7 @@
 
 import type { CSSProperties, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { addCampaignComment, applyBid } from "@/shared/api/client";
 import type { CurrentCampaignDetail, CurrentCampaignMetricRow } from "@/shared/api/types";
@@ -18,7 +18,6 @@ const weeklyColumns: Array<keyof CurrentCampaignMetricRow> = [
   "cr",
   "money_spent",
   "click_price",
-  "cpm",
   "total_revenue",
   "ordered_units",
   "total_drr_pct",
@@ -89,6 +88,9 @@ function formatValue(key: keyof CurrentCampaignMetricRow, value: unknown) {
 function columnLabel(column: keyof CurrentCampaignMetricRow) {
   if (column === "days_in_period") {
     return "days";
+  }
+  if (column === "orders_money_ads") {
+    return "orders_ads";
   }
   return column;
 }
@@ -200,7 +202,7 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
   const router = useRouter();
   const searchParams = useSearchParams();
   const [bidRub, setBidRub] = useState(detail.current_bid_rub?.toString() || "");
-  const [campaignQuery, setCampaignQuery] = useState("");
+  const [campaignQuery, setCampaignQuery] = useState(detail.selected_campaign_title || "");
   const [campaignListOpen, setCampaignListOpen] = useState(false);
   const [reason, setReason] = useState("Рост продаж");
   const [comment, setComment] = useState("");
@@ -211,7 +213,12 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
   const [commentText, setCommentText] = useState("");
   const [commentAll, setCommentAll] = useState(false);
   const [status, setStatus] = useState("");
+  const [toast, setToast] = useState("");
   const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    setCampaignQuery(detail.selected_campaign_title || "");
+  }, [detail.selected_campaign_title]);
 
   function selectCampaign(campaignId: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -248,7 +255,7 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
         reason === "Test"
           ? testCommentPayload(detail, targetClicks, essence, expectations, comment)
           : `reason=${reason}; ${comment}`.trim();
-      const result = await applyBid({
+      await applyBid({
         company: detail.company,
         campaign_id: detail.selected_campaign_id,
         sku: detail.sku,
@@ -256,7 +263,8 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
         reason,
         comment: payloadComment,
       });
-      setStatus(`Bid applied: ${result.old_bid_micro ?? "n/a"} -> ${result.new_bid_micro}`);
+      setToast("Ставка применена");
+      window.setTimeout(() => setToast(""), 2600);
       router.refresh();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Failed to apply bid");
@@ -371,6 +379,7 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
         </div>
         {status ? <p className="muted-copy">{status}</p> : null}
       </article>
+      {toast ? <div className="current-toast" role="status">{toast}</div> : null}
 
       {!detail.selected_campaign_id ? null : (
         <>

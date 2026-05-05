@@ -1271,6 +1271,20 @@ a {
   width: 18px;
 }
 
+.current-toast {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 80;
+  padding: 13px 16px;
+  border: 1px solid rgba(53, 94, 59, 0.22);
+  border-radius: 16px;
+  background: rgba(248, 255, 244, 0.96);
+  color: var(--ok);
+  box-shadow: var(--shadow);
+  font-weight: 700;
+}
+
 .current-comments-list {
   display: grid;
   gap: 8px;

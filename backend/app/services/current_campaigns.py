@@ -58,6 +58,14 @@ def _round_row(row: dict) -> dict:
     return rounded
 
 
+def _format_ru_date(value: str) -> str:
+    text = str(value or "").strip()
+    try:
+        return date.fromisoformat(text).strftime("%d.%m.%Y")
+    except Exception:
+        return text
+
+
 def _current_bid_rub(items: list[dict], sku: str) -> float | None:
     for item in items or []:
         if str(item.get("sku")) != str(sku):
@@ -142,10 +150,11 @@ def _build_bid_change_maps(bid_log_df, *, campaign_id: str, sku: str, date_from:
         new_bid = _num(row.get("new_bid_micro")) / 1_000_000 if str(row.get("new_bid_micro", "")).strip() else None
         if new_bid is None:
             continue
+        display_day = _format_ru_date(day)
         if old_bid is None:
-            line = f"{day}: {new_bid:g}"
+            line = f"{display_day}: {new_bid:g}"
         else:
-            line = f"{day}: {old_bid:g} -> {new_bid:g}"
+            line = f"{display_day}: {old_bid:g} -> {new_bid:g}"
         comment = str(row.get("comment", "") or "").strip()
         if comment and not comment.startswith(TEST_META_PREFIX):
             line = f"{line} / {comment}"
@@ -191,7 +200,7 @@ def _build_comment_maps(comments_df, *, company_name: str, campaign_id: str):
             if text not in day_out[day]:
                 day_out[day].append(text)
             week_out.setdefault(week, [])
-            line = f"{day}: {text}" if day else text
+            line = f"{_format_ru_date(day)}: {text}" if day else text
             if line not in week_out[week]:
                 week_out[week].append(line)
         return {k: "\n".join(v) for k, v in day_out.items()}, {k: "\n".join(v) for k, v in week_out.items()}
