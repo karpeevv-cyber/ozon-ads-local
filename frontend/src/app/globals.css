@@ -795,7 +795,9 @@ a {
 }
 
 .main-dashboard .panel-card,
-.main-dashboard .panel-card-wide {
+.main-dashboard .panel-card-wide,
+.all-campaigns-dashboard .panel-card,
+.all-campaigns-dashboard .panel-card-wide {
   grid-column: span 12;
 }
 
@@ -972,6 +974,10 @@ a {
   font-size: 1.35rem;
 }
 
+.campaign-summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .profile-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -1119,7 +1125,7 @@ a {
 }
 
 .campaign-table {
-  min-width: 1720px;
+  min-width: 1180px;
 }
 
 .campaign-table thead th {

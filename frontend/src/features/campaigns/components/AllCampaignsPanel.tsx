@@ -14,8 +14,6 @@ type CampaignColumn = {
 };
 
 const columns: CampaignColumn[] = [
-  { key: "campaign_id", label: "campaign_id" },
-  { key: "sku", label: "sku" },
   { key: "article", label: "article" },
   { key: "views", label: "views", numeric: true },
   { key: "clicks", label: "clicks", numeric: true },
@@ -25,10 +23,8 @@ const columns: CampaignColumn[] = [
   { key: "total_drr_pct", label: "drr", numeric: true },
   { key: "orders_money_ads", label: "orders", numeric: true },
   { key: "ordered_units", label: "ordered", numeric: true },
-  { key: "cpm", label: "cpm", numeric: true },
   { key: "ctr", label: "ctr", numeric: true },
   { key: "cr", label: "cr", numeric: true },
-  { key: "ipo", label: "ipo", numeric: true },
   { key: "bid", label: "bid", numeric: true },
   { key: "bid_change", label: "Bid change", className: "comment-cell" },
   { key: "test", label: "Test" },
@@ -103,40 +99,27 @@ export function AllCampaignsPanel({ report }: { report: CampaignReport }) {
   }
 
   return (
-    <section className="dashboard-grid section-grid">
+    <section className="dashboard-grid section-grid all-campaigns-dashboard">
       <article className="panel-card panel-card-wide section-card">
         <div className="panel-header">
           <div>
             <p className="eyebrow">All campaigns</p>
             <h3>Grand total</h3>
           </div>
-          <span className="status-badge">{report.running_campaigns_count} active</span>
         </div>
         {grandTotal ? (
-          <div className="summary-grid">
+          <div className="summary-grid campaign-summary-grid">
             <div>
-              <span>Spend</span>
-              <strong>{grandTotal.money_spent}</strong>
-            </div>
-            <div>
-              <span>Revenue</span>
-              <strong>{grandTotal.total_revenue}</strong>
-            </div>
-            <div>
-              <span>DRR %</span>
+              <span>drr</span>
               <strong>{grandTotal.total_drr_pct}</strong>
             </div>
             <div>
-              <span>Orders</span>
-              <strong>{grandTotal.orders_money_ads}</strong>
+              <span>ctr</span>
+              <strong>{grandTotal.ctr}</strong>
             </div>
             <div>
-              <span>Ordered units</span>
-              <strong>{grandTotal.ordered_units}</strong>
-            </div>
-            <div>
-              <span>Clicks</span>
-              <strong>{grandTotal.clicks}</strong>
+              <span>cr</span>
+              <strong>{grandTotal.cr}</strong>
             </div>
           </div>
         ) : (
@@ -157,7 +140,6 @@ export function AllCampaignsPanel({ report }: { report: CampaignReport }) {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
-            <span className="status-badge">{reportRows.length} rows</span>
           </div>
         </div>
         <div className="campaign-table-wrap">
