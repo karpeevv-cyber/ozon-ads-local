@@ -103,6 +103,12 @@ export type LoginPayload = {
   password: string;
 };
 
+export type RegisterPayload = {
+  email: string;
+  password: string;
+  full_name?: string;
+};
+
 export type TokenResponse = {
   access_token: string;
   token_type: string;

@@ -16,6 +16,7 @@ import {
   FinanceSummary,
   LoginPayload,
   MainOverview,
+  RegisterPayload,
   RunningCampaign,
   StorageSnapshot,
   StocksSnapshot,
@@ -44,6 +45,18 @@ function withTimeout(ms: number): { signal: AbortSignal; cleanup: () => void } {
   };
 }
 
+async function getApiErrorMessage(response: Response, apiUrl: string): Promise<string> {
+  try {
+    const payload = (await response.json()) as { detail?: unknown };
+    if (typeof payload.detail === "string" && payload.detail.trim()) {
+      return payload.detail;
+    }
+  } catch {
+    // Fall back to status text for non-JSON errors.
+  }
+  return `API request failed: ${response.status} ${response.statusText} for ${apiUrl}`;
+}
+
 async function requestJson<T>(path: string): Promise<T> {
   const apiUrl = `${getApiBaseUrl()}${path}`;
   const timeoutMs = typeof window === "undefined" ? 600000 : 25000;
@@ -54,7 +67,7 @@ async function requestJson<T>(path: string): Promise<T> {
   }).finally(timeout.cleanup);
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText} for ${apiUrl}`);
+    throw new Error(await getApiErrorMessage(response, apiUrl));
   }
 
   return (await response.json()) as T;
@@ -76,7 +89,7 @@ export async function postJson<T>(path: string, body: unknown, token?: string): 
   }).finally(timeout.cleanup);
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText} for ${apiUrl}`);
+    throw new Error(await getApiErrorMessage(response, apiUrl));
   }
 
   return (await response.json()) as T;
@@ -98,7 +111,7 @@ export async function putJson<T>(path: string, body: unknown, token?: string): P
   }).finally(timeout.cleanup);
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText} for ${apiUrl}`);
+    throw new Error(await getApiErrorMessage(response, apiUrl));
   }
 
   return (await response.json()) as T;
@@ -120,7 +133,7 @@ export async function patchJson<T>(path: string, body: unknown, token?: string):
   }).finally(timeout.cleanup);
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText} for ${apiUrl}`);
+    throw new Error(await getApiErrorMessage(response, apiUrl));
   }
 
   return (await response.json()) as T;
@@ -139,7 +152,7 @@ export async function getAuthedJson<T>(path: string, token: string): Promise<T> 
   }).finally(timeout.cleanup);
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText} for ${apiUrl}`);
+    throw new Error(await getApiErrorMessage(response, apiUrl));
   }
 
   return (await response.json()) as T;
@@ -215,6 +228,10 @@ export function getMainOverview(params: {
 
 export function login(payload: LoginPayload): Promise<TokenResponse> {
   return postJson<TokenResponse>("/auth/login", payload);
+}
+
+export function register(payload: RegisterPayload): Promise<TokenResponse> {
+  return postJson<TokenResponse>("/auth/register", payload);
 }
 
 export function getCurrentUser(token: string): Promise<CurrentUser> {
