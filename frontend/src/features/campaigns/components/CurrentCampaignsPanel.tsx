@@ -49,7 +49,19 @@ const dailyColumns: Array<keyof CurrentCampaignMetricRow> = [
   "comment_all",
 ];
 
-const fillMetrics = new Set(["money_spent", "total_revenue", "ctr", "cr", "total_drr_pct"]);
+const totalsColumns: Array<keyof CurrentCampaignMetricRow> = [
+  "views",
+  "clicks",
+  "ctr",
+  "cr",
+  "money_spent",
+  "click_price",
+  "total_revenue",
+  "ordered_units",
+  "total_drr_pct",
+];
+
+const fillMetrics = new Set(["views", "clicks", "money_spent", "total_revenue", "ctr", "cr", "total_drr_pct"]);
 const compactColumns = new Set(["bid_change", "comment", "comment_all"]);
 
 function formatDate(value?: string | null) {
@@ -94,6 +106,9 @@ function fillStyle(value: unknown, max: number): CSSProperties {
 
 function tone(key: keyof CurrentCampaignMetricRow, value: unknown, max: number): MetricTone {
   if (key === "money_spent" || key === "total_revenue") {
+    return "neutral";
+  }
+  if (key === "views" || key === "clicks") {
     return "neutral";
   }
   const num = Number(value ?? 0);
@@ -183,6 +198,7 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
   const router = useRouter();
   const searchParams = useSearchParams();
   const [bidRub, setBidRub] = useState(detail.current_bid_rub?.toString() || "");
+  const [campaignQuery, setCampaignQuery] = useState(detail.selected_campaign_title || "");
   const [reason, setReason] = useState("Рост продаж");
   const [comment, setComment] = useState("");
   const [targetClicks, setTargetClicks] = useState("");
@@ -200,6 +216,11 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
     params.set("current_campaign_id", campaignId);
     router.push(`/?${params.toString()}`);
   }
+
+  const filteredCampaigns = detail.campaigns.filter((campaign) => {
+    const haystack = `${campaign.title} ${campaign.campaign_id}`.toLowerCase();
+    return haystack.includes(campaignQuery.trim().toLowerCase());
+  });
 
   async function submitBid(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -253,10 +274,6 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
   }
 
   const totals = detail.totals ? [detail.totals] : [];
-  const cpcRange = detail.parameters.cpc_econ
-    ? `${detail.parameters.cpc_econ_min ?? "-"} - ${detail.parameters.cpc_econ} - ${detail.parameters.cpc_econ_max ?? "-"}`
-    : "-";
-
   return (
     <section className="dashboard-grid section-grid current-campaigns-dashboard">
       <article className="panel-card panel-card-wide section-card">
@@ -265,21 +282,70 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
             <p className="eyebrow">Current campaigns</p>
             <h3>Campaign detail</h3>
           </div>
-          <select className="campaign-select" value={detail.selected_campaign_id} onChange={(event) => selectCampaign(event.target.value)}>
-            {detail.campaigns.map((campaign) => (
-              <option key={campaign.campaign_id} value={campaign.campaign_id}>
-                {campaign.title || `Campaign ${campaign.campaign_id}`} | {campaign.campaign_id}
-              </option>
-            ))}
-          </select>
         </div>
-        <div className="current-campaign-meta">
-          <span>article: {detail.article || "-"}</span>
-          <span>sku: {detail.sku || "-"}</span>
-          <span>current bid: {detail.current_bid_rub ?? "-"}</span>
-          <span>CPC econ: {cpcRange}</span>
+        <div className="current-top-grid">
+          <div className="campaign-combobox">
+            <input
+              className="campaign-select"
+              value={campaignQuery}
+              onChange={(event) => setCampaignQuery(event.target.value)}
+              placeholder="Search campaign by title or ID"
+              list="current-campaign-options"
+            />
+            <datalist id="current-campaign-options">
+              {detail.campaigns.map((campaign) => (
+                <option key={campaign.campaign_id} value={`${campaign.title || `Campaign ${campaign.campaign_id}`} | ${campaign.campaign_id}`} />
+              ))}
+            </datalist>
+            <div className="campaign-combobox-list">
+              {filteredCampaigns.slice(0, 12).map((campaign) => (
+                <button key={campaign.campaign_id} type="button" onClick={() => selectCampaign(campaign.campaign_id)}>
+                  {campaign.title || `Campaign ${campaign.campaign_id}`} <span>{campaign.campaign_id}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <form className="current-form" onSubmit={submitBid}>
+            <strong>Bids</strong>
+            <input type="number" step="0.01" value={bidRub} onChange={(event) => setBidRub(event.target.value)} placeholder="Bid RUB" required />
+            <select value={reason} onChange={(event) => setReason(event.target.value)}>
+              <option value="Рост продаж">Рост продаж</option>
+              <option value="Снижение остатков">Снижение остатков</option>
+              <option value="Снижение ДРР">Снижение ДРР</option>
+              <option value="Test">Test</option>
+            </select>
+            {reason === "Test" ? (
+              <>
+                <input type="number" min="1" value={targetClicks} onChange={(event) => setTargetClicks(event.target.value)} placeholder="target_clicks" required />
+                <input value={essence} onChange={(event) => setEssence(event.target.value)} placeholder="test_essence" required />
+                <textarea value={expectations} onChange={(event) => setExpectations(event.target.value)} placeholder="test_expectations" required />
+              </>
+            ) : null}
+            <input value={comment} onChange={(event) => setComment(event.target.value)} placeholder="comment" />
+            <button type="submit" disabled={pending || !detail.is_single_sku}>
+              {pending ? "Saving..." : "Apply bid"}
+            </button>
+          </form>
+
+          <form className="current-form" onSubmit={submitComment}>
+            <strong>Comments</strong>
+            <input type="date" value={commentDay} onChange={(event) => setCommentDay(event.target.value)} required />
+            <label className="current-checkbox">
+              <input type="checkbox" checked={commentAll} onChange={(event) => setCommentAll(event.target.checked)} />
+              all campaigns
+            </label>
+            <textarea value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder="Комментарий" required />
+            <button type="submit" disabled={pending || (!detail.selected_campaign_id && !commentAll)}>
+              {pending ? "Saving..." : "Add comment"}
+            </button>
+          </form>
         </div>
+        {status ? <p className="muted-copy">{status}</p> : null}
       </article>
+
+      {!detail.selected_campaign_id ? null : (
+        <>
 
       <article className="panel-card panel-card-wide section-card">
         <div className="panel-header">
@@ -290,7 +356,7 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
         </div>
         <MetricsTable
           rows={totals}
-          columns={["days_in_period", "views", "clicks", "ctr", "cr", "ipo", "money_spent", "click_price", "cpm", "target_cpc", "total_revenue", "ordered_units", "total_drr_pct"]}
+          columns={totalsColumns}
           empty="No totals for selected campaign."
         />
       </article>
@@ -313,68 +379,6 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
           </div>
         </div>
         <MetricsTable rows={detail.daily_rows} columns={dailyColumns} empty="No daily rows." />
-      </article>
-
-      <article className="panel-card panel-card-wide section-card current-actions-card">
-        <div>
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Bids</p>
-              <h3>Apply bid</h3>
-            </div>
-          </div>
-          <form className="current-form" onSubmit={submitBid}>
-            <input type="number" step="0.01" value={bidRub} onChange={(event) => setBidRub(event.target.value)} placeholder="Bid RUB" required />
-            <select value={reason} onChange={(event) => setReason(event.target.value)}>
-              <option value="Рост продаж">Рост продаж</option>
-              <option value="Снижение остатков">Снижение остатков</option>
-              <option value="Снижение ДРР">Снижение ДРР</option>
-              <option value="Test">Test</option>
-            </select>
-            {reason === "Test" ? (
-              <>
-                <input type="number" min="1" value={targetClicks} onChange={(event) => setTargetClicks(event.target.value)} placeholder="target_clicks" required />
-                <input value={essence} onChange={(event) => setEssence(event.target.value)} placeholder="test_essence" required />
-                <textarea value={expectations} onChange={(event) => setExpectations(event.target.value)} placeholder="test_expectations" required />
-              </>
-            ) : null}
-            <input value={comment} onChange={(event) => setComment(event.target.value)} placeholder="comment" />
-            <button type="submit" disabled={pending || !detail.is_single_sku}>
-              {pending ? "Saving..." : "Apply bid"}
-            </button>
-          </form>
-        </div>
-
-        <div>
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Comments</p>
-              <h3>Campaign comments</h3>
-            </div>
-          </div>
-          <form className="current-form" onSubmit={submitComment}>
-            <input type="date" value={commentDay} onChange={(event) => setCommentDay(event.target.value)} required />
-            <label className="current-checkbox">
-              <input type="checkbox" checked={commentAll} onChange={(event) => setCommentAll(event.target.checked)} />
-              all campaigns
-            </label>
-            <textarea value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder="Комментарий" required />
-            <button type="submit" disabled={pending}>
-              {pending ? "Saving..." : "Add comment"}
-            </button>
-          </form>
-          <div className="current-comments-list">
-            {detail.comments.length === 0 ? (
-              <p className="muted-copy">No comments.</p>
-            ) : (
-              detail.comments.map((item, index) => (
-                <p key={`${item.ts}:${index}`}>
-                  <strong>{formatDate(item.day)}</strong> {item.comment}
-                </p>
-              ))
-            )}
-          </div>
-        </div>
       </article>
 
       <article className="panel-card panel-card-wide section-card">
@@ -420,8 +424,9 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
             </tbody>
           </table>
         </div>
-        {status ? <p className="muted-copy">{status}</p> : null}
       </article>
+        </>
+      )}
     </section>
   );
 }

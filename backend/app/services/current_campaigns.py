@@ -236,11 +236,31 @@ def get_current_campaign_detail(
         for item in campaigns
         if item.get("id") is not None
     ]
-    selected_id = str(campaign_id or (campaign_options[0]["campaign_id"] if campaign_options else ""))
+    if not campaign_id:
+        return {
+            "company": company_name,
+            "date_from": date_from,
+            "date_to": date_to,
+            "campaigns": campaign_options,
+            "selected_campaign_id": "",
+            "selected_campaign_title": "",
+            "sku": "",
+            "article": "",
+            "current_bid_rub": None,
+            "is_single_sku": False,
+            "totals": None,
+            "parameters": {},
+            "weekly_rows": [],
+            "daily_rows": [],
+            "comments": [],
+            "test_history": [],
+        }
+
+    selected_id = str(campaign_id)
     selected = next((item for item in campaign_options if item["campaign_id"] == selected_id), None)
     if selected is None:
-        selected = campaign_options[0] if campaign_options else {"campaign_id": "", "title": "", "state": ""}
-        selected_id = selected["campaign_id"]
+        selected = {"campaign_id": "", "title": "", "state": ""}
+        selected_id = ""
     if not selected_id:
         return {
             "company": company_name,
