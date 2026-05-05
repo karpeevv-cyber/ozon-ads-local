@@ -95,6 +95,41 @@ def append_bid_change(
         writer.writerow(payload)
 
 
+def append_campaign_comment(
+    *,
+    campaign_id: str,
+    comment: str,
+    day: date | None,
+    company: str | None,
+    path: str,
+    tz: ZoneInfo = TZ_DEFAULT,
+) -> None:
+    ensure_bid_log(path)
+    now = datetime.now(tz)
+    payload = {
+        "ts_iso": now.isoformat(),
+        "date": (day or now.date()).isoformat(),
+        "campaign_id": str(campaign_id),
+        "sku": CAMPAIGN_COMMENT_SKU,
+        "old_bid_micro": "",
+        "new_bid_micro": "",
+        "reason": str(company or "").strip(),
+        "comment": str(comment or "").strip(),
+    }
+    if _use_gsheet_backend():
+        try:
+            _append_gsheet_row(payload)
+            return
+        except Exception:
+            pass
+    if _use_gist_backend():
+        _append_gist_row(payload)
+        return
+    with open(path, "a", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=BID_LOG_COLUMNS, delimiter=";")
+        writer.writerow(payload)
+
+
 def load_campaign_comments_from_bid_log(path: str) -> pd.DataFrame:
     if _use_gist_backend():
         df = _load_gist_rows()

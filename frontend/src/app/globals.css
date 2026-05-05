@@ -797,7 +797,9 @@ a {
 .main-dashboard .panel-card,
 .main-dashboard .panel-card-wide,
 .all-campaigns-dashboard .panel-card,
-.all-campaigns-dashboard .panel-card-wide {
+.all-campaigns-dashboard .panel-card-wide,
+.current-campaigns-dashboard .panel-card,
+.current-campaigns-dashboard .panel-card-wide {
   grid-column: span 12;
 }
 
@@ -1127,6 +1129,106 @@ a {
 .campaign-table {
   min-width: 1040px;
   table-layout: auto;
+}
+
+.current-campaign-table {
+  min-width: 1320px;
+}
+
+.campaign-select {
+  max-width: min(620px, 48vw);
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--ink);
+  font: inherit;
+}
+
+.current-campaign-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.current-campaign-meta span {
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.54);
+  color: var(--muted);
+}
+
+.current-actions-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.current-form {
+  display: grid;
+  gap: 10px;
+}
+
+.current-form input,
+.current-form select,
+.current-form textarea,
+.current-form button {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  font: inherit;
+}
+
+.current-form input,
+.current-form select,
+.current-form textarea {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--ink);
+}
+
+.current-form textarea {
+  min-height: 82px;
+  resize: vertical;
+}
+
+.current-form button {
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.current-form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.current-checkbox {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+}
+
+.current-checkbox input {
+  width: 18px;
+}
+
+.current-comments-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.current-comments-list p {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.46);
 }
 
 .campaign-table thead th {

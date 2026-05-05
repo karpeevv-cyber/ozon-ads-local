@@ -7,6 +7,7 @@ from app.schemas.campaigns import (
     CampaignReportResponse,
     CampaignSummaryResponse,
     CompanyConfigResponse,
+    CurrentCampaignResponse,
     MainOverviewResponse,
 )
 from app.services.campaign_reporting import (
@@ -19,6 +20,7 @@ from app.services.campaign_reporting import (
 )
 from app.services.bid_log import load_bid_changes_df, load_campaign_comments_df
 from app.services.company_config import load_runtime_company_configs, resolve_company_config
+from app.services.current_campaigns import get_current_campaign_detail
 from app.services.integrations.ozon_ads import get_running_campaigns
 from app.services.integrations.ozon_ads import perf_token
 from app.services.integrations.ozon_seller import seller_analytics_sku_day, seller_analytics_stocks
@@ -155,6 +157,25 @@ def get_campaign_report(
         target_drr_pct=float(target_drr_pct),
         running_campaigns_count=len(running_ids),
         rows=rows,
+    )
+
+
+@router.get("/current-detail", response_model=CurrentCampaignResponse)
+def current_campaign_detail(
+    company: str | None = Query(default=None),
+    date_from: str = Query(...),
+    date_to: str = Query(...),
+    campaign_id: str | None = Query(default=None),
+    target_drr_pct: float = Query(default=20.0),
+) -> CurrentCampaignResponse:
+    return CurrentCampaignResponse(
+        **get_current_campaign_detail(
+            company=company,
+            date_from=date_from,
+            date_to=date_to,
+            campaign_id=campaign_id,
+            target_drr_pct=float(target_drr_pct),
+        )
     )
 
 

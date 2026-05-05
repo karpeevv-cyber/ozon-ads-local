@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.services.company_config import resolve_company_config
-from app.services.bid_history import apply_bid_and_log
+from app.services.bid_history import append_campaign_comment, apply_bid_and_log
 from app.services.integrations.ozon_ads import (
     get_campaign_products_all,
     perf_token,
@@ -42,5 +42,30 @@ def apply_bid_command(
         "old_bid_micro": result.old_bid_micro,
         "new_bid_micro": result.new_bid_micro,
         "reason": result.reason,
+        "comment": str(comment),
+    }
+
+
+def add_campaign_comment_command(
+    *,
+    company: str | None,
+    campaign_id: str,
+    day: str,
+    comment: str,
+):
+    from datetime import date
+
+    company_name, _config = resolve_company_config(company)
+    append_campaign_comment(
+        campaign_id=str(campaign_id),
+        comment=str(comment),
+        day=date.fromisoformat(str(day)),
+        company=company_name,
+        path=str(backend_data_path("bid_changes.csv")),
+    )
+    return {
+        "company": company_name,
+        "campaign_id": str(campaign_id),
+        "day": str(day),
         "comment": str(comment),
     }

@@ -184,6 +184,84 @@ export type ApplyBidResponse = {
   comment: string;
 };
 
+export type AddCampaignCommentPayload = {
+  company?: string;
+  campaign_id: string;
+  day: string;
+  comment: string;
+};
+
+export type AddCampaignCommentResponse = {
+  company: string;
+  campaign_id: string;
+  day: string;
+  comment: string;
+};
+
+export type CurrentCampaignOption = {
+  campaign_id: string;
+  title: string;
+  state: string;
+};
+
+export type CurrentCampaignMetricRow = {
+  week?: string | null;
+  day?: string | null;
+  article?: string | null;
+  days_in_period?: number | null;
+  views: number;
+  clicks: number;
+  ctr: number;
+  cr: number;
+  ipo: number;
+  money_spent: number;
+  click_price: number;
+  cpm: number;
+  target_cpc: number;
+  orders_money_ads: number;
+  total_revenue: number;
+  ordered_units: number;
+  total_drr_pct: number;
+  bid_change: string;
+  comment: string;
+  comment_all: string;
+};
+
+export type CurrentCampaignComment = {
+  day: string;
+  ts: string;
+  comment: string;
+};
+
+export type CurrentCampaignTest = {
+  started_at: string;
+  target_clicks: number;
+  status: string;
+  completion_day: string;
+  essence: string;
+  expectations: string;
+  note: string;
+};
+
+export type CurrentCampaignDetail = {
+  company: string;
+  date_from: string;
+  date_to: string;
+  campaigns: CurrentCampaignOption[];
+  selected_campaign_id: string;
+  selected_campaign_title: string;
+  sku: string;
+  article: string;
+  current_bid_rub: number | null;
+  is_single_sku: boolean;
+  totals: CurrentCampaignMetricRow | null;
+  parameters: Record<string, number | null>;
+  weekly_rows: CurrentCampaignMetricRow[];
+  daily_rows: CurrentCampaignMetricRow[];
+  comments: CurrentCampaignComment[];
+  test_history: CurrentCampaignTest[];
+};
+
 export type StockRow = {
   sku: string;
   article: string;

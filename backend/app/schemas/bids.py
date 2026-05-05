@@ -48,3 +48,17 @@ class ApplyBidResponse(BaseModel):
     new_bid_micro: int
     reason: str
     comment: str
+
+
+class AddCampaignCommentRequest(BaseModel):
+    company: str | None = None
+    campaign_id: str
+    day: str
+    comment: str
+
+
+class AddCampaignCommentResponse(BaseModel):
+    company: str
+    campaign_id: str
+    day: str
+    comment: str

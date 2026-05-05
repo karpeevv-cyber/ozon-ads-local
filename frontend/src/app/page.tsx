@@ -3,6 +3,7 @@ import { BidAuditPanel } from "@/features/bids/components/BidAuditPanel";
 import { BidApplyCard } from "@/features/bids/components/BidApplyCard";
 import { AllCampaignsPanel } from "@/features/campaigns/components/AllCampaignsPanel";
 import { CampaignFilters } from "@/features/campaigns/components/CampaignFilters";
+import { CurrentCampaignsPanel } from "@/features/campaigns/components/CurrentCampaignsPanel";
 import { FinancePanel } from "@/features/finance/components/FinancePanel";
 import { MainDashboard } from "@/features/main/components/MainDashboard";
 import { ProfilePanel } from "@/features/profile/components/ProfilePanel";
@@ -15,17 +16,17 @@ import {
   getCampaignComments,
   getCampaignReport,
   getCompanies,
+  getCurrentCampaignDetail,
   getFinanceSummary,
   getMainOverview,
   getRecentBidChanges,
-  getRunningCampaigns,
   getStorageSnapshot,
   getStocksWorkspace,
   getTrendsSnapshot,
   getUnitEconomicsProducts,
   getUnitEconomicsSummary,
 } from "@/shared/api/client";
-import { CompanyConfig, RunningCampaign } from "@/shared/api/types";
+import { CompanyConfig } from "@/shared/api/types";
 import { AppShell } from "@/shared/ui/AppShell";
 import { getDefaultDateRange } from "@/shared/utils/dates";
 
@@ -43,6 +44,7 @@ type HomePageProps = {
     stocks_refresh?: string;
     storage_refresh?: string;
     main_refresh?: string;
+    current_campaign_id?: string;
   }>;
 };
 
@@ -127,37 +129,6 @@ function isAbortLikeError(error: unknown): boolean {
   return name.includes("abort") || message.includes("aborted");
 }
 
-function CurrentCampaignsPanel({ campaigns }: { campaigns: RunningCampaign[] }) {
-  return (
-    <article className="panel-card panel-card-wide section-card">
-      <div className="panel-header">
-        <div>
-          <p className="eyebrow">Current campaigns</p>
-          <h3>Running campaign list</h3>
-        </div>
-        <span className="status-badge">{campaigns.length} active</span>
-      </div>
-      <div className="list-stack">
-        {campaigns.length === 0 ? (
-          <p className="muted-copy">No running campaigns returned by the backend.</p>
-        ) : (
-          campaigns.map((campaign) => (
-            <div className="list-row" key={campaign.campaign_id}>
-              <div>
-                <strong>{campaign.title || `Campaign ${campaign.campaign_id}`}</strong>
-                <p>
-                  ID {campaign.campaign_id} / State {campaign.state || "unknown"}
-                </p>
-              </div>
-              <span className="status-badge">{campaign.state || "unknown"}</span>
-            </div>
-          ))
-        )}
-      </div>
-    </article>
-  );
-}
-
 function UnitEconomicsProductsPanel({
   products,
 }: {
@@ -227,6 +198,7 @@ async function renderTabContent(params: {
   mainRefresh: boolean;
   stocksRefresh: boolean;
   storageRefresh: boolean;
+  currentCampaignId?: string;
 }) {
   const {
     activeTab,
@@ -242,6 +214,7 @@ async function renderTabContent(params: {
     mainRefresh,
     stocksRefresh,
     storageRefresh,
+    currentCampaignId,
   } = params;
 
   switch (activeTab) {
@@ -263,8 +236,13 @@ async function renderTabContent(params: {
       return <AllCampaignsPanel report={report} />;
     }
     case "current-campaigns": {
-      const campaigns = await getRunningCampaigns(selectedCompany);
-      return <CurrentCampaignsPanel campaigns={campaigns} />;
+      const detail = await getCurrentCampaignDetail({
+        company: selectedCompany,
+        dateFrom,
+        dateTo,
+        campaignId: currentCampaignId,
+      });
+      return <CurrentCampaignsPanel detail={detail} />;
     }
     case "tests": {
       const [recentBidChanges, campaignComments] = await Promise.all([
@@ -388,6 +366,7 @@ async function TabContent(params: {
   mainRefresh: boolean;
   stocksRefresh: boolean;
   storageRefresh: boolean;
+  currentCampaignId?: string;
 }) {
   try {
     return await renderTabContent(params);
@@ -447,7 +426,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     .filter((value, index, arr) => allowedHighlightLevels.has(value) && arr.indexOf(value) === index);
   const stocksReviewMode = String(resolvedSearchParams.stocks_review_mode || "1") !== "0";
   const storageRefresh = Boolean(resolvedSearchParams.storage_refresh);
-  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}:${stocksRegionalOrderMin}:${stocksRegionalOrderTarget}:${stocksPositionFilter}:${stocksHighlightLevels.join("|")}:${stocksReviewMode ? "1" : "0"}:${resolvedSearchParams.main_refresh || ""}:${resolvedSearchParams.stocks_refresh || ""}:${resolvedSearchParams.storage_refresh || ""}`;
+  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}:${stocksRegionalOrderMin}:${stocksRegionalOrderTarget}:${stocksPositionFilter}:${stocksHighlightLevels.join("|")}:${stocksReviewMode ? "1" : "0"}:${resolvedSearchParams.main_refresh || ""}:${resolvedSearchParams.stocks_refresh || ""}:${resolvedSearchParams.storage_refresh || ""}:${resolvedSearchParams.current_campaign_id || ""}`;
   return (
     <AppShell
       filters={
@@ -474,6 +453,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           mainRefresh={Boolean(resolvedSearchParams.main_refresh)}
           stocksRefresh={Boolean(resolvedSearchParams.stocks_refresh)}
           storageRefresh={storageRefresh}
+          currentCampaignId={resolvedSearchParams.current_campaign_id}
         />
       </Suspense>
     </AppShell>

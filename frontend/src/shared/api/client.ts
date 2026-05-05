@@ -1,9 +1,12 @@
 import {
   ApplyBidPayload,
   ApplyBidResponse,
+  AddCampaignCommentPayload,
+  AddCampaignCommentResponse,
   CampaignReport,
   CampaignCommentRecord,
   CompanyConfig,
+  CurrentCampaignDetail,
   CompanyProfile,
   CompanyProfileList,
   CompanyProfilePayload,
@@ -168,6 +171,27 @@ export function getCampaignReport(params: {
   return requestJson<CampaignReport>(`/campaigns/report?${search.toString()}`);
 }
 
+export function getCurrentCampaignDetail(params: {
+  company?: string;
+  dateFrom: string;
+  dateTo: string;
+  campaignId?: string;
+  targetDrrPct?: number;
+}): Promise<CurrentCampaignDetail> {
+  const search = new URLSearchParams({
+    date_from: params.dateFrom,
+    date_to: params.dateTo,
+    target_drr_pct: String(params.targetDrrPct ?? 20),
+  });
+  if (params.company) {
+    search.set("company", params.company);
+  }
+  if (params.campaignId) {
+    search.set("campaign_id", params.campaignId);
+  }
+  return requestJson<CurrentCampaignDetail>(`/campaigns/current-detail?${search.toString()}`);
+}
+
 export function getMainOverview(params: {
   company?: string;
   dateFrom: string;
@@ -224,6 +248,10 @@ export function getCampaignComments(company?: string): Promise<CampaignCommentRe
 
 export function applyBid(payload: ApplyBidPayload): Promise<ApplyBidResponse> {
   return postJson<ApplyBidResponse>("/bids/apply", payload);
+}
+
+export function addCampaignComment(payload: AddCampaignCommentPayload): Promise<AddCampaignCommentResponse> {
+  return postJson<AddCampaignCommentResponse>("/bids/comments", payload);
 }
 
 export function getStocksSnapshot(company?: string): Promise<StocksSnapshot> {
