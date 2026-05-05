@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useState } from "react";
 import { CampaignReport, CampaignReportRow } from "@/shared/api/types";
 
@@ -11,6 +12,7 @@ type CampaignColumn = {
   label: string;
   numeric?: boolean;
   className?: string;
+  compact?: boolean;
 };
 
 const columns: CampaignColumn[] = [
@@ -26,10 +28,10 @@ const columns: CampaignColumn[] = [
   { key: "ctr", label: "ctr", numeric: true },
   { key: "cr", label: "cr", numeric: true },
   { key: "bid", label: "bid", numeric: true },
-  { key: "bid_change", label: "Bid change", className: "comment-cell" },
-  { key: "test", label: "Test" },
-  { key: "comment", label: "comment", className: "comment-cell" },
-  { key: "comment_all", label: "comment_all", className: "comment-cell" },
+  { key: "bid_change", label: "Bid change", compact: true },
+  { key: "test", label: "Test", compact: true },
+  { key: "comment", label: "comment", compact: true },
+  { key: "comment_all", label: "comment_all", compact: true },
 ];
 
 function asNumber(value: unknown): number {
@@ -62,10 +64,38 @@ function drrClass(value: string): string {
   return "campaign-drr-bad";
 }
 
+function buildDomain(rows: CampaignReportRow[], key: SortKey): { max: number } {
+  return {
+    max: Math.max(0, ...rows.map((row) => asNumber(row[key])).filter(Number.isFinite)),
+  };
+}
+
+function fillStyle(value: unknown, max: number): CSSProperties {
+  const intensity = max > 0 ? Math.min(1, Math.max(0, asNumber(value) / max)) : 0;
+  return {
+    "--metric-fill-scale": intensity.toFixed(4),
+    "--metric-alpha": (0.16 + intensity * 0.24).toFixed(2),
+  } as CSSProperties;
+}
+
+function metricTone(key: SortKey, value: unknown, max: number): string {
+  if (key === "money_spent" || key === "total_revenue") {
+    return "neutral";
+  }
+  const intensity = max > 0 ? Math.min(1, Math.max(0, asNumber(value) / max)) : 0;
+  if (intensity >= 0.67) {
+    return "good";
+  }
+  if (intensity >= 0.34) {
+    return "warn";
+  }
+  return "bad";
+}
+
 export function AllCampaignsPanel({ report }: { report: CampaignReport }) {
   const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("total_drr_pct");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [sortKey, setSortKey] = useState<SortKey>("article");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   const grandTotal = report.rows.find((row) => row.campaign_id === "GRAND_TOTAL");
   const query = search.trim().toLowerCase();
@@ -88,6 +118,12 @@ export function AllCampaignsPanel({ report }: { report: CampaignReport }) {
       }
       return String(left[sortKey] ?? "").localeCompare(String(right[sortKey] ?? ""), "ru") * multiplier;
     });
+  const fillDomains = {
+    money_spent: buildDomain(reportRows, "money_spent"),
+    total_revenue: buildDomain(reportRows, "total_revenue"),
+    ctr: buildDomain(reportRows, "ctr"),
+    cr: buildDomain(reportRows, "cr"),
+  };
 
   function toggleSort(nextKey: SortKey) {
     if (nextKey === sortKey) {
@@ -111,15 +147,15 @@ export function AllCampaignsPanel({ report }: { report: CampaignReport }) {
           <div className="summary-grid campaign-summary-grid">
             <div>
               <span>drr</span>
-              <strong>{grandTotal.total_drr_pct}</strong>
+              <strong>{grandTotal.total_drr_pct}%</strong>
             </div>
             <div>
               <span>ctr</span>
-              <strong>{grandTotal.ctr}</strong>
+              <strong>{grandTotal.ctr}%</strong>
             </div>
             <div>
               <span>cr</span>
-              <strong>{grandTotal.cr}</strong>
+              <strong>{grandTotal.cr}%</strong>
             </div>
           </div>
         ) : (
@@ -166,20 +202,33 @@ export function AllCampaignsPanel({ report }: { report: CampaignReport }) {
               ) : (
                 reportRows.map((row, index) => (
                   <tr key={`${row.campaign_id}:${row.sku || "all"}:${index}`}>
-                    {columns.map((column) => (
-                      <td
-                        key={column.key}
-                        className={[
-                          column.className || "",
-                          column.numeric ? "campaign-number-cell" : "",
-                          column.key === "total_drr_pct" ? drrClass(row.total_drr_pct) : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                      >
-                        {formatValue(row, column)}
-                      </td>
-                    ))}
+                    {columns.map((column) => {
+                      const formatted = formatValue(row, column);
+                      const isFillMetric =
+                        column.key === "money_spent" ||
+                        column.key === "total_revenue" ||
+                        column.key === "ctr" ||
+                        column.key === "cr";
+                      const domain = isFillMetric ? fillDomains[column.key as keyof typeof fillDomains] : undefined;
+                      return (
+                        <td
+                          key={column.key}
+                          title={column.compact ? formatted : undefined}
+                          style={domain ? fillStyle(row[column.key], domain.max) : undefined}
+                          className={[
+                            column.className || "",
+                            column.numeric ? "campaign-number-cell" : "",
+                            column.compact ? "campaign-compact-cell" : "",
+                            isFillMetric && domain ? `metric-cell metric-cell-${metricTone(column.key, row[column.key], domain.max)}` : "",
+                            column.key === "total_drr_pct" ? drrClass(row.total_drr_pct) : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          <span>{formatted}</span>
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))
               )}

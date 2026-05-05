@@ -1125,7 +1125,8 @@ a {
 }
 
 .campaign-table {
-  min-width: 1180px;
+  min-width: 1040px;
+  table-layout: auto;
 }
 
 .campaign-table thead th {
@@ -1157,6 +1158,18 @@ a {
 .campaign-number-cell {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.campaign-compact-cell {
+  max-width: 1px;
+  width: 1%;
+}
+
+.campaign-compact-cell span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .campaign-drr-good {
