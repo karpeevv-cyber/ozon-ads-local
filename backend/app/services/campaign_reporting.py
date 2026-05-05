@@ -277,14 +277,13 @@ def fetch_ads_daily_totals(
     end = datetime.fromisoformat(date_to).date()
     days = [day.isoformat() for day in daterange(start, end)]
 
-    totals = []
-    by_campaign_day = {} if return_by_campaign else None
-    for day_str in days:
+    def fetch_one_day(day_str: str):
         day_spend = 0.0
         day_views = 0
         day_clicks = 0
         day_orders_money = 0.0
         day_orders = 0
+        day_by_campaign = {} if return_by_campaign else None
 
         for batch in chunks(running_ids, int(batch_size)):
             stats_day = get_campaign_stats_json(token, day_str, day_str, batch)
@@ -303,9 +302,9 @@ def fetch_ads_daily_totals(
                 day_orders_money += orders_money
                 day_orders += orders
 
-                if return_by_campaign:
+                if return_by_campaign and day_by_campaign is not None:
                     campaign_id = str(row.get("id"))
-                    by_campaign_day[(day_str, campaign_id)] = {
+                    day_by_campaign[(day_str, campaign_id)] = {
                         "money_spent": float(spend),
                         "views": views,
                         "clicks": clicks,
@@ -314,16 +313,28 @@ def fetch_ads_daily_totals(
                         "orders": orders,
                     }
 
-        totals.append(
-            {
-                "day": day_str,
-                "views": day_views,
-                "clicks": day_clicks,
-                "money_spent": float(day_spend),
-                "orders_money_ads": float(day_orders_money),
-                "orders": int(day_orders),
-            }
-        )
+        return {
+            "day": day_str,
+            "views": day_views,
+            "clicks": day_clicks,
+            "money_spent": float(day_spend),
+            "orders_money_ads": float(day_orders_money),
+            "orders": int(day_orders),
+        }, day_by_campaign
+
+    totals_by_day: dict[str, dict] = {}
+    by_campaign_day = {} if return_by_campaign else None
+    max_workers = min(5, max(1, len(days)))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_map = {executor.submit(fetch_one_day, day_str): day_str for day_str in days}
+        for future in as_completed(future_map):
+            day_str = future_map[future]
+            row, day_by_campaign = future.result()
+            totals_by_day[day_str] = row
+            if return_by_campaign and by_campaign_day is not None and day_by_campaign:
+                by_campaign_day.update(day_by_campaign)
+
+    totals = [totals_by_day[day_str] for day_str in days]
     if return_by_campaign:
         return totals, by_campaign_day
     return totals
