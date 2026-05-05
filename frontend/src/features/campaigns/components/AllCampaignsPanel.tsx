@@ -1,8 +1,10 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { CampaignReport, CampaignReportRow } from "@/shared/api/types";
+import { CurrentCampaignsPanel } from "@/features/campaigns/components/CurrentCampaignsPanel";
+import { CampaignReport, CampaignReportRow, CurrentCampaignDetail } from "@/shared/api/types";
 
 type SortKey = keyof CampaignReportRow;
 type SortDirection = "asc" | "desc";
@@ -92,7 +94,9 @@ function metricTone(key: SortKey, value: unknown, max: number): string {
   return "bad";
 }
 
-export function AllCampaignsPanel({ report }: { report: CampaignReport }) {
+export function AllCampaignsPanel({ report, currentDetail }: { report: CampaignReport; currentDetail: CurrentCampaignDetail }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("article");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -132,6 +136,13 @@ export function AllCampaignsPanel({ report }: { report: CampaignReport }) {
     }
     setSortKey(nextKey);
     setSortDirection(columns.find((column) => column.key === nextKey)?.numeric ? "desc" : "asc");
+  }
+
+  function selectCampaign(campaignId: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", "all-campaigns");
+    params.set("current_campaign_id", campaignId);
+    router.push(`/?${params.toString()}`);
   }
 
   return (
@@ -201,7 +212,11 @@ export function AllCampaignsPanel({ report }: { report: CampaignReport }) {
                 </tr>
               ) : (
                 reportRows.map((row, index) => (
-                  <tr key={`${row.campaign_id}:${row.sku || "all"}:${index}`}>
+                  <tr
+                    key={`${row.campaign_id}:${row.sku || "all"}:${index}`}
+                    className={row.campaign_id === currentDetail.selected_campaign_id ? "campaign-row-selected" : "campaign-row-clickable"}
+                    onClick={() => selectCampaign(row.campaign_id)}
+                  >
                     {columns.map((column) => {
                       const formatted = formatValue(row, column);
                       const isFillMetric =
@@ -236,6 +251,7 @@ export function AllCampaignsPanel({ report }: { report: CampaignReport }) {
           </table>
         </div>
       </article>
+      <CurrentCampaignsPanel detail={currentDetail} embedded />
     </section>
   );
 }

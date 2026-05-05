@@ -13,7 +13,6 @@ type AppShellProps = {
 const navItems = [
   { id: "main", label: "Main" },
   { id: "all-campaigns", label: "All campaigns" },
-  { id: "current-campaigns", label: "Current campaigns" },
   { id: "tests", label: "Tests" },
   { id: "unit-economics", label: "Unit Economics" },
   { id: "unit-economics-products", label: "Unit Economics Products" },

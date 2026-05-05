@@ -1325,6 +1325,62 @@ a {
   font-size: 0.88rem;
 }
 
+.campaign-row-clickable {
+  cursor: pointer;
+}
+
+.campaign-row-clickable:hover td,
+.campaign-row-selected td {
+  background-color: rgba(184, 92, 56, 0.08);
+}
+
+.campaign-row-selected td {
+  box-shadow: inset 0 1px 0 rgba(184, 92, 56, 0.2), inset 0 -1px 0 rgba(184, 92, 56, 0.2);
+}
+
+.all-campaigns-dashboard > .current-campaigns-dashboard {
+  grid-column: span 12;
+}
+
+.current-search-row {
+  margin-bottom: 16px;
+}
+
+.current-actions-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(320px, 1.15fr) minmax(320px, 1.15fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.current-actions-grid .current-form {
+  min-height: 230px;
+}
+
+.current-form-compact {
+  align-content: start;
+}
+
+.current-actions-grid .current-form-compact textarea {
+  min-height: 42px;
+}
+
+.current-test-card {
+  overflow: hidden;
+}
+
+.current-test-wrap {
+  max-height: 168px;
+  overflow: auto;
+}
+
+.current-test-table th,
+.current-test-table td {
+  padding: 8px 7px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
 .campaign-number-cell {
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -1554,6 +1610,10 @@ a {
   }
 
   .bid-form {
+    grid-template-columns: 1fr;
+  }
+
+  .current-actions-grid {
     grid-template-columns: 1fr;
   }
 

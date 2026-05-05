@@ -26,7 +26,7 @@ import {
   getUnitEconomicsProducts,
   getUnitEconomicsSummary,
 } from "@/shared/api/client";
-import { CompanyConfig } from "@/shared/api/types";
+import { CompanyConfig, CurrentCampaignDetail } from "@/shared/api/types";
 import { AppShell } from "@/shared/ui/AppShell";
 import { getDefaultDateRange } from "@/shared/utils/dates";
 
@@ -129,6 +129,31 @@ function isAbortLikeError(error: unknown): boolean {
   return name.includes("abort") || message.includes("aborted");
 }
 
+function emptyCurrentCampaignDetail(params: {
+  company: string;
+  dateFrom: string;
+  dateTo: string;
+}): CurrentCampaignDetail {
+  return {
+    company: params.company,
+    date_from: params.dateFrom,
+    date_to: params.dateTo,
+    campaigns: [],
+    selected_campaign_id: "",
+    selected_campaign_title: "",
+    sku: "",
+    article: "",
+    current_bid_rub: null,
+    is_single_sku: false,
+    totals: null,
+    parameters: {},
+    weekly_rows: [],
+    daily_rows: [],
+    comments: [],
+    test_history: [],
+  };
+}
+
 function UnitEconomicsProductsPanel({
   products,
 }: {
@@ -228,12 +253,21 @@ async function renderTabContent(params: {
       return <MainDashboard overview={overview} />;
     }
     case "all-campaigns": {
-      const report = await getCampaignReport({
+      const reportPromise = getCampaignReport({
         company: selectedCompany,
         dateFrom,
         dateTo,
       });
-      return <AllCampaignsPanel report={report} />;
+      const detailPromise = currentCampaignId
+        ? getCurrentCampaignDetail({
+            company: selectedCompany,
+            dateFrom,
+            dateTo,
+            campaignId: currentCampaignId,
+          })
+        : Promise.resolve(emptyCurrentCampaignDetail({ company: selectedCompany, dateFrom, dateTo }));
+      const [report, detail] = await Promise.all([reportPromise, detailPromise]);
+      return <AllCampaignsPanel report={report} currentDetail={detail} />;
     }
     case "current-campaigns": {
       const detail = await getCurrentCampaignDetail({

@@ -198,7 +198,7 @@ function testCommentPayload(detail: CurrentCampaignDetail, targetClicks: string,
   })}`;
 }
 
-export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetail }) {
+export function CurrentCampaignsPanel({ detail, embedded = false }: { detail: CurrentCampaignDetail; embedded?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [bidRub, setBidRub] = useState(detail.current_bid_rub?.toString() || "");
@@ -222,7 +222,7 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
 
   function selectCampaign(campaignId: string) {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", "current-campaigns");
+    params.set("tab", embedded ? "all-campaigns" : "current-campaigns");
     params.set("current_campaign_id", campaignId);
     setCampaignListOpen(false);
     router.push(`/?${params.toString()}`);
@@ -295,17 +295,21 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
   }
 
   const totals = detail.totals ? [detail.totals] : [];
+  const testRows = embedded ? detail.test_history.slice(0, 3) : detail.test_history;
   return (
     <section className="dashboard-grid section-grid current-campaigns-dashboard">
       <article className="panel-card panel-card-wide section-card">
         <div className="panel-header">
           <div>
             <p className="eyebrow">Current campaigns</p>
-            <h3>Campaign detail</h3>
+            <h3>{detail.selected_campaign_title || "Campaign detail"}</h3>
           </div>
         </div>
-        <div className="current-top-grid">
-          <div className="campaign-combobox">
+        {!detail.selected_campaign_id && embedded ? (
+          <p className="muted-copy">Select a campaign in the table above to view bids, comments, tests and detail rows.</p>
+        ) : null}
+        {!embedded ? (
+          <div className="campaign-combobox current-search-row">
             <div className="campaign-combobox-control">
               <input
                 className="campaign-select"
@@ -341,8 +345,11 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
               </div>
             ) : null}
           </div>
+        ) : null}
 
-          <form className="current-form" onSubmit={submitBid}>
+        {detail.selected_campaign_id ? (
+          <div className={embedded ? "current-actions-grid" : "current-top-grid"}>
+          <form className="current-form current-form-compact" onSubmit={submitBid}>
             <strong>Bids</strong>
             <input type="number" step="0.01" value={bidRub} onChange={(event) => setBidRub(event.target.value)} placeholder="Bid RUB" required />
             <select value={reason} onChange={(event) => setReason(event.target.value)}>
@@ -364,7 +371,7 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
             </button>
           </form>
 
-          <form className="current-form" onSubmit={submitComment}>
+          <form className="current-form current-form-compact" onSubmit={submitComment}>
             <strong>Comments</strong>
             <input type="date" value={commentDay} onChange={(event) => setCommentDay(event.target.value)} required />
             <label className="current-checkbox">
@@ -376,7 +383,44 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
               {pending ? "Saving..." : "Add comment"}
             </button>
           </form>
+
+          {embedded ? (
+            <div className="current-form current-test-card">
+              <strong>Test history</strong>
+              <div className="campaign-table-wrap current-test-wrap">
+                <table className="data-table current-test-table">
+                  <thead>
+                    <tr>
+                      <th>started_at</th>
+                      <th>target_clicks</th>
+                      <th>status</th>
+                      <th>completion_day</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {testRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="empty-cell">
+                          No test history.
+                        </td>
+                      </tr>
+                    ) : (
+                      testRows.map((test, index) => (
+                        <tr key={`${test.started_at}:${index}`}>
+                          <td>{formatDate(test.started_at)}</td>
+                          <td>{test.target_clicks}</td>
+                          <td>{test.status}</td>
+                          <td>{test.completion_day ? formatDate(test.completion_day) : "-"}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
         </div>
+        ) : null}
         {status ? <p className="muted-copy">{status}</p> : null}
       </article>
       {toast ? <div className="current-toast" role="status">{toast}</div> : null}
@@ -384,7 +428,8 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
       {!detail.selected_campaign_id ? null : (
         <>
 
-      <article className="panel-card panel-card-wide section-card">
+      {!embedded ? (
+        <article className="panel-card panel-card-wide section-card">
         <div className="panel-header">
           <div>
             <p className="eyebrow">Current campaigns</p>
@@ -397,6 +442,7 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
           empty="No totals for selected campaign."
         />
       </article>
+      ) : null}
 
       <article className="panel-card panel-card-wide section-card">
         <div className="panel-header">
@@ -418,7 +464,8 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
         <MetricsTable rows={detail.daily_rows} columns={dailyColumns} empty="No daily rows." />
       </article>
 
-      <article className="panel-card panel-card-wide section-card">
+      {!embedded ? (
+        <article className="panel-card panel-card-wide section-card">
         <div className="panel-header">
           <div>
             <p className="eyebrow">Tests</p>
@@ -439,14 +486,14 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
               </tr>
             </thead>
             <tbody>
-              {detail.test_history.length === 0 ? (
+              {testRows.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="empty-cell">
                     No test history.
                   </td>
                 </tr>
               ) : (
-                detail.test_history.map((test, index) => (
+                testRows.map((test, index) => (
                   <tr key={`${test.started_at}:${index}`}>
                     <td>{formatDate(test.started_at)}</td>
                     <td>{test.target_clicks}</td>
@@ -462,6 +509,7 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
           </table>
         </div>
       </article>
+      ) : null}
         </>
       )}
     </section>
