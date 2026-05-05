@@ -39,16 +39,6 @@ export function AppShell({ filters, children }: AppShellProps) {
     }
   }, [activeTab, optimisticTab]);
 
-  useEffect(() => {
-    if (!optimisticTab) {
-      return;
-    }
-    const timeoutId = window.setTimeout(() => {
-      setOptimisticTab(null);
-    }, 6000);
-    return () => window.clearTimeout(timeoutId);
-  }, [optimisticTab]);
-
   const makeHref = (tab: string) => {
     const params = new URLSearchParams();
     params.set("tab", tab);
