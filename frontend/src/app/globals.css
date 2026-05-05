@@ -1366,11 +1366,16 @@ a {
 }
 
 .current-test-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   overflow: hidden;
 }
 
 .current-test-wrap {
-  max-height: 168px;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
   overflow: auto;
 }
 

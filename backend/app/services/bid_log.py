@@ -70,9 +70,22 @@ def _normalize_comments_df(df: pd.DataFrame) -> pd.DataFrame:
 
         out.loc[missing_week, "week"] = out.loc[missing_week, "day"].apply(week_start)
     out["campaign_id"] = out["campaign_id"].astype(str)
-    out["company"] = out["company"].astype(str)
+    out["company"] = out["company"].astype(str).apply(_normalize_legacy_company_name)
     out["comment"] = out["comment"].astype(str)
     return out[["ts", "day", "week", "company", "campaign_id", "comment"]]
+
+
+def _normalize_legacy_company_name(value: str) -> str:
+    text = str(value or "").strip()
+    normalized = text.lower().replace("_", " ")
+    aliases = {
+        "osome": "osome",
+        "osome tea": "osome",
+        "osomo": "osome",
+        "aura": "aura",
+        "aura tea": "aura",
+    }
+    return aliases.get(normalized, text)
 
 
 def load_campaign_comments_df(path: str = "campaign_comments.csv") -> pd.DataFrame:

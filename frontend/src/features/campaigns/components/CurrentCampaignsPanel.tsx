@@ -316,7 +316,7 @@ export function CurrentCampaignsPanel({
   }
 
   const totals = detail.totals ? [detail.totals] : [];
-  const testRows = embedded ? detail.test_history.slice(0, 3) : detail.test_history;
+  const testRows = detail.test_history;
   return (
     <section className="dashboard-grid section-grid current-campaigns-dashboard">
       <article className="panel-card panel-card-wide section-card">
