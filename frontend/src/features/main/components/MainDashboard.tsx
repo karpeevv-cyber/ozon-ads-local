@@ -165,10 +165,10 @@ function RevenueChart({ overview }: MainDashboardProps) {
   const totalRevenue = revenues.reduce((sum, value) => sum + value, 0);
   const averageRevenue = totalRevenue / rows.length;
 
-  const chartWidth = 1200;
+  const chartWidth = 1800;
   const chartHeight = 340;
   const leftPad = 76;
-  const rightPad = 64;
+  const rightPad = 88;
   const topPad = 22;
   const bottomPad = 66;
   const innerWidth = chartWidth - leftPad - rightPad;

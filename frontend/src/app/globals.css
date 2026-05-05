@@ -1526,9 +1526,8 @@ a {
 
 .line-chart {
   display: block;
-  width: min(100%, 1200px);
+  width: 100%;
   height: auto;
-  margin: 0 auto;
 }
 
 .line-chart-grid {
