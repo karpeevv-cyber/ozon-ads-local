@@ -16,11 +16,9 @@ const weeklyColumns: Array<keyof CurrentCampaignMetricRow> = [
   "clicks",
   "ctr",
   "cr",
-  "ipo",
   "money_spent",
   "click_price",
   "cpm",
-  "target_cpc",
   "total_revenue",
   "ordered_units",
   "total_drr_pct",
@@ -31,19 +29,16 @@ const weeklyColumns: Array<keyof CurrentCampaignMetricRow> = [
 
 const dailyColumns: Array<keyof CurrentCampaignMetricRow> = [
   "day",
-  "article",
   "money_spent",
   "views",
   "clicks",
   "click_price",
   "orders_money_ads",
-  "cpm",
   "total_revenue",
   "ordered_units",
   "total_drr_pct",
   "ctr",
   "cr",
-  "ipo",
   "bid_change",
   "comment",
   "comment_all",
@@ -89,6 +84,13 @@ function formatValue(key: keyof CurrentCampaignMetricRow, value: unknown) {
     return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: key === "click_price" || key === "target_cpc" ? 1 : 0 }).format(value);
   }
   return String(value);
+}
+
+function columnLabel(column: keyof CurrentCampaignMetricRow) {
+  if (column === "days_in_period") {
+    return "days";
+  }
+  return column;
 }
 
 function domain(rows: CurrentCampaignMetricRow[], key: keyof CurrentCampaignMetricRow) {
@@ -139,7 +141,7 @@ function MetricsTable({
         <thead>
           <tr>
             {columns.map((column) => (
-              <th key={column}>{column}</th>
+              <th key={column}>{columnLabel(column)}</th>
             ))}
           </tr>
         </thead>
@@ -198,7 +200,8 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
   const router = useRouter();
   const searchParams = useSearchParams();
   const [bidRub, setBidRub] = useState(detail.current_bid_rub?.toString() || "");
-  const [campaignQuery, setCampaignQuery] = useState(detail.selected_campaign_title || "");
+  const [campaignQuery, setCampaignQuery] = useState("");
+  const [campaignListOpen, setCampaignListOpen] = useState(false);
   const [reason, setReason] = useState("Рост продаж");
   const [comment, setComment] = useState("");
   const [targetClicks, setTargetClicks] = useState("");
@@ -214,6 +217,7 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", "current-campaigns");
     params.set("current_campaign_id", campaignId);
+    setCampaignListOpen(false);
     router.push(`/?${params.toString()}`);
   }
 
@@ -221,6 +225,15 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
     const haystack = `${campaign.title} ${campaign.campaign_id}`.toLowerCase();
     return haystack.includes(campaignQuery.trim().toLowerCase());
   });
+
+  function toggleCampaignList() {
+    if (campaignListOpen) {
+      setCampaignListOpen(false);
+      return;
+    }
+    setCampaignQuery("");
+    setCampaignListOpen(true);
+  }
 
   async function submitBid(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -285,25 +298,40 @@ export function CurrentCampaignsPanel({ detail }: { detail: CurrentCampaignDetai
         </div>
         <div className="current-top-grid">
           <div className="campaign-combobox">
-            <input
-              className="campaign-select"
-              value={campaignQuery}
-              onChange={(event) => setCampaignQuery(event.target.value)}
-              placeholder="Search campaign by title or ID"
-              list="current-campaign-options"
-            />
-            <datalist id="current-campaign-options">
-              {detail.campaigns.map((campaign) => (
-                <option key={campaign.campaign_id} value={`${campaign.title || `Campaign ${campaign.campaign_id}`} | ${campaign.campaign_id}`} />
-              ))}
-            </datalist>
-            <div className="campaign-combobox-list">
-              {filteredCampaigns.slice(0, 12).map((campaign) => (
-                <button key={campaign.campaign_id} type="button" onClick={() => selectCampaign(campaign.campaign_id)}>
-                  {campaign.title || `Campaign ${campaign.campaign_id}`} <span>{campaign.campaign_id}</span>
-                </button>
-              ))}
+            <div className="campaign-combobox-control">
+              <input
+                className="campaign-select"
+                value={campaignQuery}
+                onFocus={() => {
+                  if (campaignQuery.trim()) {
+                    setCampaignListOpen(true);
+                  }
+                }}
+                onChange={(event) => {
+                  setCampaignQuery(event.target.value);
+                  setCampaignListOpen(true);
+                }}
+                placeholder="Search campaign by title or ID"
+              />
+              <button
+                className="campaign-combobox-toggle"
+                type="button"
+                aria-label={campaignListOpen ? "Hide campaigns" : "Show campaigns"}
+                onClick={toggleCampaignList}
+              >
+                ▾
+              </button>
             </div>
+            {campaignListOpen ? (
+              <div className="campaign-combobox-list">
+                {filteredCampaigns.slice(0, 40).map((campaign) => (
+                  <button key={campaign.campaign_id} type="button" onClick={() => selectCampaign(campaign.campaign_id)}>
+                    {campaign.title || `Campaign ${campaign.campaign_id}`} <span>{campaign.campaign_id}</span>
+                  </button>
+                ))}
+                {filteredCampaigns.length === 0 ? <p>No campaigns found.</p> : null}
+              </div>
+            ) : null}
           </div>
 
           <form className="current-form" onSubmit={submitBid}>

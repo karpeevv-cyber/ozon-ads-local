@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import date, timedelta
 
 import pandas as pd
@@ -13,11 +14,15 @@ from app.services.campaign_reporting import (
     load_products_parallel,
 )
 from app.services.company_config import resolve_company_config
-from app.services.integrations.ozon_ads import get_campaign_products_all, get_running_campaigns, perf_token
-from app.services.integrations.ozon_seller import seller_analytics_sku_day, seller_analytics_stocks
+from app.services.integrations.ozon_ads import get_running_campaigns, perf_token
+from app.services.integrations.ozon_seller import seller_analytics_sku_day
 from app.services.main_overview import _campaign_weekly_aggregate
 
 TEST_META_PREFIX = "__test_meta__:"
+CURRENT_CAMPAIGN_CACHE_TTL_SECONDS = 300
+
+_seller_daily_cache: dict[tuple[str, str, str], tuple[float, tuple[dict, dict, dict]]] = {}
+_ads_daily_cache: dict[tuple[str, str, str, str], tuple[float, tuple[pd.DataFrame, dict]]] = {}
 
 
 def _num(value) -> float:
@@ -67,22 +72,53 @@ def _current_bid_rub(items: list[dict], sku: str) -> float | None:
     return None
 
 
-def _sku_offer_map(*, skus: list[str], seller_client_id: str | None, seller_api_key: str | None) -> dict[str, str]:
-    sku_values = [str(sku).strip() for sku in skus if str(sku).strip().isdigit()]
-    if not sku_values:
-        return {}
-    out: dict[str, str] = {}
-    for index in range(0, len(sku_values), 200):
-        response = seller_analytics_stocks(
-            skus=sku_values[index : index + 200],
-            client_id=seller_client_id,
-            api_key=seller_api_key,
-        )
-        for item in response.get("items", []) or []:
-            sku = item.get("sku")
-            if sku is not None:
-                out[str(sku)] = str(item.get("offer_id") or "").strip()
-    return out
+def _cached_seller_analytics_sku_day(
+    *,
+    company_name: str,
+    date_from: str,
+    date_to: str,
+    seller_client_id: str | None,
+    seller_api_key: str | None,
+) -> tuple[dict, dict, dict]:
+    key = (company_name, date_from, date_to)
+    now = time.monotonic()
+    cached = _seller_daily_cache.get(key)
+    if cached and now - cached[0] < CURRENT_CAMPAIGN_CACHE_TTL_SECONDS:
+        return cached[1]
+    value = seller_analytics_sku_day(
+        date_from,
+        date_to,
+        limit=1000,
+        client_id=seller_client_id,
+        api_key=seller_api_key,
+    )
+    _seller_daily_cache[key] = (now, value)
+    return value
+
+
+def _cached_ads_daily_totals(
+    *,
+    company_name: str,
+    token: str,
+    date_from: str,
+    date_to: str,
+    campaign_id: str,
+) -> tuple[pd.DataFrame, dict]:
+    key = (company_name, date_from, date_to, campaign_id)
+    now = time.monotonic()
+    cached = _ads_daily_cache.get(key)
+    if cached and now - cached[0] < CURRENT_CAMPAIGN_CACHE_TTL_SECONDS:
+        return cached[1]
+    value = fetch_ads_daily_totals(
+        token,
+        date_from,
+        date_to,
+        [campaign_id],
+        10,
+        return_by_campaign=True,
+    )
+    _ads_daily_cache[key] = (now, value)
+    return value
 
 
 def _build_bid_change_maps(bid_log_df, *, campaign_id: str, sku: str, date_from: str, date_to: str):
@@ -286,22 +322,21 @@ def get_current_campaign_detail(
     items = products_by_campaign_id.get(selected_id, []) or []
     out_sku, _out_title, _out_bid, skus = campaign_display_fields(selected.get("title", ""), items)
     single_sku = out_sku if len(skus) == 1 else ""
-    article = _sku_offer_map(skus=[single_sku], seller_client_id=seller_client_id, seller_api_key=seller_api_key).get(single_sku, single_sku)
+    article = str((items[0] or {}).get("offer_id") or (items[0] or {}).get("offerId") or single_sku) if items else single_sku
 
-    _by_sku, _by_day, by_day_sku = seller_analytics_sku_day(
-        date_from,
-        date_to,
-        limit=1000,
-        client_id=seller_client_id,
-        api_key=seller_api_key,
+    _by_sku, _by_day, by_day_sku = _cached_seller_analytics_sku_day(
+        company_name=company_name,
+        date_from=date_from,
+        date_to=date_to,
+        seller_client_id=seller_client_id,
+        seller_api_key=seller_api_key,
     )
-    _daily, ads_daily_by_campaign = fetch_ads_daily_totals(
-        token,
-        date_from,
-        date_to,
-        [selected_id],
-        10,
-        return_by_campaign=True,
+    _daily, ads_daily_by_campaign = _cached_ads_daily_totals(
+        company_name=company_name,
+        token=token,
+        date_from=date_from,
+        date_to=date_to,
+        campaign_id=selected_id,
     )
     daily_rows = build_campaign_daily_rows(
         campaign_id=selected_id,
