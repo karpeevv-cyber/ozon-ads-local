@@ -80,7 +80,7 @@ function fillStyle(value: unknown, max: number): CSSProperties {
 }
 
 function metricTone(key: SortKey, value: unknown, max: number): string {
-  if (key === "money_spent" || key === "total_revenue") {
+  if (key === "money_spent" || key === "total_revenue" || key === "views" || key === "clicks") {
     return "neutral";
   }
   const intensity = max > 0 ? Math.min(1, Math.max(0, asNumber(value) / max)) : 0;
