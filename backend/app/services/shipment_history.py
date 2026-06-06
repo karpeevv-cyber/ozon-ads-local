@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Iterable
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.bootstrap import create_all
@@ -367,6 +368,32 @@ def load_shipment_pairs(
     }
     ts = max((item.updated_at for item in rows if item.updated_at is not None), default=None)
     return pairs, ts
+
+
+def load_shipment_city_totals(
+    db: Session,
+    *,
+    company_name: str,
+    seller_client_id: str,
+) -> dict[str, int]:
+    if not seller_client_id:
+        return {}
+    create_all()
+    from app.models.shipment_event import ShipmentEvent
+
+    rows = (
+        db.query(ShipmentEvent.city_key, func.sum(ShipmentEvent.quantity))
+        .filter(ShipmentEvent.company_name == str(company_name or ""))
+        .filter(ShipmentEvent.seller_client_id == str(seller_client_id or ""))
+        .filter(ShipmentEvent.city_key != "")
+        .group_by(ShipmentEvent.city_key)
+        .all()
+    )
+    return {
+        str(city_key or "").strip(): int(total or 0)
+        for city_key, total in rows
+        if str(city_key or "").strip() and int(total or 0) > 0
+    }
 
 
 def has_unknown_shipment_city(

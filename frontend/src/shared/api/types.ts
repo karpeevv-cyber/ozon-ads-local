@@ -305,6 +305,7 @@ export type StocksWorkspaceTimings = {
   stocks_cache_ms: number;
   shipment_pairs_ms: number;
   shipment_rebuild_ms: number;
+  shipment_city_totals_ms: number;
   dataframe_ms: number;
   shipment_events_ms: number;
   matrix_ms: number;

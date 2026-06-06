@@ -26,6 +26,7 @@ from app.services.legacy_compat import (
 )
 from app.services.shipment_history import (
     has_unknown_shipment_city,
+    load_shipment_city_totals,
     load_shipment_events_map,
     load_shipment_pairs,
     load_shipment_transit_map,
@@ -592,10 +593,31 @@ def get_stocks_workspace(
 
     transit_for_totals = pd.DataFrame(0, index=df_pivot.index, columns=df_pivot.columns) if use_supply_transit else df_transit.fillna(0)
     cluster_totals = df_pivot.fillna(0).sum(axis=0) + transit_for_totals.sum(axis=0)
-    ordered_clusters = cluster_totals.sort_values(ascending=False).index.astype(str).tolist()
+    city_totals_checkpoint = perf_counter()
+    shipment_city_totals = (
+        load_shipment_city_totals(
+            db,
+            company_name=company_name,
+            seller_client_id=seller_client_id,
+        )
+        if db is not None
+        else {}
+    )
+    timings["shipment_city_totals_ms"] = round((perf_counter() - city_totals_checkpoint) * 1000, 2)
+    ordered_clusters = sorted(
+        cluster_totals.index.astype(str).tolist(),
+        key=lambda city: (
+            -int(shipment_city_totals.get(_normalize_city(str(city)), 0) or 0),
+            -float(cluster_totals.get(city, 0) or 0),
+            str(city),
+        ),
+    )
     existing_city_keys = {_normalize_city(str(city)) for city in ordered_clusters}
     transit_city_keys = {city_key for (_article, city_key), qty in transit_lookup.items() if int(qty or 0) > 0}
-    for city_key in sorted(transit_city_keys - existing_city_keys):
+    for city_key in sorted(
+        transit_city_keys - existing_city_keys,
+        key=lambda item: (-int(shipment_city_totals.get(item, 0) or 0), item),
+    ):
         ordered_clusters.append(_city_key_to_label(city_key))
     if has_unknown_shipment_city(
         db,

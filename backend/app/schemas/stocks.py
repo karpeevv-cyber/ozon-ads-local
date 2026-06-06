@@ -38,6 +38,7 @@ class StocksWorkspaceTimingResponse(BaseModel):
     stocks_cache_ms: float = 0
     shipment_pairs_ms: float = 0
     shipment_rebuild_ms: float = 0
+    shipment_city_totals_ms: float = 0
     dataframe_ms: float = 0
     shipment_events_ms: float = 0
     matrix_ms: float = 0
