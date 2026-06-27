@@ -40,6 +40,7 @@ class UnitEconomicsProductRow(BaseModel):
     package_cost: float
     label_cost: float
     packing_cost: float
+    is_active: bool = True
 
 
 class UnitEconomicsProductsResponse(BaseModel):
@@ -56,6 +57,7 @@ class UnitEconomicsProductUpdateRow(BaseModel):
     package_cost: float
     label_cost: float
     packing_cost: float
+    is_active: bool = True
 
 
 class UnitEconomicsProductsUpdateRequest(BaseModel):

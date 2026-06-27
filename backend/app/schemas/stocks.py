@@ -24,6 +24,7 @@ class StocksWorkspaceSettingsResponse(BaseModel):
     regional_order_min: int
     regional_order_target: int
     position_filter: str
+    assortment_filter: str
 
 
 class StocksWorkspaceSummaryResponse(BaseModel):
@@ -36,6 +37,7 @@ class StocksWorkspaceSummaryResponse(BaseModel):
 class StocksWorkspaceTimingResponse(BaseModel):
     resolve_company_ms: float = 0
     stocks_cache_ms: float = 0
+    assortment_filter_ms: float = 0
     shipment_pairs_ms: float = 0
     shipment_rebuild_ms: float = 0
     shipment_city_totals_ms: float = 0

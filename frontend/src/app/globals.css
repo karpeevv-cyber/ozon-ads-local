@@ -382,7 +382,7 @@ a {
 
 .stocks-controls {
   display: grid;
-  grid-template-columns: minmax(180px, 1.2fr) 112px 112px minmax(220px, 1fr) 170px auto;
+  grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) 112px 112px minmax(220px, 1fr) 170px auto;
   gap: 10px;
   margin-bottom: 10px;
   align-items: end;
@@ -812,6 +812,56 @@ a {
   background: var(--accent);
   color: white;
   cursor: pointer;
+}
+
+.unit-products-editor-wrap {
+  max-height: 620px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+
+.unit-products-editor-table th,
+.unit-products-editor-table td {
+  padding: 9px 10px;
+  vertical-align: middle;
+}
+
+.unit-products-editor-table input[type="text"],
+.unit-products-editor-table input[type="number"] {
+  width: 100%;
+  min-width: 86px;
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--ink);
+  font: inherit;
+}
+
+.unit-products-editor-table input[type="number"] {
+  min-width: 74px;
+}
+
+.unit-products-inactive {
+  background: rgba(214, 102, 64, 0.08);
+}
+
+.unit-products-discontinued-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+}
+
+.unit-products-discontinued-check input {
+  width: 16px;
+  height: 16px;
+}
+
+.unit-products-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
 }
 
 .dashboard-grid {

@@ -39,6 +39,7 @@ type HomePageProps = {
     stocks_regional_order_min?: string;
     stocks_regional_order_target?: string;
     stocks_position_filter?: string;
+    stocks_assortment_filter?: string;
     stocks_highlight_levels?: string;
     stocks_review_mode?: string;
     stocks_refresh?: string;
@@ -179,12 +180,13 @@ function UnitEconomicsProductsPanel({
                 <th>Package</th>
                 <th>Label</th>
                 <th>Packing</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
               {products.rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="empty-cell">
+                  <td colSpan={7} className="empty-cell">
                     No unit economics products loaded yet.
                   </td>
                 </tr>
@@ -197,6 +199,7 @@ function UnitEconomicsProductsPanel({
                     <td>{row.package_cost}</td>
                     <td>{row.label_cost}</td>
                     <td>{row.packing_cost}</td>
+                    <td>{row.is_active ? "Active" : "Discontinued"}</td>
                   </tr>
                 ))
               )}
@@ -218,6 +221,7 @@ async function renderTabContent(params: {
   stocksRegionalOrderMin: number;
   stocksRegionalOrderTarget: number;
   stocksPositionFilter: string;
+  stocksAssortmentFilter: string;
   stocksHighlightLevels: string[];
   stocksReviewMode: boolean;
   mainRefresh: boolean;
@@ -234,6 +238,7 @@ async function renderTabContent(params: {
     stocksRegionalOrderMin,
     stocksRegionalOrderTarget,
     stocksPositionFilter,
+    stocksAssortmentFilter,
     stocksHighlightLevels,
     stocksReviewMode,
     mainRefresh,
@@ -329,6 +334,7 @@ async function renderTabContent(params: {
         regionalOrderMin: stocksRegionalOrderMin,
         regionalOrderTarget: stocksRegionalOrderTarget,
         positionFilter: stocksPositionFilter,
+        assortmentFilter: stocksAssortmentFilter,
         forceRefresh: stocksRefresh,
       });
       return (
@@ -395,6 +401,7 @@ async function TabContent(params: {
   stocksRegionalOrderMin: number;
   stocksRegionalOrderTarget: number;
   stocksPositionFilter: string;
+  stocksAssortmentFilter: string;
   stocksHighlightLevels: string[];
   stocksReviewMode: boolean;
   mainRefresh: boolean;
@@ -453,6 +460,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   )
     ? String(resolvedSearchParams.stocks_position_filter || "ALL").toUpperCase()
     : "ALL";
+  const stocksAssortmentFilter = ["ALL", "ACTIVE", "DISCONTINUED"].includes(
+    String(resolvedSearchParams.stocks_assortment_filter || "").toUpperCase(),
+  )
+    ? String(resolvedSearchParams.stocks_assortment_filter || "ALL").toUpperCase()
+    : "ALL";
   const allowedHighlightLevels = new Set(["paid_now", "paid_30", "paid_60"]);
   const stocksHighlightLevels = String(resolvedSearchParams.stocks_highlight_levels || "paid_now")
     .split(",")
@@ -460,7 +472,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     .filter((value, index, arr) => allowedHighlightLevels.has(value) && arr.indexOf(value) === index);
   const stocksReviewMode = String(resolvedSearchParams.stocks_review_mode || "1") !== "0";
   const storageRefresh = Boolean(resolvedSearchParams.storage_refresh);
-  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}:${stocksRegionalOrderMin}:${stocksRegionalOrderTarget}:${stocksPositionFilter}:${stocksHighlightLevels.join("|")}:${stocksReviewMode ? "1" : "0"}:${resolvedSearchParams.main_refresh || ""}:${resolvedSearchParams.stocks_refresh || ""}:${resolvedSearchParams.storage_refresh || ""}:${resolvedSearchParams.current_campaign_id || ""}`;
+  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}:${stocksRegionalOrderMin}:${stocksRegionalOrderTarget}:${stocksPositionFilter}:${stocksAssortmentFilter}:${stocksHighlightLevels.join("|")}:${stocksReviewMode ? "1" : "0"}:${resolvedSearchParams.main_refresh || ""}:${resolvedSearchParams.stocks_refresh || ""}:${resolvedSearchParams.storage_refresh || ""}:${resolvedSearchParams.current_campaign_id || ""}`;
   return (
     <AppShell
       filters={
@@ -482,6 +494,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           stocksRegionalOrderMin={stocksRegionalOrderMin}
           stocksRegionalOrderTarget={stocksRegionalOrderTarget}
           stocksPositionFilter={stocksPositionFilter}
+          stocksAssortmentFilter={stocksAssortmentFilter}
           stocksHighlightLevels={stocksHighlightLevels}
           stocksReviewMode={stocksReviewMode}
           mainRefresh={Boolean(resolvedSearchParams.main_refresh)}

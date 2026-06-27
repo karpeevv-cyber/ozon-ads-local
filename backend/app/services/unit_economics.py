@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 import requests
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from app.services.company_config import resolve_company_config
@@ -99,24 +100,55 @@ def _load_unit_cost_overrides(path: Path) -> pd.DataFrame:
     try:
         df = pd.read_csv(path, dtype={"sku": str})
     except Exception:
-        return pd.DataFrame(columns=["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost"])
-    for col in ["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost"]:
+        return pd.DataFrame(columns=["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost", "is_active"])
+    for col in ["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost", "is_active"]:
         if col not in df.columns:
-            df[col] = ""
+            df[col] = True if col == "is_active" else ""
     df["sku"] = df["sku"].astype(str).str.strip()
     df = df[df["sku"].str.fullmatch(r"\d+")].copy()
-    return df[["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost"]]
+    df["is_active"] = df["is_active"].apply(_to_bool)
+    return df[["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost", "is_active"]]
 
 
 def save_unit_cost_overrides(df: pd.DataFrame, path: Path) -> None:
     out = df.copy()
     out["sku"] = out["sku"].astype(str).str.strip()
     out = out[out["sku"].str.fullmatch(r"\d+")].copy()
+    if "is_active" not in out.columns:
+        out["is_active"] = True
+    out["is_active"] = out["is_active"].apply(_to_bool)
     out.to_csv(path, index=False, encoding="utf-8-sig")
 
 
-def _load_unit_cost_overrides_from_db(db: Session, *, company_name: str, seller_client_id: str | None) -> pd.DataFrame:
+def _to_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "y", "active", "да"}:
+        return True
+    if text in {"0", "false", "no", "n", "inactive", "discontinued", "нет"}:
+        return False
+    return bool(value)
+
+
+def _ensure_unit_economics_schema(db: Session) -> None:
     create_all()
+    inspector = inspect(db.bind)
+    columns = {column["name"] for column in inspector.get_columns("unit_economics_overrides")}
+    if "is_active" in columns:
+        return
+    dialect = db.bind.dialect.name if db.bind is not None else ""
+    if dialect == "postgresql":
+        db.execute(text("ALTER TABLE unit_economics_overrides ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE"))
+    else:
+        db.execute(text("ALTER TABLE unit_economics_overrides ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1"))
+    db.commit()
+
+
+def _load_unit_cost_overrides_from_db(db: Session, *, company_name: str, seller_client_id: str | None) -> pd.DataFrame:
+    _ensure_unit_economics_schema(db)
     from app.models.unit_economics import UnitEconomicsOverride
 
     rows = (
@@ -126,7 +158,7 @@ def _load_unit_cost_overrides_from_db(db: Session, *, company_name: str, seller_
         .all()
     )
     if not rows:
-        return pd.DataFrame(columns=["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost"])
+        return pd.DataFrame(columns=["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost", "is_active"])
     return pd.DataFrame(
         [
             {
@@ -136,10 +168,38 @@ def _load_unit_cost_overrides_from_db(db: Session, *, company_name: str, seller_
                 "package_cost": row.package_cost,
                 "label_cost": row.label_cost,
                 "packing_cost": row.packing_cost,
+                "is_active": bool(row.is_active),
             }
             for row in rows
         ]
     )
+
+
+def load_inactive_unit_economics_skus(
+    *,
+    company_name: str | None,
+    seller_client_id: str | None,
+    db: Session | None = None,
+) -> set[str]:
+    company, _config = resolve_company_config(company_name)
+    overrides = pd.DataFrame(columns=["sku", "is_active"])
+    if db is not None:
+        try:
+            overrides = _load_unit_cost_overrides_from_db(
+                db,
+                company_name=company,
+                seller_client_id=seller_client_id,
+            )
+        except Exception:
+            overrides = pd.DataFrame(columns=["sku", "is_active"])
+    if overrides.empty:
+        overrides = _load_unit_cost_overrides(
+            _get_unit_econ_products_load_path(company_name=company, seller_client_id=seller_client_id)
+        )
+    if overrides.empty or "is_active" not in overrides.columns:
+        return set()
+    inactive = overrides[~overrides["is_active"].apply(_to_bool)].copy()
+    return {str(sku).strip() for sku in inactive["sku"].tolist() if str(sku).strip()}
 
 
 def _save_unit_cost_overrides_to_db(
@@ -149,7 +209,7 @@ def _save_unit_cost_overrides_to_db(
     seller_client_id: str | None,
     payload_df: pd.DataFrame,
 ) -> None:
-    create_all()
+    _ensure_unit_economics_schema(db)
     from app.models.unit_economics import UnitEconomicsOverride
 
     scope_company = str(company_name or "")
@@ -182,6 +242,7 @@ def _save_unit_cost_overrides_to_db(
         record.package_cost = float(item["package_cost"] or 0.0)
         record.label_cost = float(item["label_cost"] or 0.0)
         record.packing_cost = float(item["packing_cost"] or 0.0)
+        record.is_active = _to_bool(item.get("is_active", True))
     db.commit()
 
 
@@ -231,9 +292,10 @@ def _load_unit_costs(sheet_id: str, gid: str) -> pd.DataFrame:
 def load_effective_unit_costs(company_name: str | None, seller_client_id: str | None = None, db: Session | None = None) -> pd.DataFrame:
     config = get_unit_econ_sheet_config(company_name=company_name, seller_client_id=seller_client_id)
     if not config:
-        return pd.DataFrame(columns=["sku", "sheet_name", "tea_cost", "package_cost", "label_cost", "packing_cost"])
+        return pd.DataFrame(columns=["sku", "sheet_name", "tea_cost", "package_cost", "label_cost", "packing_cost", "is_active"])
     base = _load_unit_costs(config["sheet_id"], config["gid"]).copy()
-    overrides = pd.DataFrame(columns=["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost"])
+    base["is_active"] = True
+    overrides = pd.DataFrame(columns=["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost", "is_active"])
     if db is not None:
         try:
             overrides = _load_unit_cost_overrides_from_db(
@@ -242,7 +304,7 @@ def load_effective_unit_costs(company_name: str | None, seller_client_id: str | 
                 seller_client_id=seller_client_id,
             ).copy()
         except Exception:
-            overrides = pd.DataFrame(columns=["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost"])
+            overrides = pd.DataFrame(columns=["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost", "is_active"])
     if overrides.empty:
         overrides = _load_unit_cost_overrides(
             _get_unit_econ_products_load_path(company_name=company_name, seller_client_id=seller_client_id)
@@ -250,6 +312,9 @@ def load_effective_unit_costs(company_name: str | None, seller_client_id: str | 
     if overrides.empty:
         return base
     overrides["position"] = overrides["position"].astype(str).fillna("").str.strip()
+    if "is_active" not in overrides.columns:
+        overrides["is_active"] = True
+    overrides["is_active"] = overrides["is_active"].apply(_to_bool)
     for col in ["tea_cost", "package_cost", "label_cost", "packing_cost"]:
         overrides[col] = pd.to_numeric(overrides[col], errors="coerce")
     merged = base.merge(overrides, on="sku", how="outer", suffixes=("", "__override"))
@@ -261,7 +326,10 @@ def load_effective_unit_costs(company_name: str | None, seller_client_id: str | 
         override_col = f"{col}__override"
         if override_col in merged.columns:
             merged[col] = merged[override_col].where(merged[override_col].notna(), merged[col])
-    return merged[["sku", "sheet_name", "tea_cost", "package_cost", "label_cost", "packing_cost"]].copy()
+    if "is_active__override" in merged.columns:
+        merged["is_active"] = merged["is_active__override"].where(merged["is_active__override"].notna(), merged["is_active"])
+    merged["is_active"] = merged["is_active"].apply(_to_bool)
+    return merged[["sku", "sheet_name", "tea_cost", "package_cost", "label_cost", "packing_cost", "is_active"]].copy()
 
 
 def _load_saved_unit_cost_overrides(
@@ -581,14 +649,16 @@ def get_unit_economics_products(*, company: str | None, date_from: str, date_to:
 
     view_df = costs_df.merge(sales_name_df, on="sku", how="left")
     if not overrides_df.empty:
-        view_df = view_df.merge(overrides_df[["sku", "position"]].rename(columns={"position": "saved_name"}), on="sku", how="left")
+        view_df = view_df.merge(overrides_df[["sku", "position", "is_active"]].rename(columns={"position": "saved_name", "is_active": "saved_is_active"}), on="sku", how="left")
     else:
         view_df["saved_name"] = ""
+        view_df["saved_is_active"] = True
 
     view_df["ozon_name"] = view_df["sku"].astype(str).map(sku_title_map).fillna("").astype(str).str.strip()
     view_df["sales_name"] = view_df["sales_name"].fillna("").astype(str).str.strip()
     view_df["saved_name"] = view_df["saved_name"].fillna("").astype(str).str.strip()
     view_df["sheet_title"] = view_df["sheet_title"].fillna("").astype(str).str.strip()
+    view_df["saved_is_active"] = view_df["saved_is_active"].fillna(view_df.get("is_active", True)).apply(_to_bool)
     view_df["name"] = view_df["ozon_name"]
     for source_col in ["sales_name", "saved_name", "sheet_title"]:
         missing = view_df["name"].eq("")
@@ -597,8 +667,10 @@ def get_unit_economics_products(*, company: str | None, date_from: str, date_to:
     for col in ["tea_cost", "package_cost", "label_cost", "packing_cost"]:
         view_df[col] = pd.to_numeric(view_df[col], errors="coerce").fillna(0.0)
 
+    view_df["is_active"] = view_df["saved_is_active"]
+
     rows = (
-        view_df[["sku", "name", "tea_cost", "package_cost", "label_cost", "packing_cost"]]
+        view_df[["sku", "name", "tea_cost", "package_cost", "label_cost", "packing_cost", "is_active"]]
         .sort_values(["sku"], ascending=[True])
         .to_dict("records")
     )
@@ -616,13 +688,14 @@ def update_unit_economics_products(*, company: str | None, rows: list[dict], db:
     )
     payload_df = pd.DataFrame(rows or [])
     if payload_df.empty:
-        payload_df = pd.DataFrame(columns=["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost"])
-    for col in ["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost"]:
+        payload_df = pd.DataFrame(columns=["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost", "is_active"])
+    for col in ["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost", "is_active"]:
         if col not in payload_df.columns:
-            payload_df[col] = ""
-    payload_df = payload_df[["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost"]].copy()
+            payload_df[col] = True if col == "is_active" else ""
+    payload_df = payload_df[["sku", "position", "tea_cost", "package_cost", "label_cost", "packing_cost", "is_active"]].copy()
     payload_df["sku"] = payload_df["sku"].astype(str).str.strip()
     payload_df["position"] = payload_df["position"].astype(str).str.strip()
+    payload_df["is_active"] = payload_df["is_active"].apply(_to_bool)
     for col in ["tea_cost", "package_cost", "label_cost", "packing_cost"]:
         payload_df[col] = pd.to_numeric(payload_df[col], errors="coerce").fillna(0.0)
 
@@ -643,7 +716,7 @@ def update_unit_economics_products(*, company: str | None, rows: list[dict], db:
     result_rows = (
         merged.sort_values(["sku"], ascending=[True])
         .rename(columns={"position": "name"})
-        [["sku", "name", "tea_cost", "package_cost", "label_cost", "packing_cost"]]
+        [["sku", "name", "tea_cost", "package_cost", "label_cost", "packing_cost", "is_active"]]
         .to_dict("records")
     )
     return {"company": company_name, "rows": result_rows, "saved_count": len(payload_df)}

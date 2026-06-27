@@ -7,6 +7,7 @@ type StocksControlsProps = {
   regionalOrderMin: number;
   regionalOrderTarget: number;
   positionFilter: string;
+  assortmentFilter: string;
   highlightLevels: string[];
   reviewMode: boolean;
 };
@@ -15,6 +16,7 @@ export function StocksControls({
   regionalOrderMin,
   regionalOrderTarget,
   positionFilter,
+  assortmentFilter,
   highlightLevels,
   reviewMode,
 }: StocksControlsProps) {
@@ -24,6 +26,7 @@ export function StocksControls({
   const [draftMin, setDraftMin] = useState(String(regionalOrderMin));
   const [draftTarget, setDraftTarget] = useState(String(regionalOrderTarget));
   const [draftPositionFilter, setDraftPositionFilter] = useState(positionFilter);
+  const [draftAssortmentFilter, setDraftAssortmentFilter] = useState(assortmentFilter);
   const [draftHighlightLevels, setDraftHighlightLevels] = useState<string[]>(highlightLevels);
   const [draftReviewMode, setDraftReviewMode] = useState(reviewMode);
 
@@ -43,6 +46,7 @@ export function StocksControls({
     params.set("stocks_regional_order_min", String(nextMin));
     params.set("stocks_regional_order_target", String(nextTarget));
     params.set("stocks_position_filter", draftPositionFilter);
+    params.set("stocks_assortment_filter", draftAssortmentFilter);
     if (draftHighlightLevels.length > 0) {
       params.set("stocks_highlight_levels", draftHighlightLevels.join(","));
     } else {
@@ -72,6 +76,17 @@ export function StocksControls({
           <option value="ALL">All</option>
           <option value="CORE">Core</option>
           <option value="ADDITIONAL">Additional</option>
+        </select>
+      </label>
+      <label>
+        <span>Assortment</span>
+        <select
+          value={draftAssortmentFilter}
+          onChange={(event) => setDraftAssortmentFilter(event.target.value)}
+        >
+          <option value="ALL">All</option>
+          <option value="ACTIVE">Active</option>
+          <option value="DISCONTINUED">Discontinued</option>
         </select>
       </label>
       <label>

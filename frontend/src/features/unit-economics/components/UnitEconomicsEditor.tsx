@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import { updateUnitEconomicsProducts } from "@/shared/api/client";
 import { UnitEconomicsProductRow } from "@/shared/api/types";
@@ -17,6 +17,7 @@ type EditableRow = {
   package_cost: string;
   label_cost: string;
   packing_cost: string;
+  is_active: boolean;
 };
 
 function toEditableRow(row: UnitEconomicsProductRow): EditableRow {
@@ -27,15 +28,20 @@ function toEditableRow(row: UnitEconomicsProductRow): EditableRow {
     package_cost: String(row.package_cost ?? 0),
     label_cost: String(row.label_cost ?? 0),
     packing_cost: String(row.packing_cost ?? 0),
+    is_active: row.is_active ?? true,
   };
 }
 
 export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps) {
-  const [draftRows, setDraftRows] = useState<EditableRow[]>(() => rows.slice(0, 6).map(toEditableRow));
+  const [draftRows, setDraftRows] = useState<EditableRow[]>(() => rows.map(toEditableRow));
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
 
-  function updateField(index: number, field: keyof EditableRow, value: string) {
+  useEffect(() => {
+    setDraftRows(rows.map(toEditableRow));
+  }, [rows]);
+
+  function updateField(index: number, field: keyof EditableRow, value: string | boolean) {
     setDraftRows((current) =>
       current.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)),
     );
@@ -69,6 +75,7 @@ export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps)
             package_cost: Number(row.package_cost),
             label_cost: Number(row.label_cost),
             packing_cost: Number(row.packing_cost),
+            is_active: row.is_active,
           })),
         },
         token,
@@ -89,53 +96,88 @@ export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps)
           <h3>Edit cost overrides</h3>
         </div>
       </div>
-      <form className="bid-form" onSubmit={handleSubmit}>
-        {draftRows.map((row, index) => (
-          <div className="list-row" key={row.sku}>
-            <div style={{ width: "100%" }}>
-              <strong>{row.sku}</strong>
-              <div className="bid-form">
-                <input
-                  type="text"
-                  value={row.position}
-                  onChange={(event) => updateField(index, "position", event.target.value)}
-                  placeholder="Name"
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  value={row.tea_cost}
-                  onChange={(event) => updateField(index, "tea_cost", event.target.value)}
-                  placeholder="Tea"
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  value={row.package_cost}
-                  onChange={(event) => updateField(index, "package_cost", event.target.value)}
-                  placeholder="Package"
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  value={row.label_cost}
-                  onChange={(event) => updateField(index, "label_cost", event.target.value)}
-                  placeholder="Label"
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  value={row.packing_cost}
-                  onChange={(event) => updateField(index, "packing_cost", event.target.value)}
-                  placeholder="Packing"
-                />
-              </div>
-            </div>
-          </div>
-        ))}
-        <button type="submit" disabled={saving}>
-          {saving ? "Saving..." : "Save overrides"}
-        </button>
+      <form onSubmit={handleSubmit}>
+        <div className="table-wrap unit-products-editor-wrap">
+          <table className="data-table unit-products-editor-table">
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Name</th>
+                <th>Tea</th>
+                <th>Package</th>
+                <th>Label</th>
+                <th>Packing</th>
+                <th>Discontinued</th>
+              </tr>
+            </thead>
+            <tbody>
+              {draftRows.map((row, index) => (
+                <tr className={row.is_active ? undefined : "unit-products-inactive"} key={row.sku}>
+                  <td>{row.sku}</td>
+                  <td>
+                    <input
+                      type="text"
+                      value={row.position}
+                      onChange={(event) => updateField(index, "position", event.target.value)}
+                      placeholder="Name"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={row.tea_cost}
+                      onChange={(event) => updateField(index, "tea_cost", event.target.value)}
+                      placeholder="Tea"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={row.package_cost}
+                      onChange={(event) => updateField(index, "package_cost", event.target.value)}
+                      placeholder="Package"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={row.label_cost}
+                      onChange={(event) => updateField(index, "label_cost", event.target.value)}
+                      placeholder="Label"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={row.packing_cost}
+                      onChange={(event) => updateField(index, "packing_cost", event.target.value)}
+                      placeholder="Packing"
+                    />
+                  </td>
+                  <td>
+                    <label className="unit-products-discontinued-check">
+                      <input
+                        type="checkbox"
+                        checked={!row.is_active}
+                        onChange={(event) => updateField(index, "is_active", !event.target.checked)}
+                      />
+                      <span>Out</span>
+                    </label>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="unit-products-editor-actions">
+          <button type="submit" className="stocks-primary-button" disabled={saving}>
+            {saving ? "Saving..." : "Save overrides"}
+          </button>
+        </div>
       </form>
       {status ? <p className="muted-copy">{status}</p> : null}
     </article>

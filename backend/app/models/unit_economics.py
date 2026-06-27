@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -23,5 +23,6 @@ class UnitEconomicsOverride(Base):
     package_cost: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     label_cost: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     packing_cost: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

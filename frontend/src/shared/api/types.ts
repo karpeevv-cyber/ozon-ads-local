@@ -291,6 +291,7 @@ export type StocksWorkspaceSettings = {
   regional_order_min: number;
   regional_order_target: number;
   position_filter: string;
+  assortment_filter: string;
 };
 
 export type StocksWorkspaceSummary = {
@@ -303,6 +304,7 @@ export type StocksWorkspaceSummary = {
 export type StocksWorkspaceTimings = {
   resolve_company_ms: number;
   stocks_cache_ms: number;
+  assortment_filter_ms: number;
   shipment_pairs_ms: number;
   shipment_rebuild_ms: number;
   shipment_city_totals_ms: number;
@@ -495,6 +497,7 @@ export type UnitEconomicsProductRow = {
   package_cost: number;
   label_cost: number;
   packing_cost: number;
+  is_active: boolean;
 };
 
 export type UnitEconomicsProducts = {
@@ -511,6 +514,7 @@ export type UnitEconomicsProductUpdateRow = {
   package_cost: number;
   label_cost: number;
   packing_cost: number;
+  is_active: boolean;
 };
 
 export type UnitEconomicsProductsUpdateResponse = {

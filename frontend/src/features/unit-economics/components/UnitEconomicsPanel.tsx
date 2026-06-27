@@ -9,6 +9,7 @@ type UnitEconomicsPanelProps = {
 export function UnitEconomicsPanel({ summary, products }: UnitEconomicsPanelProps) {
   const rows = summary.rows.slice(-5).reverse();
   const productRows = products.rows.slice(0, 4);
+  const discontinuedCount = products.rows.filter((row) => !row.is_active).length;
 
   return (
     <>
@@ -18,7 +19,9 @@ export function UnitEconomicsPanel({ summary, products }: UnitEconomicsPanelProp
             <p className="eyebrow">Unit Economics</p>
             <h3>Daily EBITDA and cost base</h3>
           </div>
-          <span className="status-badge">{products.rows.length} SKUs</span>
+          <span className="status-badge">
+            {products.rows.length} SKUs / {discontinuedCount} out
+          </span>
         </div>
         <p className="muted-copy">
           Revenue total: {summary.totals.revenue ?? 0} / EBITDA total: {summary.totals.ebitda_total ?? 0}
@@ -62,6 +65,7 @@ export function UnitEconomicsPanel({ summary, products }: UnitEconomicsPanelProp
                   <p>
                     Tea {row.tea_cost} / Package {row.package_cost} / Label {row.label_cost} / Packing {row.packing_cost}
                   </p>
+                  {!row.is_active ? <p>Discontinued</p> : null}
                 </div>
               </div>
             ))}

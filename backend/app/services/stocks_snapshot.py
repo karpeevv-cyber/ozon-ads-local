@@ -32,6 +32,7 @@ from app.services.shipment_history import (
     load_shipment_transit_map,
     rebuild_shipment_history_from_api,
 )
+from app.services.unit_economics import load_inactive_unit_economics_skus
 
 logger = logging.getLogger("uvicorn.error")
 MOSCOW_TZ = ZoneInfo("Europe/Moscow")
@@ -156,6 +157,20 @@ def _position_filter_rows(rows: list[dict], position_filter: str) -> list[dict]:
         if position_filter == "ADDITIONAL" and is_additional:
             out.append(row)
         if position_filter == "CORE" and not is_additional:
+            out.append(row)
+    return out
+
+
+def _assortment_filter_rows(rows: list[dict], inactive_skus: set[str], assortment_filter: str) -> list[dict]:
+    if assortment_filter == "ALL":
+        return rows
+    out: list[dict] = []
+    for row in rows:
+        sku = str(row.get("sku") or "").strip()
+        is_inactive = sku in inactive_skus
+        if assortment_filter == "DISCONTINUED" and is_inactive:
+            out.append(row)
+        if assortment_filter == "ACTIVE" and not is_inactive:
             out.append(row)
     return out
 
@@ -396,6 +411,7 @@ def get_stocks_workspace(
     regional_order_min: int = 2,
     regional_order_target: int = 5,
     position_filter: str = "ALL",
+    assortment_filter: str = "ALL",
     force_refresh: bool = False,
     db: Session | None = None,
 ) -> dict:
@@ -416,6 +432,9 @@ def get_stocks_workspace(
     normalized_position_filter = str(position_filter or "ALL").upper()
     if normalized_position_filter not in {"ALL", "CORE", "ADDITIONAL"}:
         normalized_position_filter = "ALL"
+    normalized_assortment_filter = str(assortment_filter or "ALL").upper()
+    if normalized_assortment_filter not in {"ALL", "ACTIVE", "DISCONTINUED"}:
+        normalized_assortment_filter = "ALL"
 
     regional_order_min = max(0, int(regional_order_min or 0))
     regional_order_target = max(regional_order_min, int(regional_order_target or 0))
@@ -431,6 +450,7 @@ def get_stocks_workspace(
                 "regional_order_min": regional_order_min,
                 "regional_order_target": regional_order_target,
                 "position_filter": normalized_position_filter,
+                "assortment_filter": normalized_assortment_filter,
             },
             "summary": {
                 "article_count": 0,
@@ -451,6 +471,17 @@ def get_stocks_workspace(
     )
     checkpoint = mark("stocks_cache_ms", checkpoint)
     filtered_rows = _position_filter_rows(base_rows, normalized_position_filter)
+    if normalized_assortment_filter != "ALL":
+        assortment_checkpoint = perf_counter()
+        inactive_skus = load_inactive_unit_economics_skus(
+            company_name=company_name,
+            seller_client_id=seller_client_id,
+            db=db,
+        )
+        filtered_rows = _assortment_filter_rows(filtered_rows, inactive_skus, normalized_assortment_filter)
+        timings["assortment_filter_ms"] = round((perf_counter() - assortment_checkpoint) * 1000, 2)
+    else:
+        timings["assortment_filter_ms"] = 0
 
     if force_refresh and db is not None:
         try:
@@ -515,6 +546,7 @@ def get_stocks_workspace(
                 "regional_order_min": regional_order_min,
                 "regional_order_target": regional_order_target,
                 "position_filter": normalized_position_filter,
+                "assortment_filter": normalized_assortment_filter,
             },
             "summary": {
                 "article_count": 0,
@@ -789,6 +821,7 @@ def get_stocks_workspace(
             "regional_order_min": regional_order_min,
             "regional_order_target": regional_order_target,
             "position_filter": normalized_position_filter,
+            "assortment_filter": normalized_assortment_filter,
         },
         "summary": {
             "article_count": len(matrix_rows),

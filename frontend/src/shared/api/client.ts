@@ -283,6 +283,7 @@ export function getStocksWorkspace(params: {
   regionalOrderMin?: number;
   regionalOrderTarget?: number;
   positionFilter?: string;
+  assortmentFilter?: string;
   forceRefresh?: boolean;
 }): Promise<StocksWorkspace> {
   const search = new URLSearchParams();
@@ -303,6 +304,9 @@ export function getStocksWorkspace(params: {
   }
   if (params.positionFilter) {
     search.set("position_filter", params.positionFilter);
+  }
+  if (params.assortmentFilter) {
+    search.set("assortment_filter", params.assortmentFilter);
   }
   if (params.forceRefresh) {
     search.set("force_refresh", "1");
