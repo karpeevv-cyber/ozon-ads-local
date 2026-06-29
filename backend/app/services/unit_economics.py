@@ -541,18 +541,21 @@ def _load_all_product_ids(*, seller_client_id: str, seller_api_key: str) -> list
     return list(dict.fromkeys(out))
 
 
-def _load_sku_title_map(*, seller_client_id: str, seller_api_key: str) -> dict[str, str]:
+def _load_sku_product_map(*, seller_client_id: str, seller_api_key: str) -> dict[str, dict[str, str]]:
     product_ids = _load_all_product_ids(seller_client_id=seller_client_id, seller_api_key=seller_api_key)
     if not product_ids:
         return {}
-    out: dict[str, str] = {}
+    out: dict[str, dict[str, str]] = {}
     for i in range(0, len(product_ids), 1000):
         batch = product_ids[i : i + 1000]
         response = seller_product_info_list(product_ids=batch, client_id=seller_client_id, api_key=seller_api_key)
         for item in response.get("items", []) or []:
             sku = item.get("sku")
             if sku is not None:
-                out[str(sku)] = str(item.get("name") or item.get("offer_id") or "").strip()
+                out[str(sku)] = {
+                    "name": str(item.get("name") or item.get("offer_id") or "").strip(),
+                    "article": str(item.get("offer_id") or "").strip(),
+                }
     return out
 
 
@@ -636,7 +639,7 @@ def get_unit_economics_products(*, company: str | None, date_from: str, date_to:
         return {"company": company_name, "date_from": date_from, "date_to": date_to, "rows": []}
 
     sales_df = _load_sales_by_sku(date_from, date_to, seller_client_id=seller_client_id, seller_api_key=seller_api_key)
-    sku_title_map = _load_sku_title_map(seller_client_id=seller_client_id, seller_api_key=seller_api_key)
+    sku_product_map = _load_sku_product_map(seller_client_id=seller_client_id, seller_api_key=seller_api_key)
     overrides_df = _load_saved_unit_cost_overrides(
         company_name=company_name,
         seller_client_id=seller_client_id,
@@ -654,7 +657,8 @@ def get_unit_economics_products(*, company: str | None, date_from: str, date_to:
         view_df["saved_name"] = ""
         view_df["saved_is_active"] = True
 
-    view_df["ozon_name"] = view_df["sku"].astype(str).map(sku_title_map).fillna("").astype(str).str.strip()
+    view_df["ozon_name"] = view_df["sku"].astype(str).map(lambda sku: (sku_product_map.get(str(sku)) or {}).get("name", "")).fillna("").astype(str).str.strip()
+    view_df["article"] = view_df["sku"].astype(str).map(lambda sku: (sku_product_map.get(str(sku)) or {}).get("article", "")).fillna("").astype(str).str.strip()
     view_df["sales_name"] = view_df["sales_name"].fillna("").astype(str).str.strip()
     view_df["saved_name"] = view_df["saved_name"].fillna("").astype(str).str.strip()
     view_df["sheet_title"] = view_df["sheet_title"].fillna("").astype(str).str.strip()
@@ -663,6 +667,9 @@ def get_unit_economics_products(*, company: str | None, date_from: str, date_to:
     for source_col in ["sales_name", "saved_name", "sheet_title"]:
         missing = view_df["name"].eq("")
         view_df.loc[missing, "name"] = view_df.loc[missing, source_col]
+    view_df.loc[view_df["article"].eq(""), "article"] = view_df["saved_name"]
+    view_df.loc[view_df["article"].astype(str).str.strip().eq(""), "article"] = view_df["sheet_title"]
+    view_df.loc[view_df["article"].astype(str).str.strip().eq(""), "article"] = view_df["sku"].astype(str)
 
     for col in ["tea_cost", "package_cost", "label_cost", "packing_cost"]:
         view_df[col] = pd.to_numeric(view_df[col], errors="coerce").fillna(0.0)
@@ -670,8 +677,8 @@ def get_unit_economics_products(*, company: str | None, date_from: str, date_to:
     view_df["is_active"] = view_df["saved_is_active"]
 
     rows = (
-        view_df[["sku", "name", "tea_cost", "package_cost", "label_cost", "packing_cost", "is_active"]]
-        .sort_values(["sku"], ascending=[True])
+        view_df[["sku", "article", "name", "tea_cost", "package_cost", "label_cost", "packing_cost", "is_active"]]
+        .sort_values(["article", "sku"], ascending=[True, True])
         .to_dict("records")
     )
     return {"company": company_name, "date_from": date_from, "date_to": date_to, "rows": rows}
@@ -716,7 +723,8 @@ def update_unit_economics_products(*, company: str | None, rows: list[dict], db:
     result_rows = (
         merged.sort_values(["sku"], ascending=[True])
         .rename(columns={"position": "name"})
-        [["sku", "name", "tea_cost", "package_cost", "label_cost", "packing_cost", "is_active"]]
+        .assign(article="")
+        [["sku", "article", "name", "tea_cost", "package_cost", "label_cost", "packing_cost", "is_active"]]
         .to_dict("records")
     )
     return {"company": company_name, "rows": result_rows, "saved_count": len(payload_df)}

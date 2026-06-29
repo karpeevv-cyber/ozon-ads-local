@@ -35,6 +35,7 @@ class UnitEconomicsSummaryResponse(BaseModel):
 
 class UnitEconomicsProductRow(BaseModel):
     sku: str
+    article: str = ""
     name: str
     tea_cost: float
     package_cost: float

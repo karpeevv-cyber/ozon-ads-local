@@ -492,6 +492,7 @@ export type UnitEconomicsSummary = {
 
 export type UnitEconomicsProductRow = {
   sku: string;
+  article: string;
   name: string;
   tea_cost: number;
   package_cost: number;

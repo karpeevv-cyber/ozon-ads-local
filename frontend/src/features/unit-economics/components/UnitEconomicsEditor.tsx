@@ -12,6 +12,7 @@ type UnitEconomicsEditorProps = {
 
 type EditableRow = {
   sku: string;
+  article: string;
   position: string;
   tea_cost: string;
   package_cost: string;
@@ -25,6 +26,7 @@ type ProductShowFilter = "ALL" | "ACTIVE" | "DISCONTINUED";
 function toEditableRow(row: UnitEconomicsProductRow): EditableRow {
   return {
     sku: row.sku,
+    article: row.article || row.name || row.sku,
     position: row.name,
     tea_cost: String(row.tea_cost ?? 0),
     package_cost: String(row.package_cost ?? 0),
@@ -34,14 +36,32 @@ function toEditableRow(row: UnitEconomicsProductRow): EditableRow {
   };
 }
 
+function parseCost(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function totalCost(row: EditableRow): number {
+  return parseCost(row.tea_cost) + parseCost(row.package_cost) + parseCost(row.label_cost) + parseCost(row.packing_cost);
+}
+
+function formatCost(value: number): string {
+  return new Intl.NumberFormat("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps) {
   const [draftRows, setDraftRows] = useState<EditableRow[]>(() => rows.map(toEditableRow));
   const [showFilter, setShowFilter] = useState<ProductShowFilter>("ALL");
+  const [isEditing, setIsEditing] = useState(false);
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setDraftRows(rows.map(toEditableRow));
+    setIsEditing(false);
   }, [rows]);
 
   function updateField(index: number, field: keyof EditableRow, value: string | boolean) {
@@ -62,33 +82,33 @@ export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps)
             return !row.is_active;
           }
           return true;
+        })
+        .sort((left, right) => {
+          const leftArticle = left.row.article || left.row.position || left.row.sku;
+          const rightArticle = right.row.article || right.row.position || right.row.sku;
+          return leftArticle.localeCompare(rightArticle, "ru");
         }),
     [draftRows, showFilter],
   );
 
   const discontinuedCount = useMemo(() => draftRows.filter((row) => !row.is_active).length, [draftRows]);
 
-  function parseCost(value: string): number {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
-  function totalCost(row: EditableRow): number {
-    return parseCost(row.tea_cost) + parseCost(row.package_cost) + parseCost(row.label_cost) + parseCost(row.packing_cost);
-  }
-
-  function formatCost(value: number): string {
-    return new Intl.NumberFormat("ru-RU", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  }
-
   function exportCsv() {
-    const header = ["sku", "name", "tea_cost", "package_cost", "label_cost", "packing_cost", "total_cost", "status"];
+    const header = [
+      "sku",
+      "article",
+      "name",
+      "tea_cost",
+      "package_cost",
+      "label_cost",
+      "packing_cost",
+      "total_cost",
+      "status",
+    ];
     const lines = visibleRows.map(({ row }) =>
       [
         row.sku,
+        row.article,
         row.position,
         row.tea_cost,
         row.package_cost,
@@ -119,6 +139,9 @@ export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!isEditing) {
+      return;
+    }
     const token = readStoredToken();
     if (!token) {
       setStatus("Authentication token is missing");
@@ -143,6 +166,7 @@ export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps)
         token,
       );
       setStatus(`Saved ${response.saved_count} rows`);
+      setIsEditing(false);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Failed to save unit economics rows");
     } finally {
@@ -169,7 +193,18 @@ export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps)
           <button type="button" className="stocks-secondary-button" onClick={exportCsv}>
             Export
           </button>
-          <button type="submit" className="stocks-primary-button" form="unit-products-editor-form" disabled={saving}>
+          <button
+            type="button"
+            className="stocks-secondary-button"
+            disabled={saving || isEditing}
+            onClick={() => {
+              setStatus("");
+              setIsEditing(true);
+            }}
+          >
+            Edit
+          </button>
+          <button type="submit" className="stocks-primary-button" form="unit-products-editor-form" disabled={saving || !isEditing}>
             {saving ? "Saving..." : "Save changes"}
           </button>
           <span className="status-badge">
@@ -183,7 +218,7 @@ export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps)
           <table className="data-table unit-products-editor-table">
             <thead>
               <tr>
-                <th>Name</th>
+                <th>Article</th>
                 <th>Tea</th>
                 <th>Package</th>
                 <th>Label</th>
@@ -203,12 +238,7 @@ export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps)
               {visibleRows.map(({ row, index }) => (
                 <tr className={row.is_active ? undefined : "unit-products-inactive"} key={row.sku}>
                   <td className="unit-product-name-cell">
-                    <input
-                      type="text"
-                      value={row.position}
-                      onChange={(event) => updateField(index, "position", event.target.value)}
-                      placeholder="Name"
-                    />
+                    <strong>{row.article || row.position || row.sku}</strong>
                     <span>{row.sku}</span>
                   </td>
                   <td>
@@ -216,6 +246,7 @@ export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps)
                       type="number"
                       step="0.01"
                       value={row.tea_cost}
+                      disabled={!isEditing || saving}
                       onChange={(event) => updateField(index, "tea_cost", event.target.value)}
                       placeholder="Tea"
                     />
@@ -225,6 +256,7 @@ export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps)
                       type="number"
                       step="0.01"
                       value={row.package_cost}
+                      disabled={!isEditing || saving}
                       onChange={(event) => updateField(index, "package_cost", event.target.value)}
                       placeholder="Package"
                     />
@@ -234,6 +266,7 @@ export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps)
                       type="number"
                       step="0.01"
                       value={row.label_cost}
+                      disabled={!isEditing || saving}
                       onChange={(event) => updateField(index, "label_cost", event.target.value)}
                       placeholder="Label"
                     />
@@ -243,6 +276,7 @@ export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps)
                       type="number"
                       step="0.01"
                       value={row.packing_cost}
+                      disabled={!isEditing || saving}
                       onChange={(event) => updateField(index, "packing_cost", event.target.value)}
                       placeholder="Packing"
                     />
@@ -252,6 +286,7 @@ export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps)
                     <select
                       className={row.is_active ? "unit-product-status-select" : "unit-product-status-select unit-product-status-out"}
                       value={row.is_active ? "ACTIVE" : "DISCONTINUED"}
+                      disabled={!isEditing || saving}
                       onChange={(event) => updateField(index, "is_active", event.target.value === "ACTIVE")}
                     >
                       <option value="ACTIVE">Active</option>
