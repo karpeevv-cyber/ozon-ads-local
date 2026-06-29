@@ -160,56 +160,7 @@ function UnitEconomicsProductsPanel({
 }: {
   products: Awaited<ReturnType<typeof getUnitEconomicsProducts>>;
 }) {
-  return (
-    <>
-      <article className="panel-card panel-card-wide section-card">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">Unit economics products</p>
-            <h3>Editable SKU cost matrix</h3>
-          </div>
-          <span className="status-badge">{products.rows.length} sku</span>
-        </div>
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>SKU</th>
-                <th>Name</th>
-                <th>Tea</th>
-                <th>Package</th>
-                <th>Label</th>
-                <th>Packing</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.rows.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="empty-cell">
-                    No unit economics products loaded yet.
-                  </td>
-                </tr>
-              ) : (
-                products.rows.map((row) => (
-                  <tr key={row.sku}>
-                    <td>{row.sku}</td>
-                    <td>{row.name || row.sku}</td>
-                    <td>{row.tea_cost}</td>
-                    <td>{row.package_cost}</td>
-                    <td>{row.label_cost}</td>
-                    <td>{row.packing_cost}</td>
-                    <td>{row.is_active ? "Active" : "Discontinued"}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </article>
-      <UnitEconomicsEditor company={products.company} rows={products.rows} />
-    </>
-  );
+  return <UnitEconomicsEditor company={products.company} rows={products.rows} />;
 }
 
 async function renderTabContent(params: {

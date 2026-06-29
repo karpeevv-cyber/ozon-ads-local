@@ -818,50 +818,102 @@ a {
   max-height: 620px;
   border: 1px solid var(--line);
   border-radius: 18px;
+  background: rgba(255, 255, 255, 0.32);
 }
 
 .unit-products-editor-table th,
 .unit-products-editor-table td {
-  padding: 9px 10px;
+  padding: 12px 10px;
   vertical-align: middle;
 }
 
+.unit-products-editor-table {
+  min-width: 980px;
+}
+
+.unit-products-editor-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(247, 239, 229, 0.96);
+}
+
 .unit-products-editor-table input[type="text"],
-.unit-products-editor-table input[type="number"] {
+.unit-products-editor-table input[type="number"],
+.unit-product-status-select,
+.unit-products-show-filter select {
   width: 100%;
-  min-width: 86px;
-  padding: 8px 9px;
+  padding: 9px 10px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.78);
   color: var(--ink);
   font: inherit;
 }
 
+.unit-products-editor-table input[type="text"] {
+  min-width: 320px;
+}
+
 .unit-products-editor-table input[type="number"] {
-  min-width: 74px;
+  min-width: 96px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .unit-products-inactive {
   background: rgba(214, 102, 64, 0.08);
 }
 
-.unit-products-discontinued-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--muted);
-}
-
-.unit-products-discontinued-check input {
-  width: 16px;
-  height: 16px;
-}
-
-.unit-products-editor-actions {
+.unit-products-header-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
-  margin-top: 12px;
+  align-items: center;
+  gap: 10px;
+}
+
+.unit-products-show-filter {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.unit-products-show-filter select {
+  min-width: 160px;
+  padding: 8px 10px;
+}
+
+.unit-product-name-cell {
+  min-width: 360px;
+}
+
+.unit-product-name-cell span {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  letter-spacing: 0.03em;
+}
+
+.unit-product-total-cell {
+  min-width: 118px;
+  text-align: right !important;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.unit-product-status-select {
+  min-width: 170px;
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.unit-product-status-out {
+  color: #b64538;
+  border-color: rgba(182, 69, 56, 0.28);
+  background: rgba(255, 245, 242, 0.82);
 }
 
 .dashboard-grid {

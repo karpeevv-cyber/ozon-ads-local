@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { updateUnitEconomicsProducts } from "@/shared/api/client";
 import { UnitEconomicsProductRow } from "@/shared/api/types";
@@ -20,6 +20,8 @@ type EditableRow = {
   is_active: boolean;
 };
 
+type ProductShowFilter = "ALL" | "ACTIVE" | "DISCONTINUED";
+
 function toEditableRow(row: UnitEconomicsProductRow): EditableRow {
   return {
     sku: row.sku,
@@ -34,6 +36,7 @@ function toEditableRow(row: UnitEconomicsProductRow): EditableRow {
 
 export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps) {
   const [draftRows, setDraftRows] = useState<EditableRow[]>(() => rows.map(toEditableRow));
+  const [showFilter, setShowFilter] = useState<ProductShowFilter>("ALL");
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -45,6 +48,65 @@ export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps)
     setDraftRows((current) =>
       current.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)),
     );
+  }
+
+  const visibleRows = useMemo(
+    () =>
+      draftRows
+        .map((row, index) => ({ row, index }))
+        .filter(({ row }) => {
+          if (showFilter === "ACTIVE") {
+            return row.is_active;
+          }
+          if (showFilter === "DISCONTINUED") {
+            return !row.is_active;
+          }
+          return true;
+        }),
+    [draftRows, showFilter],
+  );
+
+  const discontinuedCount = useMemo(() => draftRows.filter((row) => !row.is_active).length, [draftRows]);
+
+  function parseCost(value: string): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function totalCost(row: EditableRow): number {
+    return parseCost(row.tea_cost) + parseCost(row.package_cost) + parseCost(row.label_cost) + parseCost(row.packing_cost);
+  }
+
+  function formatCost(value: number): string {
+    return new Intl.NumberFormat("ru-RU", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  }
+
+  function exportCsv() {
+    const header = ["sku", "name", "tea_cost", "package_cost", "label_cost", "packing_cost", "total_cost", "status"];
+    const lines = visibleRows.map(({ row }) =>
+      [
+        row.sku,
+        row.position,
+        row.tea_cost,
+        row.package_cost,
+        row.label_cost,
+        row.packing_cost,
+        totalCost(row).toFixed(2),
+        row.is_active ? "active" : "discontinued",
+      ]
+        .map((value) => `"${String(value).replaceAll('"', '""')}"`)
+        .join(","),
+    );
+    const blob = new Blob([[header.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `unit-economics-products-${company}-${showFilter.toLowerCase()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   function readStoredToken(): string | null {
@@ -92,35 +154,62 @@ export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps)
     <article className="panel-card panel-card-wide">
       <div className="panel-header">
         <div>
-          <p className="eyebrow">Unit Economics</p>
-          <h3>Edit cost overrides</h3>
+          <p className="eyebrow">Unit Economics Products</p>
+          <h3>Editable SKU cost matrix</h3>
+        </div>
+        <div className="unit-products-header-actions">
+          <label className="unit-products-show-filter">
+            <span>Show</span>
+            <select value={showFilter} onChange={(event) => setShowFilter(event.target.value as ProductShowFilter)}>
+              <option value="ALL">All</option>
+              <option value="ACTIVE">Active</option>
+              <option value="DISCONTINUED">Out of assortment</option>
+            </select>
+          </label>
+          <button type="button" className="stocks-secondary-button" onClick={exportCsv}>
+            Export
+          </button>
+          <button type="submit" className="stocks-primary-button" form="unit-products-editor-form" disabled={saving}>
+            {saving ? "Saving..." : "Save changes"}
+          </button>
+          <span className="status-badge">
+            {visibleRows.length} SKU
+            {discontinuedCount ? ` / ${discontinuedCount} out` : ""}
+          </span>
         </div>
       </div>
-      <form onSubmit={handleSubmit}>
+      <form id="unit-products-editor-form" onSubmit={handleSubmit}>
         <div className="table-wrap unit-products-editor-wrap">
           <table className="data-table unit-products-editor-table">
             <thead>
               <tr>
-                <th>SKU</th>
                 <th>Name</th>
                 <th>Tea</th>
                 <th>Package</th>
                 <th>Label</th>
                 <th>Packing</th>
-                <th>Discontinued</th>
+                <th>Total cost</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              {draftRows.map((row, index) => (
+              {visibleRows.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="empty-cell">
+                    No products matched the current filter.
+                  </td>
+                </tr>
+              ) : null}
+              {visibleRows.map(({ row, index }) => (
                 <tr className={row.is_active ? undefined : "unit-products-inactive"} key={row.sku}>
-                  <td>{row.sku}</td>
-                  <td>
+                  <td className="unit-product-name-cell">
                     <input
                       type="text"
                       value={row.position}
                       onChange={(event) => updateField(index, "position", event.target.value)}
                       placeholder="Name"
                     />
+                    <span>{row.sku}</span>
                   </td>
                   <td>
                     <input
@@ -158,25 +247,21 @@ export function UnitEconomicsEditor({ company, rows }: UnitEconomicsEditorProps)
                       placeholder="Packing"
                     />
                   </td>
+                  <td className="unit-product-total-cell">{formatCost(totalCost(row))}</td>
                   <td>
-                    <label className="unit-products-discontinued-check">
-                      <input
-                        type="checkbox"
-                        checked={!row.is_active}
-                        onChange={(event) => updateField(index, "is_active", !event.target.checked)}
-                      />
-                      <span>Out</span>
-                    </label>
+                    <select
+                      className={row.is_active ? "unit-product-status-select" : "unit-product-status-select unit-product-status-out"}
+                      value={row.is_active ? "ACTIVE" : "DISCONTINUED"}
+                      onChange={(event) => updateField(index, "is_active", event.target.value === "ACTIVE")}
+                    >
+                      <option value="ACTIVE">Active</option>
+                      <option value="DISCONTINUED">Out of assortment</option>
+                    </select>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-        <div className="unit-products-editor-actions">
-          <button type="submit" className="stocks-primary-button" disabled={saving}>
-            {saving ? "Saving..." : "Save overrides"}
-          </button>
         </div>
       </form>
       {status ? <p className="muted-copy">{status}</p> : null}
