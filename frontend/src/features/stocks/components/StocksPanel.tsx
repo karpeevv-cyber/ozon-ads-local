@@ -139,7 +139,7 @@ export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPa
 
         <StocksControls
           regionalOrderMin={workspace.settings.regional_order_min}
-          regionalOrderTarget={workspace.settings.regional_order_target}
+          minimumSupply={workspace.settings.minimum_supply}
           positionFilter={workspace.settings.position_filter}
           assortmentFilter={workspace.settings.assortment_filter}
           highlightLevels={highlightLevels}

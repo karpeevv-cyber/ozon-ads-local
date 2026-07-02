@@ -38,6 +38,7 @@ type HomePageProps = {
     tab?: string;
     stocks_regional_order_min?: string;
     stocks_regional_order_target?: string;
+    stocks_minimum_supply?: string;
     stocks_position_filter?: string;
     stocks_assortment_filter?: string;
     stocks_highlight_levels?: string;
@@ -170,7 +171,7 @@ async function renderTabContent(params: {
   dateTo: string;
   companies: CompanyConfig[];
   stocksRegionalOrderMin: number;
-  stocksRegionalOrderTarget: number;
+  stocksMinimumSupply: number;
   stocksPositionFilter: string;
   stocksAssortmentFilter: string;
   stocksHighlightLevels: string[];
@@ -187,7 +188,7 @@ async function renderTabContent(params: {
     dateTo,
     companies,
     stocksRegionalOrderMin,
-    stocksRegionalOrderTarget,
+    stocksMinimumSupply,
     stocksPositionFilter,
     stocksAssortmentFilter,
     stocksHighlightLevels,
@@ -283,7 +284,7 @@ async function renderTabContent(params: {
         dateFrom,
         dateTo,
         regionalOrderMin: stocksRegionalOrderMin,
-        regionalOrderTarget: stocksRegionalOrderTarget,
+        minimumSupply: stocksMinimumSupply,
         positionFilter: stocksPositionFilter,
         assortmentFilter: stocksAssortmentFilter,
         forceRefresh: stocksRefresh,
@@ -350,7 +351,7 @@ async function TabContent(params: {
   dateTo: string;
   companies: CompanyConfig[];
   stocksRegionalOrderMin: number;
-  stocksRegionalOrderTarget: number;
+  stocksMinimumSupply: number;
   stocksPositionFilter: string;
   stocksAssortmentFilter: string;
   stocksHighlightLevels: string[];
@@ -402,9 +403,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const dateTo = resolvedSearchParams.date_to || defaultRange.dateTo;
   const activeTab = resolveTab(resolvedSearchParams.tab);
   const stocksRegionalOrderMin = Math.max(0, Number.parseInt(resolvedSearchParams.stocks_regional_order_min || "2", 10) || 2);
-  const stocksRegionalOrderTarget = Math.max(
-    stocksRegionalOrderMin,
-    Number.parseInt(resolvedSearchParams.stocks_regional_order_target || "5", 10) || 5,
+  const stocksMinimumSupply = Math.max(
+    0,
+    Number.parseInt(
+      resolvedSearchParams.stocks_minimum_supply || resolvedSearchParams.stocks_regional_order_target || "5",
+      10,
+    ) || 5,
   );
   const stocksPositionFilter = ["ALL", "CORE", "ADDITIONAL"].includes(
     String(resolvedSearchParams.stocks_position_filter || "").toUpperCase(),
@@ -423,7 +427,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     .filter((value, index, arr) => allowedHighlightLevels.has(value) && arr.indexOf(value) === index);
   const stocksReviewMode = String(resolvedSearchParams.stocks_review_mode || "1") !== "0";
   const storageRefresh = Boolean(resolvedSearchParams.storage_refresh);
-  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}:${stocksRegionalOrderMin}:${stocksRegionalOrderTarget}:${stocksPositionFilter}:${stocksAssortmentFilter}:${stocksHighlightLevels.join("|")}:${stocksReviewMode ? "1" : "0"}:${resolvedSearchParams.main_refresh || ""}:${resolvedSearchParams.stocks_refresh || ""}:${resolvedSearchParams.storage_refresh || ""}:${resolvedSearchParams.current_campaign_id || ""}`;
+  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}:${stocksRegionalOrderMin}:${stocksMinimumSupply}:${stocksPositionFilter}:${stocksAssortmentFilter}:${stocksHighlightLevels.join("|")}:${stocksReviewMode ? "1" : "0"}:${resolvedSearchParams.main_refresh || ""}:${resolvedSearchParams.stocks_refresh || ""}:${resolvedSearchParams.storage_refresh || ""}:${resolvedSearchParams.current_campaign_id || ""}`;
   return (
     <AppShell
       filters={
@@ -443,7 +447,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           dateTo={dateTo}
           companies={companies}
           stocksRegionalOrderMin={stocksRegionalOrderMin}
-          stocksRegionalOrderTarget={stocksRegionalOrderTarget}
+          stocksMinimumSupply={stocksMinimumSupply}
           stocksPositionFilter={stocksPositionFilter}
           stocksAssortmentFilter={stocksAssortmentFilter}
           stocksHighlightLevels={stocksHighlightLevels}

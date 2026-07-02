@@ -5,7 +5,7 @@ import { FormEvent, useState, useTransition } from "react";
 
 type StocksControlsProps = {
   regionalOrderMin: number;
-  regionalOrderTarget: number;
+  minimumSupply: number;
   positionFilter: string;
   assortmentFilter: string;
   highlightLevels: string[];
@@ -14,7 +14,7 @@ type StocksControlsProps = {
 
 export function StocksControls({
   regionalOrderMin,
-  regionalOrderTarget,
+  minimumSupply,
   positionFilter,
   assortmentFilter,
   highlightLevels,
@@ -24,7 +24,7 @@ export function StocksControls({
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
   const [draftMin, setDraftMin] = useState(String(regionalOrderMin));
-  const [draftTarget, setDraftTarget] = useState(String(regionalOrderTarget));
+  const [draftMinimumSupply, setDraftMinimumSupply] = useState(String(minimumSupply));
   const [draftPositionFilter, setDraftPositionFilter] = useState(positionFilter);
   const [draftAssortmentFilter, setDraftAssortmentFilter] = useState(assortmentFilter);
   const [draftHighlightLevels, setDraftHighlightLevels] = useState<string[]>(highlightLevels);
@@ -42,9 +42,10 @@ export function StocksControls({
   function buildParams() {
     const params = new URLSearchParams(searchParams.toString());
     const nextMin = Math.max(0, Number.parseInt(draftMin || "0", 10) || 0);
-    const nextTarget = Math.max(nextMin, Number.parseInt(draftTarget || "0", 10) || 0);
+    const nextMinimumSupply = Math.max(0, Number.parseInt(draftMinimumSupply || "0", 10) || 0);
     params.set("stocks_regional_order_min", String(nextMin));
-    params.set("stocks_regional_order_target", String(nextTarget));
+    params.set("stocks_minimum_supply", String(nextMinimumSupply));
+    params.delete("stocks_regional_order_target");
     params.set("stocks_position_filter", draftPositionFilter);
     params.set("stocks_assortment_filter", draftAssortmentFilter);
     if (draftHighlightLevels.length > 0) {
@@ -100,13 +101,13 @@ export function StocksControls({
         />
       </label>
       <label>
-        <span>Regional target</span>
+        <span>Minimum supply</span>
         <input
           type="number"
           min="0"
           step="1"
-          value={draftTarget}
-          onChange={(event) => setDraftTarget(event.target.value)}
+          value={draftMinimumSupply}
+          onChange={(event) => setDraftMinimumSupply(event.target.value)}
         />
       </label>
       <fieldset className="stocks-highlight-group">

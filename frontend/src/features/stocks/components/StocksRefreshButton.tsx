@@ -17,7 +17,7 @@ export function StocksRefreshButton() {
     const params = new URLSearchParams();
     const company = searchParams.get("company");
     const regionalOrderMin = searchParams.get("stocks_regional_order_min");
-    const regionalOrderTarget = searchParams.get("stocks_regional_order_target");
+    const minimumSupply = searchParams.get("stocks_minimum_supply") || searchParams.get("stocks_regional_order_target");
     const positionFilter = searchParams.get("stocks_position_filter");
     const assortmentFilter = searchParams.get("stocks_assortment_filter");
     if (company) {
@@ -26,8 +26,8 @@ export function StocksRefreshButton() {
     if (regionalOrderMin) {
       params.set("regional_order_min", regionalOrderMin);
     }
-    if (regionalOrderTarget) {
-      params.set("regional_order_target", regionalOrderTarget);
+    if (minimumSupply) {
+      params.set("minimum_supply", minimumSupply);
     }
     if (positionFilter) {
       params.set("position_filter", positionFilter);

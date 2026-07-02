@@ -289,7 +289,7 @@ export type StocksSnapshot = {
 
 export type StocksWorkspaceSettings = {
   regional_order_min: number;
-  regional_order_target: number;
+  minimum_supply: number;
   position_filter: string;
   assortment_filter: string;
 };

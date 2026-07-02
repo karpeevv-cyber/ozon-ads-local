@@ -22,7 +22,7 @@ class StocksSnapshotResponse(BaseModel):
 
 class StocksWorkspaceSettingsResponse(BaseModel):
     regional_order_min: int
-    regional_order_target: int
+    minimum_supply: int
     position_filter: str
     assortment_filter: str
 

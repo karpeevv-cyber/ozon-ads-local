@@ -433,7 +433,7 @@ def get_stocks_workspace(
     date_from: str | None = None,
     date_to: str | None = None,
     regional_order_min: int = 2,
-    regional_order_target: int = 5,
+    minimum_supply: int = 5,
     position_filter: str = "ALL",
     assortment_filter: str = "ALL",
     force_refresh: bool = False,
@@ -461,7 +461,7 @@ def get_stocks_workspace(
         normalized_assortment_filter = "ALL"
 
     regional_order_min = max(0, int(regional_order_min or 0))
-    regional_order_target = max(regional_order_min, int(regional_order_target or 0))
+    minimum_supply = max(0, int(minimum_supply or 0))
 
     if not seller_client_id or not seller_api_key:
         return {
@@ -472,7 +472,7 @@ def get_stocks_workspace(
             "shipments_updated_at": None,
             "settings": {
                 "regional_order_min": regional_order_min,
-                "regional_order_target": regional_order_target,
+                "minimum_supply": minimum_supply,
                 "position_filter": normalized_position_filter,
                 "assortment_filter": normalized_assortment_filter,
             },
@@ -569,7 +569,7 @@ def get_stocks_workspace(
             "shipments_updated_at": _format_cache_ts(shipments_ts, naive_tz=timezone.utc),
             "settings": {
                 "regional_order_min": regional_order_min,
-                "regional_order_target": regional_order_target,
+                "minimum_supply": minimum_supply,
                 "position_filter": normalized_position_filter,
                 "assortment_filter": normalized_assortment_filter,
             },
@@ -754,7 +754,7 @@ def get_stocks_workspace(
     for column in candidate_mask.columns:
         city_key = _normalize_city(str(column))
         if _is_moscow_or_spb(str(column)):
-            candidate_mask[column] = total_with_transit[column] <= need60[column]
+            candidate_mask[column] = (total_with_transit[column] + float(minimum_supply)) < need60[column]
         else:
             candidate_mask[column] = total_with_transit[column] <= float(regional_order_min)
         if not is_used_for_shipments(city_key):
@@ -882,7 +882,7 @@ def get_stocks_workspace(
         "shipments_updated_at": _format_cache_ts(shipments_ts, naive_tz=timezone.utc),
         "settings": {
             "regional_order_min": regional_order_min,
-            "regional_order_target": regional_order_target,
+            "minimum_supply": minimum_supply,
             "position_filter": normalized_position_filter,
             "assortment_filter": normalized_assortment_filter,
         },

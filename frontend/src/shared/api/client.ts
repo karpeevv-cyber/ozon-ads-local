@@ -282,7 +282,7 @@ export function getStocksWorkspace(params: {
   dateFrom?: string;
   dateTo?: string;
   regionalOrderMin?: number;
-  regionalOrderTarget?: number;
+  minimumSupply?: number;
   positionFilter?: string;
   assortmentFilter?: string;
   forceRefresh?: boolean;
@@ -300,8 +300,8 @@ export function getStocksWorkspace(params: {
   if (params.regionalOrderMin !== undefined) {
     search.set("regional_order_min", String(params.regionalOrderMin));
   }
-  if (params.regionalOrderTarget !== undefined) {
-    search.set("regional_order_target", String(params.regionalOrderTarget));
+  if (params.minimumSupply !== undefined) {
+    search.set("minimum_supply", String(params.minimumSupply));
   }
   if (params.positionFilter) {
     search.set("position_filter", params.positionFilter);
