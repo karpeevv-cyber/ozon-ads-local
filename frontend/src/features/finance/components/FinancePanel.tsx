@@ -4,29 +4,52 @@ type FinancePanelProps = {
   summary: FinanceSummary;
 };
 
-const columns: { key: keyof FinanceSummary["rows"][number]; label: string; title: string; isPercent?: boolean }[] = [
-  { key: "day", label: "day", title: "день" },
-  { key: "opening_balance", label: "start", title: "на начало дня" },
-  { key: "closing_balance", label: "end", title: "на конец дня" },
-  { key: "change", label: "delta", title: "изменение" },
-  { key: "sales", label: "sales", title: "продажи" },
-  { key: "fee", label: "fee", title: "комиссия" },
-  { key: "acquiring", label: "acq.", title: "эквайринг" },
-  { key: "payments", label: "pays", title: "выплаты" },
-  { key: "logistics", label: "log.", title: "логистика" },
-  { key: "reverse_logistics", label: "rev. log.", title: "обратная логистика" },
-  { key: "returns", label: "ret.", title: "возвраты" },
-  { key: "cross_docking", label: "cross", title: "кросс-докинг" },
-  { key: "export", label: "export", title: "вывоз со склада" },
-  { key: "acceptance", label: "accept", title: "приемка" },
-  { key: "errors", label: "errors", title: "ошибки" },
-  { key: "storage", label: "storage", title: "Хранение" },
-  { key: "marketing", label: "ads", title: "реклама" },
-  { key: "promotion_with_cpo", label: "cpo", title: "реклама - за заказ" },
-  { key: "points_for_reviews", label: "reviews", title: "баллы за отзывы" },
-  { key: "seller_bonuses", label: "bonuses", title: "бонусы продавца" },
-  { key: "check", label: "check", title: "проверка" },
-  { key: "logistics_pct", label: "log. %", title: "% логистики", isPercent: true },
+type FinanceRow = FinanceSummary["rows"][number];
+type FinanceColumn = {
+  key: keyof FinanceRow | string;
+  keys: (keyof FinanceRow)[];
+  label: string;
+  title: string;
+  isPercent?: boolean;
+};
+
+const column = (
+  key: keyof FinanceRow,
+  label: string,
+  title: string,
+  isPercent?: boolean,
+): FinanceColumn => ({ key, keys: [key], label, title, isPercent });
+
+const columns: FinanceColumn[] = [
+  column("day", "day", "день"),
+  column("opening_balance", "start", "на начало дня"),
+  column("closing_balance", "end", "на конец дня"),
+  column("change", "delta", "изменение"),
+  column("sales", "sales", "продажи"),
+  { key: "fee_acquiring", keys: ["fee", "acquiring"], label: "fee + acq.", title: "комиссия + эквайринг" },
+  column("payments", "pays", "выплаты"),
+  column("logistics", "log.", "логистика"),
+  {
+    key: "reverse_logistics_returns",
+    keys: ["reverse_logistics", "returns"],
+    label: "rev. log. + ret.",
+    title: "обратная логистика + возвраты",
+  },
+  {
+    key: "cross_docking_acceptance",
+    keys: ["cross_docking", "acceptance"],
+    label: "cross + accept",
+    title: "кросс-докинг + приемка",
+  },
+  column("export", "export", "вывоз со склада"),
+  column("errors", "errors", "ошибки"),
+  column("storage", "storage", "Хранение"),
+  column("marketing", "ads", "реклама"),
+  column("promotion_with_cpo", "cpo", "реклама - за заказ"),
+  column("points_for_reviews", "reviews", "баллы за отзывы"),
+  column("seller_bonuses", "bonuses", "бонусы продавца"),
+  column("check", "check", "проверка"),
+  column("logistics_pct", "log. %", "% логистики", true),
 ];
 
 const highlightedColumns = new Set(["opening_balance", "closing_balance", "change", "sales"]);
@@ -41,6 +64,13 @@ function formatValue(value: string | number, isPercent?: boolean) {
 function formatDate(value: string) {
   const [year, month, day] = value.split("-");
   return year && month && day ? `${day}.${month}.${year}` : value;
+}
+
+function getFinanceValue(source: FinanceRow | FinanceSummary["totals"], column: FinanceColumn) {
+  if (column.keys.length === 1) {
+    return source[column.keys[0]] ?? 0;
+  }
+  return column.keys.reduce((sum, key) => sum + Number(source[key] ?? 0), 0);
 }
 
 export function FinancePanel({ summary }: FinancePanelProps) {
@@ -76,7 +106,7 @@ export function FinancePanel({ summary }: FinancePanelProps) {
                       ? "Total"
                       : column.key === "opening_balance" || column.key === "closing_balance"
                         ? ""
-                      : formatValue(summary.totals[column.key] ?? 0, column.isPercent)}
+                      : formatValue(getFinanceValue(summary.totals, column), column.isPercent)}
                   </td>
                 ))}
               </tr>
@@ -97,7 +127,7 @@ export function FinancePanel({ summary }: FinancePanelProps) {
                     >
                       {column.key === "day"
                         ? formatDate(row.day)
-                        : formatValue(row[column.key], column.isPercent)}
+                        : formatValue(getFinanceValue(row, column), column.isPercent)}
                     </td>
                   ))}
                 </tr>
