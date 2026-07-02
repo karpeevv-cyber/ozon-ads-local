@@ -10,6 +10,7 @@ class FinanceRowResponse(BaseModel):
     fee: int
     acquiring: int
     payments: int
+    payment_commission: int
     logistics: int
     reverse_logistics: int
     returns: int
@@ -19,6 +20,9 @@ class FinanceRowResponse(BaseModel):
     acceptance: int
     errors: int
     defects: int
+    mutual_offset: int
+    decompensation: int
+    disposal: int
     storage: int
     marketing: int
     promotion_with_cpo: int

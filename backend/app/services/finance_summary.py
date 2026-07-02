@@ -62,6 +62,7 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
         marketing = 0.0
         promotion_with_cpo = 0.0
         acquiring = 0.0
+        payment_commission = 0.0
         returns_processing = 0.0
         reverse_logistics = 0.0
         cross_docking = 0.0
@@ -70,6 +71,9 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
         acceptance = 0.0
         errors = 0.0
         defects = 0.0
+        mutual_offset = 0.0
+        decompensation = 0.0
+        disposal = 0.0
         seller_bonuses = 0.0
         points_for_reviews = 0.0
         for service in services:
@@ -87,10 +91,20 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
                 pickup_point_storage += value
             if name == "goods_processing_in_shipment":
                 acceptance += value
-            if name in {"booking_space_and_staff_for_partial_shipment", "processing_of_identified_surpluses_in_shipment"}:
+            if name in {
+                "booking_space_and_staff_for_partial_shipment",
+                "processing_of_identified_surpluses_in_shipment",
+                "goods_shelf_life_processing",
+            }:
                 errors += value
             if name == "defect_processing":
                 defects += value
+            if name == "offset_of_claims_between_contracts":
+                mutual_offset += value
+            if name == "decompensation_and_return_to_warehouse":
+                decompensation += value
+            if name == "product_disposal":
+                disposal += value
             if name == "product_placement_in_ozon_warehouses":
                 storage += value
             if name == "pay_per_click":
@@ -99,6 +113,8 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
                 promotion_with_cpo += value
             if name == "acquiring":
                 acquiring += value
+            if name in {"flexible_payment_schedule", "early_payment"}:
+                payment_commission += value
             if name == "partner_returns_cancellations_processing":
                 returns_processing += value
             if name == "seller_bonuses":
@@ -112,6 +128,7 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
             float(sales or 0)
             + float(fee or 0)
             + acquiring
+            + payment_commission
             + logistics
             + reverse_logistics
             + returns_processing
@@ -121,6 +138,9 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
             + acceptance
             + errors
             + defects
+            + mutual_offset
+            + decompensation
+            + disposal
             + storage
             + marketing
             + promotion_with_cpo
@@ -139,6 +159,7 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
                 "fee": _ceil_int(fee),
                 "acquiring": _ceil_int(acquiring),
                 "payments": _ceil_int(payments),
+                "payment_commission": _ceil_int(payment_commission),
                 "logistics": _ceil_int(logistics),
                 "reverse_logistics": _ceil_int(reverse_logistics),
                 "returns": _ceil_int(returns_processing),
@@ -148,6 +169,9 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
                 "acceptance": _ceil_int(acceptance),
                 "errors": _ceil_int(errors),
                 "defects": _ceil_int(defects),
+                "mutual_offset": _ceil_int(mutual_offset),
+                "decompensation": _ceil_int(decompensation),
+                "disposal": _ceil_int(disposal),
                 "storage": _ceil_int(storage),
                 "marketing": _ceil_int(marketing),
                 "promotion_with_cpo": _ceil_int(promotion_with_cpo),

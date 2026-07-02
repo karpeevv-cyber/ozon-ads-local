@@ -61,3 +61,85 @@ class FinanceSummaryTests(unittest.TestCase):
         self.assertEqual(summary["rows"][0]["day"], date(2026, 6, 7).isoformat())
         self.assertEqual(summary["rows"][0]["defects"], -540)
         self.assertEqual(summary["totals"]["defects"], -540)
+
+    def test_finance_summary_maps_payment_commission_services(self):
+        payload = self._payload_with_services(
+            [
+                {"name": "flexible_payment_schedule", "amount": {"value": -38.3}},
+                {"name": "early_payment", "amount": {"value": -674.07}},
+            ],
+            accrued=-712.37,
+        )
+
+        summary = self._summary_for("2026-06-30", payload)
+
+        self.assertEqual(summary["rows"][0]["payment_commission"], -712)
+        self.assertEqual(summary["totals"]["payment_commission"], -712)
+
+    def test_finance_summary_maps_mutual_offset_service(self):
+        payload = self._payload_with_services(
+            [{"name": "offset_of_claims_between_contracts", "amount": {"value": -317.12}}],
+            accrued=-317.12,
+        )
+
+        summary = self._summary_for("2026-06-28", payload)
+
+        self.assertEqual(summary["rows"][0]["mutual_offset"], -317)
+        self.assertEqual(summary["totals"]["mutual_offset"], -317)
+
+    def test_finance_summary_maps_decompensation_service(self):
+        payload = self._payload_with_services(
+            [{"name": "decompensation_and_return_to_warehouse", "amount": {"value": -427}}],
+            accrued=-427,
+        )
+
+        summary = self._summary_for("2026-06-29", payload)
+
+        self.assertEqual(summary["rows"][0]["decompensation"], -427)
+        self.assertEqual(summary["totals"]["decompensation"], -427)
+
+    def test_finance_summary_maps_disposal_service(self):
+        payload = self._payload_with_services(
+            [{"name": "product_disposal", "amount": {"value": -225}}],
+            accrued=-225,
+        )
+
+        summary = self._summary_for("2026-06-08", payload)
+
+        self.assertEqual(summary["rows"][0]["disposal"], -225)
+        self.assertEqual(summary["totals"]["disposal"], -225)
+
+    def test_finance_summary_adds_shelf_life_processing_to_errors(self):
+        payload = self._payload_with_services(
+            [
+                {"name": "booking_space_and_staff_for_partial_shipment", "amount": {"value": -15}},
+                {"name": "goods_shelf_life_processing", "amount": {"value": -130}},
+            ],
+            accrued=-145,
+        )
+
+        summary = self._summary_for("2026-06-04", payload)
+
+        self.assertEqual(summary["rows"][0]["errors"], -145)
+        self.assertEqual(summary["totals"]["errors"], -145)
+
+    def _summary_for(self, day: str, payload: dict):
+        with (
+            patch("app.services.finance_summary.resolve_company_config", return_value=("aura", {"seller_client_id": "1", "seller_api_key": "k"})),
+            patch("app.services.finance_summary.seller_finance_balance", return_value=payload),
+        ):
+            return get_finance_summary(company="aura", date_from=day, date_to=day)
+
+    def _payload_with_services(self, services: list[dict], *, accrued: float):
+        return {
+            "total": {
+                "opening_balance": {"value": 0},
+                "closing_balance": {"value": 0},
+                "accrued": {"value": accrued},
+                "payments": [],
+            },
+            "cashflows": {
+                "sales": {"amount": {"value": 0}, "fee": {"value": 0}},
+                "services": services,
+            },
+        }

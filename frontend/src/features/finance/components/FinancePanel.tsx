@@ -28,6 +28,7 @@ const columns: FinanceColumn[] = [
   column("sales", "sales", "продажи"),
   { key: "fee_acquiring", keys: ["fee", "acquiring"], label: "fee + acq.", title: "комиссия + эквайринг" },
   column("payments", "pays", "выплаты"),
+  column("payment_commission", "ком. выпл.", "комиссия за выплату"),
   column("logistics", "log.", "логистика"),
   {
     key: "reverse_logistics_returns",
@@ -45,6 +46,9 @@ const columns: FinanceColumn[] = [
   column("pickup_point_storage", "хран. ПВЗ", "хранение товаров в ПВЗ"),
   column("errors", "errors", "ошибки"),
   column("defects", "брак", "обработка брака"),
+  column("mutual_offset", "взаимозач.", "взаимозачет"),
+  column("decompensation", "декомп.", "декомпенсация"),
+  column("disposal", "утил.", "утилизация"),
   column("storage", "storage", "Хранение"),
   column("marketing", "ads", "реклама"),
   column("promotion_with_cpo", "cpo", "реклама - за заказ"),

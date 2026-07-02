@@ -432,6 +432,7 @@ export type FinanceRow = {
   fee: number;
   acquiring: number;
   payments: number;
+  payment_commission: number;
   logistics: number;
   reverse_logistics: number;
   returns: number;
@@ -441,6 +442,9 @@ export type FinanceRow = {
   acceptance: number;
   errors: number;
   defects: number;
+  mutual_offset: number;
+  decompensation: number;
+  disposal: number;
   storage: number;
   marketing: number;
   promotion_with_cpo: number;
