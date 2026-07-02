@@ -2,6 +2,7 @@ from app.models.bids import BidChange, CampaignComment
 from app.models.campaign import Campaign, CampaignDailyMetric, CampaignProduct
 from app.models.main_overview_cache import MainOverviewCache
 from app.models.organization import MarketplaceCredential, Organization
+from app.models.stock_warehouse_preference import StockWarehousePreference
 from app.models.shipment_event import ShipmentEvent
 from app.models.shipment_history import ShipmentHistory
 from app.models.shipment_transit import ShipmentTransit
@@ -20,6 +21,7 @@ __all__ = [
     "MarketplaceCredential",
     "OrganizationMembership",
     "Organization",
+    "StockWarehousePreference",
     "ShipmentEvent",
     "ShipmentHistory",
     "ShipmentTransit",

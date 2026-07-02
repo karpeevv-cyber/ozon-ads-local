@@ -294,6 +294,13 @@ export type StocksWorkspaceSettings = {
   assortment_filter: string;
 };
 
+export type StocksWorkspaceColumn = {
+  city: string;
+  city_key: string;
+  shipment_total_qty: number;
+  is_used_for_shipments: boolean;
+};
+
 export type StocksWorkspaceSummary = {
   article_count: number;
   city_count: number;
@@ -357,7 +364,14 @@ export type StocksWorkspace = {
   summary: StocksWorkspaceSummary;
   timings: StocksWorkspaceTimings;
   columns: string[];
+  columns_meta: StocksWorkspaceColumn[];
   rows: StocksWorkspaceRow[];
+};
+
+export type StocksWarehousePreferencesUpdateResponse = {
+  company: string;
+  seller_client_id: string;
+  used_city_keys: string[];
 };
 
 export type StorageRiskRow = {

@@ -20,6 +20,7 @@ import {
   RunningCampaign,
   StorageSnapshot,
   StocksSnapshot,
+  StocksWarehousePreferencesUpdateResponse,
   StocksWorkspace,
   TrendsSnapshot,
   TokenResponse,
@@ -312,6 +313,13 @@ export function getStocksWorkspace(params: {
     search.set("force_refresh", "1");
   }
   return requestJson<StocksWorkspace>(`/stocks/workspace?${search.toString()}`);
+}
+
+export function updateStocksWarehousePreferences(payload: {
+  company?: string;
+  city_keys: string[];
+}): Promise<StocksWarehousePreferencesUpdateResponse> {
+  return putJson<StocksWarehousePreferencesUpdateResponse>("/stocks/warehouse-preferences", payload);
 }
 
 export function getStorageSnapshot(company?: string, forceRefresh = false): Promise<StorageSnapshot> {

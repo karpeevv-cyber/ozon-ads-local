@@ -11,6 +11,7 @@ from app.models import (
     MainOverviewCache,
     MarketplaceCredential,
     Organization,
+    StockWarehousePreference,
     ShipmentEvent,
     ShipmentHistory,
     ShipmentTransit,

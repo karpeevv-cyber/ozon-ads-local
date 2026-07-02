@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { StocksWorkspace } from "@/shared/api/types";
 import { StocksControls } from "@/features/stocks/components/StocksControls";
 import { StocksRefreshButton } from "@/features/stocks/components/StocksRefreshButton";
+import { StocksWarehouseSelector } from "@/features/stocks/components/StocksWarehouseSelector";
 
 type StocksPanelProps = {
   workspace: StocksWorkspace;
@@ -67,6 +68,8 @@ function formatMetric(value: number | null | undefined) {
 }
 
 export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPanelProps) {
+  const columnMetaByCity = new Map((workspace.columns_meta || []).map((column) => [column.city, column]));
+
   function qtyToBucket(quantity: number): number {
     if (quantity <= 0) return 0;
     if (quantity <= 5) return 1;
@@ -170,11 +173,19 @@ export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPa
                   <th title="Total revenue for this article in the selected period">Revenue</th>
                   <th title="Ordered units for this article in the selected period">Units</th>
                   <th title="Period DRR for the only campaign linked to this article">DRR</th>
-                  {workspace.columns.map((column) => (
-                    <th key={column} title={column}>
-                      <span className="stocks-city-head">{column}</span>
-                    </th>
-                  ))}
+                  {workspace.columns.map((column) => {
+                    const meta = columnMetaByCity.get(column);
+                    const isInactiveWarehouse = meta ? !meta.is_used_for_shipments : false;
+                    return (
+                      <th
+                        key={column}
+                        title={`${column}\nShipped total: ${meta?.shipment_total_qty ?? 0}`}
+                        className={isInactiveWarehouse ? "stocks-unused-warehouse" : undefined}
+                      >
+                        <span className="stocks-city-head">{column}</span>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
@@ -216,9 +227,12 @@ export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPa
                             .join("\n")
                         : "- нет отгрузок";
                       const title = ["Отгрузки", shipmentTooltip].join("\n");
+                      const meta = columnMetaByCity.get(cell.city);
+                      const isInactiveWarehouse = meta ? !meta.is_used_for_shipments : false;
                       return (
                         <td
                           key={`${row.article}:${cell.city}`}
+                          className={isInactiveWarehouse ? "stocks-unused-warehouse" : undefined}
                           style={style}
                           title={title}
                         >
@@ -232,6 +246,7 @@ export function StocksPanel({ workspace, highlightLevels, reviewMode }: StocksPa
             </table>
           </div>
         )}
+        <StocksWarehouseSelector company={workspace.company} columns={workspace.columns_meta || []} />
       </article>
     </section>
   );

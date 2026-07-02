@@ -27,6 +27,13 @@ class StocksWorkspaceSettingsResponse(BaseModel):
     assortment_filter: str
 
 
+class StocksWorkspaceColumnResponse(BaseModel):
+    city: str
+    city_key: str
+    shipment_total_qty: int = 0
+    is_used_for_shipments: bool = True
+
+
 class StocksWorkspaceSummaryResponse(BaseModel):
     article_count: int
     city_count: int
@@ -91,4 +98,16 @@ class StocksWorkspaceResponse(BaseModel):
     summary: StocksWorkspaceSummaryResponse
     timings: StocksWorkspaceTimingResponse = Field(default_factory=StocksWorkspaceTimingResponse)
     columns: list[str]
+    columns_meta: list[StocksWorkspaceColumnResponse] = Field(default_factory=list)
     rows: list[StocksWorkspaceRowResponse]
+
+
+class StocksWarehousePreferencesUpdateRequest(BaseModel):
+    company: str | None = None
+    city_keys: list[str] = Field(default_factory=list)
+
+
+class StocksWarehousePreferencesUpdateResponse(BaseModel):
+    company: str
+    seller_client_id: str
+    used_city_keys: list[str]

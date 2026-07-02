@@ -2,7 +2,14 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.schemas.stocks import StocksSnapshotResponse, StocksWorkspaceResponse
+from app.schemas.stocks import (
+    StocksSnapshotResponse,
+    StocksWarehousePreferencesUpdateRequest,
+    StocksWarehousePreferencesUpdateResponse,
+    StocksWorkspaceResponse,
+)
+from app.services.company_config import resolve_company_config
+from app.services.stock_warehouse_preferences import save_stock_warehouse_preferences
 from app.services.stocks_snapshot import get_stocks_snapshot, get_stocks_workspace
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
@@ -37,4 +44,24 @@ def stocks_workspace(
             force_refresh=force_refresh,
             db=db,
         )
+    )
+
+
+@router.put("/warehouse-preferences", response_model=StocksWarehousePreferencesUpdateResponse)
+def update_warehouse_preferences(
+    payload: StocksWarehousePreferencesUpdateRequest,
+    db: Session = Depends(get_db),
+):
+    company_name, config = resolve_company_config(payload.company)
+    seller_client_id = (config.get("seller_client_id") or "").strip()
+    preferences = save_stock_warehouse_preferences(
+        db,
+        company_name=company_name,
+        seller_client_id=seller_client_id,
+        city_keys=payload.city_keys,
+    )
+    return StocksWarehousePreferencesUpdateResponse(
+        company=company_name,
+        seller_client_id=seller_client_id,
+        used_city_keys=sorted([city_key for city_key, is_used in preferences.items() if is_used]),
     )

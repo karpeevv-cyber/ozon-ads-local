@@ -32,6 +32,7 @@ from app.services.shipment_history import (
     load_shipment_transit_map,
     rebuild_shipment_history_from_api,
 )
+from app.services.stock_warehouse_preferences import load_stock_warehouse_preferences
 from app.services.unit_economics import load_inactive_unit_economics_skus
 
 logger = logging.getLogger("uvicorn.error")
@@ -137,6 +138,29 @@ def _city_key_to_label(city_key: str) -> str:
     if not text:
         return "UNKNOWN"
     return "-".join(part.capitalize() for part in text.split("-"))
+
+
+def _build_columns_meta(
+    columns: list[str],
+    *,
+    shipment_city_totals: dict[str, int],
+    preferences: dict[str, bool],
+) -> list[dict]:
+    has_saved_preferences = bool(preferences)
+    out: list[dict] = []
+    for city in columns:
+        city_key = _normalize_city(str(city))
+        shipment_total_qty = int(shipment_city_totals.get(city_key, 0) or 0)
+        is_used = bool(preferences.get(city_key)) if has_saved_preferences else shipment_total_qty > 0
+        out.append(
+            {
+                "city": str(city),
+                "city_key": city_key,
+                "shipment_total_qty": shipment_total_qty,
+                "is_used_for_shipments": is_used,
+            }
+        )
+    return out
 
 
 def _format_cache_ts(value: datetime | None, *, naive_tz) -> str | None:
@@ -460,6 +484,7 @@ def get_stocks_workspace(
             },
             "timings": {**timings, "total_ms": round((perf_counter() - started_at) * 1000, 2)},
             "columns": [],
+            "columns_meta": [],
             "rows": [],
         }
 
@@ -556,6 +581,7 @@ def get_stocks_workspace(
             },
             "timings": timings,
             "columns": [],
+            "columns_meta": [],
             "rows": [],
         }
 
@@ -636,9 +662,24 @@ def get_stocks_workspace(
         else {}
     )
     timings["shipment_city_totals_ms"] = round((perf_counter() - city_totals_checkpoint) * 1000, 2)
+    preferences_checkpoint = perf_counter()
+    warehouse_preferences = load_stock_warehouse_preferences(
+        db,
+        company_name=company_name,
+        seller_client_id=seller_client_id,
+    )
+    timings["warehouse_preferences_ms"] = round((perf_counter() - preferences_checkpoint) * 1000, 2)
+    has_saved_warehouse_preferences = bool(warehouse_preferences)
     ordered_clusters = sorted(
         cluster_totals.index.astype(str).tolist(),
         key=lambda city: (
+            0
+            if (
+                bool(warehouse_preferences.get(_normalize_city(str(city))))
+                if has_saved_warehouse_preferences
+                else int(shipment_city_totals.get(_normalize_city(str(city)), 0) or 0) > 0
+            )
+            else 1,
             -int(shipment_city_totals.get(_normalize_city(str(city)), 0) or 0),
             -float(cluster_totals.get(city, 0) or 0),
             str(city),
@@ -648,7 +689,17 @@ def get_stocks_workspace(
     transit_city_keys = {city_key for (_article, city_key), qty in transit_lookup.items() if int(qty or 0) > 0}
     for city_key in sorted(
         transit_city_keys - existing_city_keys,
-        key=lambda item: (-int(shipment_city_totals.get(item, 0) or 0), item),
+        key=lambda item: (
+            0
+            if (
+                bool(warehouse_preferences.get(item))
+                if has_saved_warehouse_preferences
+                else int(shipment_city_totals.get(item, 0) or 0) > 0
+            )
+            else 1,
+            -int(shipment_city_totals.get(item, 0) or 0),
+            item,
+        ),
     ):
         ordered_clusters.append(_city_key_to_label(city_key))
     if has_unknown_shipment_city(
@@ -657,6 +708,27 @@ def get_stocks_workspace(
         seller_client_id=seller_client_id,
     ) and "UNKNOWN" not in {_normalize_city(str(city)) for city in ordered_clusters}:
         ordered_clusters.append("UNKNOWN")
+
+    ordered_clusters = sorted(
+        ordered_clusters,
+        key=lambda city: (
+            0
+            if (
+                bool(warehouse_preferences.get(_normalize_city(str(city))))
+                if has_saved_warehouse_preferences
+                else int(shipment_city_totals.get(_normalize_city(str(city)), 0) or 0) > 0
+            )
+            else 1,
+            -int(shipment_city_totals.get(_normalize_city(str(city)), 0) or 0),
+            -float(cluster_totals.get(city, 0) or 0) if city in cluster_totals else 0,
+            str(city),
+        ),
+    )
+    columns_meta = _build_columns_meta(
+        ordered_clusters,
+        shipment_city_totals=shipment_city_totals,
+        preferences=warehouse_preferences,
+    )
 
     df_pivot = df_pivot.reindex(columns=ordered_clusters).loc[:, lambda frame: ~frame.columns.duplicated()]
     df_ads = df_ads.reindex(columns=ordered_clusters).loc[:, lambda frame: ~frame.columns.duplicated()]
@@ -831,5 +903,6 @@ def get_stocks_workspace(
         },
         "timings": timings,
         "columns": ordered_clusters,
+        "columns_meta": columns_meta,
         "rows": matrix_rows,
     }
