@@ -44,6 +44,7 @@ const columns: FinanceColumn[] = [
   column("export", "export", "вывоз со склада"),
   column("pickup_point_storage", "хран. ПВЗ", "хранение товаров в ПВЗ"),
   column("errors", "errors", "ошибки"),
+  column("defects", "брак", "обработка брака"),
   column("storage", "storage", "Хранение"),
   column("marketing", "ads", "реклама"),
   column("promotion_with_cpo", "cpo", "реклама - за заказ"),

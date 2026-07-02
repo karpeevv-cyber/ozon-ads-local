@@ -35,3 +35,29 @@ class FinanceSummaryTests(unittest.TestCase):
         self.assertEqual(summary["rows"][0]["day"], date(2026, 6, 21).isoformat())
         self.assertEqual(summary["rows"][0]["pickup_point_storage"], -3252)
         self.assertEqual(summary["totals"]["pickup_point_storage"], -3252)
+
+    def test_finance_summary_maps_defect_processing_service(self):
+        payload = {
+            "total": {
+                "opening_balance": {"value": 0},
+                "closing_balance": {"value": 0},
+                "accrued": {"value": -540},
+                "payments": [],
+            },
+            "cashflows": {
+                "sales": {"amount": {"value": 0}, "fee": {"value": 0}},
+                "services": [
+                    {"name": "defect_processing", "amount": {"value": -540}},
+                ],
+            },
+        }
+
+        with (
+            patch("app.services.finance_summary.resolve_company_config", return_value=("aura", {"seller_client_id": "1", "seller_api_key": "k"})),
+            patch("app.services.finance_summary.seller_finance_balance", return_value=payload),
+        ):
+            summary = get_finance_summary(company="aura", date_from="2026-06-07", date_to="2026-06-07")
+
+        self.assertEqual(summary["rows"][0]["day"], date(2026, 6, 7).isoformat())
+        self.assertEqual(summary["rows"][0]["defects"], -540)
+        self.assertEqual(summary["totals"]["defects"], -540)

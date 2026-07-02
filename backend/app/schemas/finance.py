@@ -18,6 +18,7 @@ class FinanceRowResponse(BaseModel):
     pickup_point_storage: int
     acceptance: int
     errors: int
+    defects: int
     storage: int
     marketing: int
     promotion_with_cpo: int

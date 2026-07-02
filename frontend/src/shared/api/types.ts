@@ -440,6 +440,7 @@ export type FinanceRow = {
   pickup_point_storage: number;
   acceptance: number;
   errors: number;
+  defects: number;
   storage: number;
   marketing: number;
   promotion_with_cpo: number;

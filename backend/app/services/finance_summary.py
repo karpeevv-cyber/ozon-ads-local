@@ -69,6 +69,7 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
         pickup_point_storage = 0.0
         acceptance = 0.0
         errors = 0.0
+        defects = 0.0
         seller_bonuses = 0.0
         points_for_reviews = 0.0
         for service in services:
@@ -88,6 +89,8 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
                 acceptance += value
             if name in {"booking_space_and_staff_for_partial_shipment", "processing_of_identified_surpluses_in_shipment"}:
                 errors += value
+            if name == "defect_processing":
+                defects += value
             if name == "product_placement_in_ozon_warehouses":
                 storage += value
             if name == "pay_per_click":
@@ -117,6 +120,7 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
             + pickup_point_storage
             + acceptance
             + errors
+            + defects
             + storage
             + marketing
             + promotion_with_cpo
@@ -143,6 +147,7 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
                 "pickup_point_storage": _ceil_int(pickup_point_storage),
                 "acceptance": _ceil_int(acceptance),
                 "errors": _ceil_int(errors),
+                "defects": _ceil_int(defects),
                 "storage": _ceil_int(storage),
                 "marketing": _ceil_int(marketing),
                 "promotion_with_cpo": _ceil_int(promotion_with_cpo),
