@@ -42,6 +42,7 @@ const columns: FinanceColumn[] = [
     title: "кросс-докинг + приемка",
   },
   column("export", "export", "вывоз со склада"),
+  column("pickup_point_storage", "хран. ПВЗ", "хранение товаров в ПВЗ"),
   column("errors", "errors", "ошибки"),
   column("storage", "storage", "Хранение"),
   column("marketing", "ads", "реклама"),

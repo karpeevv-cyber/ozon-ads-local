@@ -15,6 +15,7 @@ class FinanceRowResponse(BaseModel):
     returns: int
     cross_docking: int
     export: int
+    pickup_point_storage: int
     acceptance: int
     errors: int
     storage: int

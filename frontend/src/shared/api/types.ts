@@ -437,6 +437,7 @@ export type FinanceRow = {
   returns: number;
   cross_docking: number;
   export: number;
+  pickup_point_storage: number;
   acceptance: number;
   errors: number;
   storage: number;
