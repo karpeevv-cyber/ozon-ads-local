@@ -670,16 +670,16 @@ def get_stocks_workspace(
     )
     timings["warehouse_preferences_ms"] = round((perf_counter() - preferences_checkpoint) * 1000, 2)
     has_saved_warehouse_preferences = bool(warehouse_preferences)
+
+    def is_used_for_shipments(city_key: str) -> bool:
+        if has_saved_warehouse_preferences:
+            return bool(warehouse_preferences.get(city_key))
+        return int(shipment_city_totals.get(city_key, 0) or 0) > 0
+
     ordered_clusters = sorted(
         cluster_totals.index.astype(str).tolist(),
         key=lambda city: (
-            0
-            if (
-                bool(warehouse_preferences.get(_normalize_city(str(city))))
-                if has_saved_warehouse_preferences
-                else int(shipment_city_totals.get(_normalize_city(str(city)), 0) or 0) > 0
-            )
-            else 1,
+            0 if is_used_for_shipments(_normalize_city(str(city))) else 1,
             -int(shipment_city_totals.get(_normalize_city(str(city)), 0) or 0),
             -float(cluster_totals.get(city, 0) or 0),
             str(city),
@@ -690,13 +690,7 @@ def get_stocks_workspace(
     for city_key in sorted(
         transit_city_keys - existing_city_keys,
         key=lambda item: (
-            0
-            if (
-                bool(warehouse_preferences.get(item))
-                if has_saved_warehouse_preferences
-                else int(shipment_city_totals.get(item, 0) or 0) > 0
-            )
-            else 1,
+            0 if is_used_for_shipments(item) else 1,
             -int(shipment_city_totals.get(item, 0) or 0),
             item,
         ),
@@ -712,13 +706,7 @@ def get_stocks_workspace(
     ordered_clusters = sorted(
         ordered_clusters,
         key=lambda city: (
-            0
-            if (
-                bool(warehouse_preferences.get(_normalize_city(str(city))))
-                if has_saved_warehouse_preferences
-                else int(shipment_city_totals.get(_normalize_city(str(city)), 0) or 0) > 0
-            )
-            else 1,
+            0 if is_used_for_shipments(_normalize_city(str(city))) else 1,
             -int(shipment_city_totals.get(_normalize_city(str(city)), 0) or 0),
             -float(cluster_totals.get(city, 0) or 0) if city in cluster_totals else 0,
             str(city),
@@ -769,6 +757,9 @@ def get_stocks_workspace(
             candidate_mask[column] = total_with_transit[column] <= need60[column]
         else:
             candidate_mask[column] = total_with_transit[column] <= float(regional_order_min)
+        if not is_used_for_shipments(city_key):
+            candidate_mask[column] = False
+            continue
         candidate_mask[column] = candidate_mask[column] & pd.Series(
             [(str(article), city_key) in shipments_pairs for article in candidate_mask.index],
             index=candidate_mask.index,
