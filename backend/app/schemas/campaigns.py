@@ -81,6 +81,7 @@ class MainOverviewWeeklyRowResponse(BaseModel):
     total_drr_pct: float
     ebitda: float
     avoidable: float = 0.0
+    avoidable_breakdown: list[dict] = Field(default_factory=list)
     ebitda_pct: float
     total_revenue_per_day: float
     money_spent_per_day: float

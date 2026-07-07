@@ -16,6 +16,19 @@ from app.db.bootstrap import create_all
 from app.models.main_overview_cache import MainOverviewCache
 
 
+AVOIDABLE_BREAKDOWN_LABELS = [
+    "Комиссия за выплату",
+    "Вывоз со склада",
+    "Хранение в ПВЗ",
+    "Ошибки",
+    "Обработка брака",
+    "Взаимозачет",
+    "Декомпенсация",
+    "Утилизация",
+    "Хранение",
+]
+
+
 def _to_float(value) -> float:
     try:
         if value is None:
@@ -26,6 +39,33 @@ def _to_float(value) -> float:
         return float(text) if text else 0.0
     except Exception:
         return 0.0
+
+
+def _normalize_avoidable_breakdown(value) -> list[dict[str, float | str]]:
+    if not isinstance(value, list):
+        return []
+    out: list[dict[str, float | str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        label = str(item.get("label", "") or "").strip()
+        amount = _to_float(item.get("amount"))
+        if label and amount != 0.0:
+            out.append({"label": label, "amount": amount})
+    return out
+
+
+def _sum_avoidable_breakdowns(values) -> list[dict[str, float | str]]:
+    totals = {label: 0.0 for label in AVOIDABLE_BREAKDOWN_LABELS}
+    for value in values:
+        for item in _normalize_avoidable_breakdown(value):
+            label = str(item["label"])
+            totals[label] = totals.get(label, 0.0) + float(item["amount"])
+    return [
+        {"label": label, "amount": amount}
+        for label, amount in totals.items()
+        if amount != 0.0
+    ]
 
 
 def _daily_rows_with_legacy_main_logic(
@@ -79,8 +119,10 @@ def _daily_rows_with_legacy_main_logic(
             )
         if "avoidable" not in ebitda_daily.columns:
             ebitda_daily["avoidable"] = 0.0
+        if "avoidable_breakdown" not in ebitda_daily.columns:
+            ebitda_daily["avoidable_breakdown"] = [[] for _ in range(len(ebitda_daily))]
         df_daily_raw = df_daily_raw.merge(
-            ebitda_daily[["day", "ebitda", "avoidable", "ebitda_pct"]],
+            ebitda_daily[["day", "ebitda", "avoidable", "avoidable_breakdown", "ebitda_pct"]],
             on="day",
             how="left",
         )
@@ -89,10 +131,13 @@ def _daily_rows_with_legacy_main_logic(
         df_daily_raw["ebitda"] = 0.0
     if "avoidable" not in df_daily_raw.columns:
         df_daily_raw["avoidable"] = 0.0
+    if "avoidable_breakdown" not in df_daily_raw.columns:
+        df_daily_raw["avoidable_breakdown"] = [[] for _ in range(len(df_daily_raw))]
     if "ebitda_pct" not in df_daily_raw.columns:
         df_daily_raw["ebitda_pct"] = 0.0
     df_daily_raw["ebitda"] = pd.to_numeric(df_daily_raw["ebitda"], errors="coerce").fillna(0.0)
     df_daily_raw["avoidable"] = pd.to_numeric(df_daily_raw["avoidable"], errors="coerce").fillna(0.0)
+    df_daily_raw["avoidable_breakdown"] = df_daily_raw["avoidable_breakdown"].apply(_normalize_avoidable_breakdown)
     df_daily_raw["ebitda_pct"] = pd.to_numeric(df_daily_raw["ebitda_pct"], errors="coerce").fillna(0.0)
 
     campaign_title_map = {
@@ -184,6 +229,11 @@ def _campaign_weekly_aggregate(df_daily_raw: pd.DataFrame, target_drr_pct: float
         dfw["ebitda"] = 0.0
     if "avoidable" not in dfw.columns:
         dfw["avoidable"] = 0.0
+    if "avoidable_breakdown" not in dfw.columns:
+        dfw["avoidable_breakdown"] = [[] for _ in range(len(dfw))]
+    avoidable_breakdown_by_week = (
+        dfw.groupby("week_start")["avoidable_breakdown"].apply(_sum_avoidable_breakdowns).to_dict()
+    )
 
     agg = (
         dfw.groupby("week_start", as_index=False)
@@ -200,6 +250,9 @@ def _campaign_weekly_aggregate(df_daily_raw: pd.DataFrame, target_drr_pct: float
             avoidable=("avoidable", "sum"),
         )
         .sort_values("week_start")
+    )
+    agg["avoidable_breakdown"] = agg["week_start"].map(avoidable_breakdown_by_week).apply(
+        lambda value: value if isinstance(value, list) else []
     )
 
     target_drr = float(target_drr_pct) / 100.0
@@ -357,6 +410,7 @@ def get_main_overview(*, company: str | None, date_from: str, date_to: str, targ
         "total_drr_pct",
         "ebitda",
         "avoidable",
+        "avoidable_breakdown",
         "ebitda_pct",
         "total_revenue_per_day",
         "money_spent_per_day",

@@ -122,11 +122,13 @@ function MetricCell({
   value,
   formatted,
   domain,
+  tooltipItems,
 }: {
   metric: string;
   value: number;
   formatted: string;
   domain: MetricDomain;
+  tooltipItems?: Array<{ label: string; amount: number }>;
 }) {
   const direction = getMetricDirection(metric);
   const intensity = getIntensity(metric, value, domain[metric]);
@@ -135,10 +137,23 @@ function MetricCell({
     "--metric-fill-scale": intensity.toFixed(4),
     "--metric-alpha": (0.16 + intensity * 0.24).toFixed(2),
   } as CSSProperties;
+  const tooltipText = tooltipItems?.length
+    ? tooltipItems.map((item) => `${item.label}: ${formatMoney(item.amount)}`).join("\n")
+    : formatted;
 
   return (
-    <td className={`metric-cell metric-cell-${tone}`} style={style} title={formatted}>
+    <td className={`metric-cell metric-cell-${tone}`} style={style} title={tooltipText}>
       <span>{formatted}</span>
+      {tooltipItems?.length ? (
+        <div className="metric-tooltip" role="tooltip">
+          {tooltipItems.map((item) => (
+            <div className="metric-tooltip-row" key={item.label}>
+              <span>{item.label}</span>
+              <strong>{formatMoney(item.amount)}</strong>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </td>
   );
 }
@@ -333,7 +348,13 @@ function WeeklyTable({ overview }: MainDashboardProps) {
                   <MetricCell metric="total_revenue" value={row.total_revenue} formatted={formatMoney(row.total_revenue)} domain={metricDomain} />
                   <MetricCell metric="total_drr_pct" value={row.total_drr_pct} formatted={formatPct(row.total_drr_pct)} domain={metricDomain} />
                   <MetricCell metric="ebitda" value={row.ebitda} formatted={formatMoney(row.ebitda)} domain={metricDomain} />
-                  <MetricCell metric="avoidable" value={row.avoidable} formatted={formatMoney(row.avoidable)} domain={metricDomain} />
+                  <MetricCell
+                    metric="avoidable"
+                    value={row.avoidable}
+                    formatted={formatMoney(row.avoidable)}
+                    domain={metricDomain}
+                    tooltipItems={row.avoidable_breakdown}
+                  />
                   <MetricCell metric="ebitda_pct" value={row.ebitda_pct} formatted={formatPct(row.ebitda_pct)} domain={metricDomain} />
                   <MetricCell metric="total_revenue_per_day" value={row.total_revenue_per_day} formatted={formatMoney(row.total_revenue_per_day)} domain={metricDomain} />
                   <MetricCell metric="money_spent_per_day" value={row.money_spent_per_day} formatted={formatMoney(row.money_spent_per_day)} domain={metricDomain} />

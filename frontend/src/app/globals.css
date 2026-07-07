@@ -1654,7 +1654,7 @@ a {
 .metric-cell {
   position: relative;
   min-width: 104px;
-  overflow: hidden;
+  overflow: visible;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1675,6 +1675,46 @@ a {
 .metric-cell span {
   position: relative;
   z-index: 1;
+}
+
+.metric-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 20;
+  display: none;
+  min-width: 260px;
+  padding: 10px 12px;
+  border: 1px solid rgba(20, 28, 38, 0.12);
+  border-radius: 8px;
+  background: rgba(18, 24, 32, 0.96);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.22);
+  color: #ffffff;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.metric-cell:hover .metric-tooltip {
+  display: grid;
+  gap: 6px;
+}
+
+.metric-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.metric-tooltip-row span {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.metric-tooltip-row strong {
+  font-weight: 700;
+  color: #ffffff;
 }
 
 .metric-cell-good::before {

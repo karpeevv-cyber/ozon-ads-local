@@ -34,6 +34,58 @@ UNIT_ECON_SOURCES = [
     },
 ]
 
+AVOIDABLE_COMPONENTS = [
+    {
+        "key": "avoidable_payment_commission",
+        "label": "Комиссия за выплату",
+        "tags": {"flexible_payment_schedule", "early_payment"},
+    },
+    {
+        "key": "avoidable_export",
+        "label": "Вывоз со склада",
+        "tags": {"ozon_warehouse_pickup", "ozon_warehouse_pickup_assortment"},
+    },
+    {
+        "key": "avoidable_pickup_point_storage",
+        "label": "Хранение в ПВЗ",
+        "tags": {"temporary_placement_agent"},
+    },
+    {
+        "key": "avoidable_errors",
+        "label": "Ошибки",
+        "tags": {
+            "booking_space_and_staff_for_partial_shipment",
+            "processing_of_identified_surpluses_in_shipment",
+            "goods_shelf_life_processing",
+        },
+    },
+    {
+        "key": "avoidable_defects",
+        "label": "Обработка брака",
+        "tags": {"defect_processing"},
+    },
+    {
+        "key": "avoidable_mutual_offset",
+        "label": "Взаимозачет",
+        "tags": {"offset_of_claims_between_contracts"},
+    },
+    {
+        "key": "avoidable_decompensation",
+        "label": "Декомпенсация",
+        "tags": {"decompensation_and_return_to_warehouse"},
+    },
+    {
+        "key": "avoidable_disposal",
+        "label": "Утилизация",
+        "tags": {"product_disposal"},
+    },
+    {
+        "key": "avoidable_storage",
+        "label": "Хранение",
+        "tags": {"product_placement_in_ozon_warehouses"},
+    },
+]
+
 SHEET_TEA_COST = "себес порции чая"
 SHEET_PACKAGE_COST = "косты уп"
 SHEET_PACKAGE_COST_ALT = "косты упаковки"
@@ -424,6 +476,8 @@ def _load_finance_period_costs(date_from: str, date_to: str, *, seller_client_id
         "seller_bonuses": 0.0,
         "avoidable": 0.0,
     }
+    for component in AVOIDABLE_COMPONENTS:
+        out[component["key"]] = 0.0
     for service in services:
         name = str(service.get("name", "") or "").strip()
         raw_value = _to_num((service.get("amount", {}) or {}).get("value", 0))
@@ -452,22 +506,15 @@ def _load_finance_period_costs(date_from: str, date_to: str, *, seller_client_id
             out["points_for_reviews"] += value
         elif name == "seller_bonuses":
             out["seller_bonuses"] += value
-        if name in {
-            "flexible_payment_schedule",
-            "early_payment",
-            "ozon_warehouse_pickup",
-            "ozon_warehouse_pickup_assortment",
-            "temporary_placement_agent",
-            "booking_space_and_staff_for_partial_shipment",
-            "processing_of_identified_surpluses_in_shipment",
-            "goods_shelf_life_processing",
-            "defect_processing",
-            "offset_of_claims_between_contracts",
-            "decompensation_and_return_to_warehouse",
-            "product_disposal",
-            "product_placement_in_ozon_warehouses",
-        }:
-            out["avoidable"] += raw_value
+        for component in AVOIDABLE_COMPONENTS:
+            if name in component["tags"]:
+                out[component["key"]] += raw_value
+    out["avoidable"] = sum(float(out.get(component["key"], 0.0) or 0.0) for component in AVOIDABLE_COMPONENTS)
+    out["avoidable_breakdown"] = [
+        {"label": str(component["label"]), "amount": float(out.get(component["key"], 0.0) or 0.0)}
+        for component in AVOIDABLE_COMPONENTS
+        if float(out.get(component["key"], 0.0) or 0.0) != 0.0
+    ]
     return out
 
 
@@ -607,6 +654,7 @@ def get_unit_economics_summary(*, company: str | None, date_from: str, date_to: 
                 "revenue": float(pd.to_numeric(applied["revenue"], errors="coerce").fillna(0.0).sum()),
                 "ebitda_total": float((pd.to_numeric(applied["EBITDA"], errors="coerce").fillna(0.0) * qty).sum()),
                 "avoidable": float(finance_costs.get("avoidable", 0.0) or 0.0),
+                "avoidable_breakdown": finance_costs.get("avoidable_breakdown", []),
                 "tea_cost": float((pd.to_numeric(applied["tea_cost"], errors="coerce").fillna(0.0) * qty).sum()),
                 "package_cost": float((pd.to_numeric(applied["package_cost"], errors="coerce").fillna(0.0) * qty).sum()),
                 "label_cost": float((pd.to_numeric(applied["label_cost"], errors="coerce").fillna(0.0) * qty).sum()),
@@ -623,10 +671,10 @@ def get_unit_economics_summary(*, company: str | None, date_from: str, date_to: 
             }
         )
     revenue_total = sum(float(row["revenue"]) for row in rows)
-    totals = {key: 0.0 for key in rows[0].keys() if key != "day"} if rows else {}
+    totals = {key: 0.0 for key in rows[0].keys() if key not in {"day", "avoidable_breakdown"}} if rows else {}
     for row in rows:
         for key, value in row.items():
-            if key != "day":
+            if key not in {"day", "avoidable_breakdown"}:
                 totals[key] = totals.get(key, 0.0) + float(value)
     totals_pct: dict[str, float | str] = {}
     for key, value in totals.items():

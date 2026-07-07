@@ -74,6 +74,7 @@ export type MainOverviewWeeklyRow = {
   total_drr_pct: number;
   ebitda: number;
   avoidable: number;
+  avoidable_breakdown: Array<{ label: string; amount: number }>;
   ebitda_pct: number;
   total_revenue_per_day: number;
   money_spent_per_day: number;
