@@ -6,6 +6,7 @@ class FinanceRowResponse(BaseModel):
     opening_balance: int
     closing_balance: int
     change: int
+    avoidable: int
     sales: int
     fee: int
     acquiring: int

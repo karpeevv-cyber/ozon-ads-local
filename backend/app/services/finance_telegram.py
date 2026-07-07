@@ -20,10 +20,12 @@ FinanceRow = dict[str, int | float | str]
 
 FINANCE_TELEGRAM_COLUMNS: list[tuple[str, tuple[str, ...]]] = [
     ("день", ("day",)),
+    ("продажи", ("sales",)),
+    ("дрр", ("drr",)),
     ("на начало дня", ("opening_balance",)),
     ("на конец дня", ("closing_balance",)),
     ("изменение", ("change",)),
-    ("продажи", ("sales",)),
+    ("возможно избежать", ("avoidable",)),
     ("комиссия + эквайринг", ("fee", "acquiring")),
     ("выплаты", ("payments",)),
     ("комиссия за выплату", ("payment_commission",)),
@@ -64,16 +66,22 @@ def _format_value(value: object, *, is_percent: bool = False) -> str:
 
 
 def _column_value(row: FinanceRow, keys: tuple[str, ...]) -> object:
+    if keys == ("drr",):
+        sales = _number(row.get("sales", 0))
+        ads = _number(row.get("marketing", 0)) + _number(row.get("promotion_with_cpo", 0))
+        return (-ads / sales * 100.0) if sales else 0.0
     if len(keys) == 1:
         return row.get(keys[0], 0)
     return sum(_number(row.get(key, 0)) for key in keys)
 
 
 def build_finance_telegram_message(*, company_name: str, row: FinanceRow) -> str:
-    lines = [f"company: {company_name}"]
-    for label, keys in FINANCE_TELEGRAM_COLUMNS:
+    lines: list[str] = []
+    for index, (label, keys) in enumerate(FINANCE_TELEGRAM_COLUMNS):
+        if index in {3, 7}:
+            lines.append("")
         value = _column_value(row, keys)
-        lines.append(f"{label}: {_format_value(value, is_percent=keys == ('logistics_pct',))}")
+        lines.append(f"{label}: {_format_value(value, is_percent=keys in {('drr',), ('logistics_pct',)})}")
     return "\n".join(lines)
 
 

@@ -123,6 +123,25 @@ class FinanceSummaryTests(unittest.TestCase):
         self.assertEqual(summary["rows"][0]["errors"], -145)
         self.assertEqual(summary["totals"]["errors"], -145)
 
+    def test_finance_summary_calculates_avoidable_costs(self):
+        payload = self._payload_with_services(
+            [
+                {"name": "early_payment", "amount": {"value": -100}},
+                {"name": "temporary_placement_agent", "amount": {"value": -200}},
+                {"name": "booking_space_and_staff_for_partial_shipment", "amount": {"value": -300}},
+                {"name": "defect_processing", "amount": {"value": -400}},
+                {"name": "offset_of_claims_between_contracts", "amount": {"value": -500}},
+                {"name": "decompensation_and_return_to_warehouse", "amount": {"value": -600}},
+                {"name": "product_disposal", "amount": {"value": -700}},
+            ],
+            accrued=-2800,
+        )
+
+        summary = self._summary_for("2026-07-06", payload)
+
+        self.assertEqual(summary["rows"][0]["avoidable"], -2800)
+        self.assertEqual(summary["totals"]["avoidable"], -2800)
+
     def _summary_for(self, day: str, payload: dict):
         with (
             patch("app.services.finance_summary.resolve_company_config", return_value=("aura", {"seller_client_id": "1", "seller_api_key": "k"})),

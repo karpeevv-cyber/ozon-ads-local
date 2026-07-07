@@ -148,6 +148,15 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
             + seller_bonuses
             - float(accrued or 0)
         )
+        avoidable = (
+            payment_commission
+            + pickup_point_storage
+            + errors
+            + defects
+            + mutual_offset
+            + decompensation
+            + disposal
+        )
 
         rows.append(
             {
@@ -155,6 +164,7 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
                 "opening_balance": _ceil_int(opening_balance),
                 "closing_balance": _ceil_int(closing_balance),
                 "change": _ceil_int(accrued),
+                "avoidable": _ceil_int(avoidable),
                 "sales": _ceil_int(sales),
                 "fee": _ceil_int(fee),
                 "acquiring": _ceil_int(acquiring),

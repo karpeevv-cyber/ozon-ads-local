@@ -25,6 +25,7 @@ const columns: FinanceColumn[] = [
   column("opening_balance", "start", "на начало дня"),
   column("closing_balance", "end", "на конец дня"),
   column("change", "delta", "изменение"),
+  column("avoidable", "avoidable", "расходы, которых потенциально можно избежать"),
   column("sales", "sales", "продажи"),
   { key: "fee_acquiring", keys: ["fee", "acquiring"], label: "fee + acq.", title: "комиссия + эквайринг" },
   column("payments", "pays", "выплаты"),

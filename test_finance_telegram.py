@@ -16,6 +16,7 @@ class FinanceTelegramTests(TestCase):
             "opening_balance": 100,
             "closing_balance": 200,
             "change": 100,
+            "avoidable": -2800,
             "sales": 1000,
             "fee": -100,
             "acquiring": -20,
@@ -43,8 +44,19 @@ class FinanceTelegramTests(TestCase):
         }
 
         message = build_finance_telegram_message(company_name="aura", row=row)
+        lines = message.splitlines()
 
-        self.assertIn("company: aura", message)
+        self.assertEqual(lines[:9], [
+            "день: 2026-07-06",
+            "продажи: 1000",
+            "дрр: 3.3%",
+            "",
+            "на начало дня: 100",
+            "на конец дня: 200",
+            "изменение: 100",
+            "возможно избежать: -2800",
+            "",
+        ])
         self.assertIn("день: 2026-07-06", message)
         self.assertIn("комиссия + эквайринг: -120", message)
         self.assertIn("обратная логистика + возвраты: -45", message)

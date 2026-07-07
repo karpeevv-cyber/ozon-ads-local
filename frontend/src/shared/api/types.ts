@@ -428,6 +428,7 @@ export type FinanceRow = {
   opening_balance: number;
   closing_balance: number;
   change: number;
+  avoidable: number;
   sales: number;
   fee: number;
   acquiring: number;
