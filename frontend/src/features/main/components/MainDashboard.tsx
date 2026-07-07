@@ -144,16 +144,6 @@ function MetricCell({
   return (
     <td className={`metric-cell metric-cell-${tone}`} style={style} title={tooltipText}>
       <span>{formatted}</span>
-      {tooltipItems?.length ? (
-        <div className="metric-tooltip" role="tooltip">
-          {tooltipItems.map((item) => (
-            <div className="metric-tooltip-row" key={item.label}>
-              <span>{item.label}</span>
-              <strong>{formatMoney(item.amount)}</strong>
-            </div>
-          ))}
-        </div>
-      ) : null}
     </td>
   );
 }
