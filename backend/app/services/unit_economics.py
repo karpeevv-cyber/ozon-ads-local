@@ -422,10 +422,12 @@ def _load_finance_period_costs(date_from: str, date_to: str, *, seller_client_id
         "storage": 0.0,
         "points_for_reviews": 0.0,
         "seller_bonuses": 0.0,
+        "avoidable": 0.0,
     }
     for service in services:
         name = str(service.get("name", "") or "").strip()
-        value = abs(_to_num((service.get("amount", {}) or {}).get("value", 0)))
+        raw_value = _to_num((service.get("amount", {}) or {}).get("value", 0))
+        value = abs(raw_value)
         if name in {"logistics", "courier_client_reinvoice"}:
             out["logistics"] += value
         elif name == "cross_docking":
@@ -450,6 +452,22 @@ def _load_finance_period_costs(date_from: str, date_to: str, *, seller_client_id
             out["points_for_reviews"] += value
         elif name == "seller_bonuses":
             out["seller_bonuses"] += value
+        if name in {
+            "flexible_payment_schedule",
+            "early_payment",
+            "ozon_warehouse_pickup",
+            "ozon_warehouse_pickup_assortment",
+            "temporary_placement_agent",
+            "booking_space_and_staff_for_partial_shipment",
+            "processing_of_identified_surpluses_in_shipment",
+            "goods_shelf_life_processing",
+            "defect_processing",
+            "offset_of_claims_between_contracts",
+            "decompensation_and_return_to_warehouse",
+            "product_disposal",
+            "product_placement_in_ozon_warehouses",
+        }:
+            out["avoidable"] += raw_value
     return out
 
 
@@ -467,7 +485,7 @@ def _apply_unit_econ_costs(sales_df: pd.DataFrame, costs_df: pd.DataFrame, finan
         merged[col] = pd.to_numeric(merged[col], errors="coerce").fillna(0.0)
     merged["delivery_fbo"] = (finance_costs["cross_docking"] + finance_costs["acceptance"]) / total_units
     merged["promotion"] = (finance_costs["marketing"] + finance_costs["promotion_with_cpo"]) / total_units
-    merged["ozon_percent_cost"] = merged["sale"].apply(lambda value: float(value) * (0.20 if float(value) <= 300 else 0.31))
+    merged["ozon_percent_cost"] = merged["sale"].apply(lambda value: float(value) * (0.20 if float(value) <= 300 else 0.36))
     merged["ozon_logistics"] = finance_costs["logistics"] / total_units
     merged["other_costs"] = (
         finance_costs["acquiring"]
@@ -588,6 +606,7 @@ def get_unit_economics_summary(*, company: str | None, date_from: str, date_to: 
                 "day": str(day_str),
                 "revenue": float(pd.to_numeric(applied["revenue"], errors="coerce").fillna(0.0).sum()),
                 "ebitda_total": float((pd.to_numeric(applied["EBITDA"], errors="coerce").fillna(0.0) * qty).sum()),
+                "avoidable": float(finance_costs.get("avoidable", 0.0) or 0.0),
                 "tea_cost": float((pd.to_numeric(applied["tea_cost"], errors="coerce").fillna(0.0) * qty).sum()),
                 "package_cost": float((pd.to_numeric(applied["package_cost"], errors="coerce").fillna(0.0) * qty).sum()),
                 "label_cost": float((pd.to_numeric(applied["label_cost"], errors="coerce").fillna(0.0) * qty).sum()),

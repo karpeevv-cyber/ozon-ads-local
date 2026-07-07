@@ -150,12 +150,14 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
         )
         avoidable = (
             payment_commission
+            + export
             + pickup_point_storage
             + errors
             + defects
             + mutual_offset
             + decompensation
             + disposal
+            + storage
         )
 
         rows.append(

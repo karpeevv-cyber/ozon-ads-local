@@ -29,6 +29,7 @@ const WEEKLY_METRIC_KEYS = [
   "total_revenue",
   "total_drr_pct",
   "ebitda",
+  "avoidable",
   "ebitda_pct",
   "total_revenue_per_day",
   "money_spent_per_day",
@@ -304,6 +305,7 @@ function WeeklyTable({ overview }: MainDashboardProps) {
               <th>revenue</th>
               <th>drr</th>
               <th>ebitda</th>
+              <th>avoidable</th>
               <th>ebitda_pct</th>
               <th>revenue/day</th>
               <th>spent/day</th>
@@ -320,7 +322,7 @@ function WeeklyTable({ overview }: MainDashboardProps) {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={15} className="empty-cell">
+                <td colSpan={16} className="empty-cell">
                   Нет weekly-данных.
                 </td>
               </tr>
@@ -331,6 +333,7 @@ function WeeklyTable({ overview }: MainDashboardProps) {
                   <MetricCell metric="total_revenue" value={row.total_revenue} formatted={formatMoney(row.total_revenue)} domain={metricDomain} />
                   <MetricCell metric="total_drr_pct" value={row.total_drr_pct} formatted={formatPct(row.total_drr_pct)} domain={metricDomain} />
                   <MetricCell metric="ebitda" value={row.ebitda} formatted={formatMoney(row.ebitda)} domain={metricDomain} />
+                  <MetricCell metric="avoidable" value={row.avoidable} formatted={formatMoney(row.avoidable)} domain={metricDomain} />
                   <MetricCell metric="ebitda_pct" value={row.ebitda_pct} formatted={formatPct(row.ebitda_pct)} domain={metricDomain} />
                   <MetricCell metric="total_revenue_per_day" value={row.total_revenue_per_day} formatted={formatMoney(row.total_revenue_per_day)} domain={metricDomain} />
                   <MetricCell metric="money_spent_per_day" value={row.money_spent_per_day} formatted={formatMoney(row.money_spent_per_day)} domain={metricDomain} />

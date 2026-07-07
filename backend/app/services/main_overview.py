@@ -77,17 +77,22 @@ def _daily_rows_with_legacy_main_logic(
                 else 0.0,
                 axis=1,
             )
+        if "avoidable" not in ebitda_daily.columns:
+            ebitda_daily["avoidable"] = 0.0
         df_daily_raw = df_daily_raw.merge(
-            ebitda_daily[["day", "ebitda", "ebitda_pct"]],
+            ebitda_daily[["day", "ebitda", "avoidable", "ebitda_pct"]],
             on="day",
             how="left",
         )
 
     if "ebitda" not in df_daily_raw.columns:
         df_daily_raw["ebitda"] = 0.0
+    if "avoidable" not in df_daily_raw.columns:
+        df_daily_raw["avoidable"] = 0.0
     if "ebitda_pct" not in df_daily_raw.columns:
         df_daily_raw["ebitda_pct"] = 0.0
     df_daily_raw["ebitda"] = pd.to_numeric(df_daily_raw["ebitda"], errors="coerce").fillna(0.0)
+    df_daily_raw["avoidable"] = pd.to_numeric(df_daily_raw["avoidable"], errors="coerce").fillna(0.0)
     df_daily_raw["ebitda_pct"] = pd.to_numeric(df_daily_raw["ebitda_pct"], errors="coerce").fillna(0.0)
 
     campaign_title_map = {
@@ -177,6 +182,8 @@ def _campaign_weekly_aggregate(df_daily_raw: pd.DataFrame, target_drr_pct: float
             dfw["orders_money_ads"] = 0.0
     if "ebitda" not in dfw.columns:
         dfw["ebitda"] = 0.0
+    if "avoidable" not in dfw.columns:
+        dfw["avoidable"] = 0.0
 
     agg = (
         dfw.groupby("week_start", as_index=False)
@@ -190,6 +197,7 @@ def _campaign_weekly_aggregate(df_daily_raw: pd.DataFrame, target_drr_pct: float
             total_revenue=("total_revenue", "sum"),
             ordered_units=("ordered_units", "sum"),
             ebitda=("ebitda", "sum"),
+            avoidable=("avoidable", "sum"),
         )
         .sort_values("week_start")
     )
@@ -348,6 +356,7 @@ def get_main_overview(*, company: str | None, date_from: str, date_to: str, targ
         "total_revenue",
         "total_drr_pct",
         "ebitda",
+        "avoidable",
         "ebitda_pct",
         "total_revenue_per_day",
         "money_spent_per_day",

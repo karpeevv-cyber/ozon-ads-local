@@ -80,6 +80,7 @@ class MainOverviewWeeklyRowResponse(BaseModel):
     total_revenue: float
     total_drr_pct: float
     ebitda: float
+    avoidable: float = 0.0
     ebitda_pct: float
     total_revenue_per_day: float
     money_spent_per_day: float

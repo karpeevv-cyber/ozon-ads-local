@@ -133,14 +133,16 @@ class FinanceSummaryTests(unittest.TestCase):
                 {"name": "offset_of_claims_between_contracts", "amount": {"value": -500}},
                 {"name": "decompensation_and_return_to_warehouse", "amount": {"value": -600}},
                 {"name": "product_disposal", "amount": {"value": -700}},
+                {"name": "ozon_warehouse_pickup", "amount": {"value": -800}},
+                {"name": "product_placement_in_ozon_warehouses", "amount": {"value": -900}},
             ],
-            accrued=-2800,
+            accrued=-4500,
         )
 
         summary = self._summary_for("2026-07-06", payload)
 
-        self.assertEqual(summary["rows"][0]["avoidable"], -2800)
-        self.assertEqual(summary["totals"]["avoidable"], -2800)
+        self.assertEqual(summary["rows"][0]["avoidable"], -4500)
+        self.assertEqual(summary["totals"]["avoidable"], -4500)
 
     def _summary_for(self, day: str, payload: dict):
         with (

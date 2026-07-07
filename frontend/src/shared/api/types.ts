@@ -73,6 +73,7 @@ export type MainOverviewWeeklyRow = {
   total_revenue: number;
   total_drr_pct: number;
   ebitda: number;
+  avoidable: number;
   ebitda_pct: number;
   total_revenue_per_day: number;
   money_spent_per_day: number;
