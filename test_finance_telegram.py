@@ -45,15 +45,15 @@ class FinanceTelegramTests(TestCase):
         message = build_finance_telegram_message(company_name="aura", row=row)
 
         self.assertIn("company: aura", message)
-        self.assertIn("day: 2026-07-06", message)
-        self.assertIn("fee + acq.: -120", message)
-        self.assertIn("rev. log. + ret.: -45", message)
-        self.assertIn("cross + accept: -13", message)
-        self.assertIn("payment commission: -12", message)
-        self.assertIn("pickup point storage: -9", message)
-        self.assertIn("mutual offset: -12", message)
-        self.assertIn("decompensation: -13", message)
-        self.assertIn("disposal: -14", message)
+        self.assertIn("день: 2026-07-06", message)
+        self.assertIn("комиссия + эквайринг: -120", message)
+        self.assertIn("обратная логистика + возвраты: -45", message)
+        self.assertIn("кросс-докинг + приемка: -13", message)
+        self.assertIn("комиссия за выплату: -12", message)
+        self.assertIn("хранение товаров в ПВЗ: -9", message)
+        self.assertIn("взаимозачет: -12", message)
+        self.assertIn("декомпенсация: -13", message)
+        self.assertIn("утилизация: -14", message)
 
     def test_resolve_company_chat_id_supports_company_specific_and_legacy_second_company(self):
         env = {
