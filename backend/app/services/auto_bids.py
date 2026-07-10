@@ -458,7 +458,7 @@ async def auto_bids_scheduler_loop(timezone_name: str) -> None:
 
     while True:
         now = datetime.now(tz)
-        sleep_seconds = _seconds_until_next_run(now, target_hour=int(os.getenv("AUTO_BIDS_HOUR", "9")))
+        sleep_seconds = _seconds_until_next_run(now, target_hour=int(os.getenv("AUTO_BIDS_HOUR", "8")))
         logger.info("auto bids scheduler sleeping", extra={"next_run": (now + timedelta(seconds=sleep_seconds)).isoformat()})
         await asyncio.sleep(sleep_seconds)
         try:
