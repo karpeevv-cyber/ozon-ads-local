@@ -19,6 +19,25 @@ def default_company_from_env() -> dict[str, str]:
     }
 
 
+def legacy_company_configs_from_env() -> dict[str, dict[str, str]]:
+    configs: dict[str, dict[str, str]] = {}
+    first_name = os.getenv("COMPANY_NAME", "").strip() or "default"
+    first = default_company_from_env()
+    if any((first.get(key) or "").strip() for key in first):
+        configs[first_name] = first
+
+    second_name = os.getenv("COMPANY_NAME_2", "").strip()
+    second = {
+        "perf_client_id": os.getenv("PERF_CLIENT_ID_2", ""),
+        "perf_client_secret": os.getenv("PERF_CLIENT_SECRET_2", ""),
+        "seller_client_id": os.getenv("SELLER_CLIENT_ID_2", ""),
+        "seller_api_key": os.getenv("SELLER_API_KEY_2", ""),
+    }
+    if second_name and any((second.get(key) or "").strip() for key in second):
+        configs[second_name] = second
+    return configs
+
+
 def _parse_company_value(value: str) -> dict[str, str]:
     raw = value.strip().strip("\"'").strip()
     if not raw:
@@ -173,15 +192,21 @@ def _config_from_organization(organization: Organization) -> dict[str, str]:
 def load_runtime_company_configs(env_path: str = ".env") -> dict[str, dict[str, str]]:
     db = SessionLocal()
     try:
-        organizations = (
-            db.query(Organization)
-            .options(joinedload(Organization.credentials))
-            .filter(Organization.is_active.is_(True))
-            .order_by(Organization.slug.asc())
-            .all()
-        )
-        if organizations:
-            return {organization.slug: _config_from_organization(organization) for organization in organizations}
+        try:
+            organizations = (
+                db.query(Organization)
+                .options(joinedload(Organization.credentials))
+                .filter(Organization.is_active.is_(True))
+                .order_by(Organization.slug.asc())
+                .all()
+            )
+            if organizations:
+                return {organization.slug: _config_from_organization(organization) for organization in organizations}
+        except Exception:
+            pass
     finally:
         db.close()
-    return load_company_configs(env_path=env_path)
+    configs = load_company_configs(env_path=env_path)
+    if configs:
+        return configs
+    return legacy_company_configs_from_env()

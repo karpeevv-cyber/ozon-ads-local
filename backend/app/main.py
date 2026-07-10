@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from app.api.router import build_api_router
 from app.core.config import get_settings
+from app.services.auto_bids import auto_bids_scheduler_loop
 from app.services.finance_telegram import finance_telegram_scheduler_loop
 from app.services.shipment_history_scheduler import shipment_history_scheduler_loop
 
@@ -27,12 +28,17 @@ def create_app() -> FastAPI:
             finance_telegram_scheduler_loop(settings.timezone),
             name="finance-telegram-daily-scheduler",
         )
+        auto_bids_task = asyncio.create_task(
+            auto_bids_scheduler_loop(settings.timezone),
+            name="auto-bids-daily-scheduler",
+        )
         try:
             yield
         finally:
             for task, task_name in [
                 (scheduler_task, "shipment_history scheduler"),
                 (finance_telegram_task, "finance telegram scheduler"),
+                (auto_bids_task, "auto bids scheduler"),
             ]:
                 task.cancel()
                 try:

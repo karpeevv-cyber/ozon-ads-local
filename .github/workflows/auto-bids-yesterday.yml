@@ -1,0 +1,49 @@
+name: Auto Bids Yesterday
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Calculate only, do not apply bid changes"
+        required: true
+        default: "1"
+        type: choice
+        options:
+          - "1"
+          - "0"
+
+jobs:
+  auto_bids:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run auto bids
+        env:
+          TZ: Europe/Moscow
+          DRY_RUN: ${{ inputs.dry_run }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          TG_CHAT_ID_2: ${{ secrets.TG_CHAT_ID_2 }}
+          COMPANY_NAME: ${{ secrets.COMPANY_NAME }}
+          COMPANY_NAME_2: ${{ secrets.COMPANY_NAME_2 }}
+          PERF_CLIENT_ID: ${{ secrets.PERF_CLIENT_ID }}
+          PERF_CLIENT_SECRET: ${{ secrets.PERF_CLIENT_SECRET }}
+          SELLER_CLIENT_ID: ${{ secrets.SELLER_CLIENT_ID }}
+          SELLER_API_KEY: ${{ secrets.SELLER_API_KEY }}
+          PERF_CLIENT_ID_2: ${{ secrets.PERF_CLIENT_ID_2 }}
+          PERF_CLIENT_SECRET_2: ${{ secrets.PERF_CLIENT_SECRET_2 }}
+          SELLER_CLIENT_ID_2: ${{ secrets.SELLER_CLIENT_ID_2 }}
+          SELLER_API_KEY_2: ${{ secrets.SELLER_API_KEY_2 }}
+        run: python auto_bids_yesterday.py
