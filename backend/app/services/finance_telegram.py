@@ -20,7 +20,7 @@ FinanceRow = dict[str, int | float | str]
 
 FINANCE_TELEGRAM_COLUMNS: list[tuple[str, tuple[str, ...]]] = [
     ("день", ("day",)),
-    ("продажи", ("sales",)),
+    ("продажи", ("revenue",)),
     ("дрр", ("drr",)),
     ("на начало дня", ("opening_balance",)),
     ("на конец дня", ("closing_balance",)),
@@ -67,9 +67,11 @@ def _format_value(value: object, *, is_percent: bool = False) -> str:
 
 def _column_value(row: FinanceRow, keys: tuple[str, ...]) -> object:
     if keys == ("drr",):
-        sales = _number(row.get("sales", 0))
+        sales = _number(row.get("revenue", 0))
         ads = _number(row.get("marketing", 0)) + _number(row.get("promotion_with_cpo", 0))
         return (-ads / sales * 100.0) if sales else 0.0
+    if keys == ("revenue",):
+        return row.get("revenue", 0)
     if len(keys) == 1:
         return row.get(keys[0], 0)
     return sum(_number(row.get(key, 0)) for key in keys)

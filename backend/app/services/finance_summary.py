@@ -4,7 +4,7 @@ import math
 from datetime import date, timedelta
 
 from app.services.company_config import resolve_company_config
-from app.services.integrations.ozon_seller import seller_finance_balance
+from app.services.integrations.ozon_seller import seller_analytics_sku_day, seller_finance_balance
 
 
 def _daterange(d_from: date, d_to: date):
@@ -37,6 +37,16 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
 
     start = date.fromisoformat(date_from)
     end = date.fromisoformat(date_to)
+    try:
+        _by_sku, revenue_by_day, _by_day_sku = seller_analytics_sku_day(
+            date_from,
+            date_to,
+            limit=1000,
+            client_id=seller_client_id,
+            api_key=seller_api_key,
+        )
+    except Exception:
+        revenue_by_day = {}
     rows = []
     for day in reversed(list(_daterange(start, end))):
         day_str = day.isoformat()
@@ -54,6 +64,7 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
         accrued = total.get("accrued", {}).get("value", 0)
         payments = sum(float(p.get("value", 0) or 0) for p in (total.get("payments", []) or []))
         sales = cashflows.get("sales", {}).get("amount", {}).get("value", 0)
+        revenue, _ordered_units = revenue_by_day.get(day_str, (0.0, 0))
         fee = cashflows.get("sales", {}).get("fee", {}).get("value", 0)
 
         services = cashflows.get("services", []) or []
@@ -122,7 +133,7 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
             if name == "points_for_reviews":
                 points_for_reviews += value
 
-        sales_val = float(sales or 0)
+        sales_val = float(revenue or 0)
         pct_logistics = (logistics / sales_val * 100.0) if sales_val else 0.0
         check_value = (
             float(sales or 0)
@@ -167,7 +178,9 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
                 "closing_balance": _ceil_int(closing_balance),
                 "change": _ceil_int(accrued),
                 "avoidable": _ceil_int(avoidable),
-                "sales": _ceil_int(sales),
+                "sales": _ceil_int(revenue),
+                "revenue": _ceil_int(revenue),
+                "finance_sales": _ceil_int(sales),
                 "fee": _ceil_int(fee),
                 "acquiring": _ceil_int(acquiring),
                 "payments": _ceil_int(payments),

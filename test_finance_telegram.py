@@ -18,6 +18,7 @@ class FinanceTelegramTests(TestCase):
             "change": 100,
             "avoidable": -2800,
             "sales": 1000,
+            "revenue": 1000,
             "fee": -100,
             "acquiring": -20,
             "payments": -500,

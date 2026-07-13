@@ -144,10 +144,30 @@ class FinanceSummaryTests(unittest.TestCase):
         self.assertEqual(summary["rows"][0]["avoidable"], -4500)
         self.assertEqual(summary["totals"]["avoidable"], -4500)
 
+    def test_finance_summary_uses_seller_analytics_revenue(self):
+        payload = self._payload_with_services([], accrued=0)
+        payload["cashflows"]["sales"]["amount"]["value"] = 1270
+
+        with (
+            patch("app.services.finance_summary.resolve_company_config", return_value=("aura", {"seller_client_id": "1", "seller_api_key": "k"})),
+            patch("app.services.finance_summary.seller_finance_balance", return_value=payload),
+            patch(
+                "app.services.finance_summary.seller_analytics_sku_day",
+                return_value=({}, {"2026-07-12": (4950.0, 7)}, {}),
+            ),
+        ):
+            summary = get_finance_summary(company="aura", date_from="2026-07-12", date_to="2026-07-12")
+
+        self.assertEqual(summary["rows"][0]["sales"], 4950)
+        self.assertEqual(summary["rows"][0]["revenue"], 4950)
+        self.assertEqual(summary["rows"][0]["finance_sales"], 1270)
+        self.assertEqual(summary["totals"]["revenue"], 4950)
+
     def _summary_for(self, day: str, payload: dict):
         with (
             patch("app.services.finance_summary.resolve_company_config", return_value=("aura", {"seller_client_id": "1", "seller_api_key": "k"})),
             patch("app.services.finance_summary.seller_finance_balance", return_value=payload),
+            patch("app.services.finance_summary.seller_analytics_sku_day", return_value=({}, {}, {})),
         ):
             return get_finance_summary(company="aura", date_from=day, date_to=day)
 
