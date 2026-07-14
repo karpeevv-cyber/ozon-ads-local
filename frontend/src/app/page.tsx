@@ -3,6 +3,7 @@ import { BidAuditPanel } from "@/features/bids/components/BidAuditPanel";
 import { BidApplyCard } from "@/features/bids/components/BidApplyCard";
 import { AllCampaignsPanel } from "@/features/campaigns/components/AllCampaignsPanel";
 import { CampaignFilters } from "@/features/campaigns/components/CampaignFilters";
+import { CampaignHourlyPanel } from "@/features/campaigns/components/CampaignHourlyPanel";
 import { CurrentCampaignsPanel } from "@/features/campaigns/components/CurrentCampaignsPanel";
 import { FinancePanel } from "@/features/finance/components/FinancePanel";
 import { MainDashboard } from "@/features/main/components/MainDashboard";
@@ -14,6 +15,7 @@ import { UnitEconomicsEditor } from "@/features/unit-economics/components/UnitEc
 import { UnitEconomicsPanel } from "@/features/unit-economics/components/UnitEconomicsPanel";
 import {
   getCampaignComments,
+  getCampaignHourlyReport,
   getCampaignReport,
   getCompanies,
   getCurrentCampaignDetail,
@@ -47,12 +49,15 @@ type HomePageProps = {
     storage_refresh?: string;
     main_refresh?: string;
     current_campaign_id?: string;
+    campaign_hourly_day?: string;
+    campaign_hourly_id?: string;
   }>;
 };
 
 type SupportedTab =
   | "main"
   | "all-campaigns"
+  | "campaign-hours"
   | "current-campaigns"
   | "tests"
   | "unit-economics"
@@ -67,6 +72,7 @@ type SupportedTab =
 const supportedTabs = new Set<SupportedTab>([
   "main",
   "all-campaigns",
+  "campaign-hours",
   "current-campaigns",
   "tests",
   "unit-economics",
@@ -180,6 +186,8 @@ async function renderTabContent(params: {
   stocksRefresh: boolean;
   storageRefresh: boolean;
   currentCampaignId?: string;
+  campaignHourlyDay?: string;
+  campaignHourlyId?: string;
 }) {
   const {
     activeTab,
@@ -197,6 +205,8 @@ async function renderTabContent(params: {
     stocksRefresh,
     storageRefresh,
     currentCampaignId,
+    campaignHourlyDay,
+    campaignHourlyId,
   } = params;
 
   switch (activeTab) {
@@ -234,6 +244,14 @@ async function renderTabContent(params: {
         campaignId: currentCampaignId,
       });
       return <CurrentCampaignsPanel detail={detail} />;
+    }
+    case "campaign-hours": {
+      const report = await getCampaignHourlyReport({
+        company: selectedCompany,
+        day: campaignHourlyDay || dateTo,
+        campaignId: campaignHourlyId,
+      });
+      return <CampaignHourlyPanel report={report} />;
     }
     case "tests": {
       const [recentBidChanges, campaignComments] = await Promise.all([
@@ -360,6 +378,8 @@ async function TabContent(params: {
   stocksRefresh: boolean;
   storageRefresh: boolean;
   currentCampaignId?: string;
+  campaignHourlyDay?: string;
+  campaignHourlyId?: string;
 }) {
   try {
     return await renderTabContent(params);
@@ -427,7 +447,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     .filter((value, index, arr) => allowedHighlightLevels.has(value) && arr.indexOf(value) === index);
   const stocksReviewMode = String(resolvedSearchParams.stocks_review_mode || "1") !== "0";
   const storageRefresh = Boolean(resolvedSearchParams.storage_refresh);
-  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}:${stocksRegionalOrderMin}:${stocksMinimumSupply}:${stocksPositionFilter}:${stocksAssortmentFilter}:${stocksHighlightLevels.join("|")}:${stocksReviewMode ? "1" : "0"}:${resolvedSearchParams.main_refresh || ""}:${resolvedSearchParams.stocks_refresh || ""}:${resolvedSearchParams.storage_refresh || ""}:${resolvedSearchParams.current_campaign_id || ""}`;
+  const tabStateKey = `${activeTab}:${selectedCompany}:${dateFrom}:${dateTo}:${stocksRegionalOrderMin}:${stocksMinimumSupply}:${stocksPositionFilter}:${stocksAssortmentFilter}:${stocksHighlightLevels.join("|")}:${stocksReviewMode ? "1" : "0"}:${resolvedSearchParams.main_refresh || ""}:${resolvedSearchParams.stocks_refresh || ""}:${resolvedSearchParams.storage_refresh || ""}:${resolvedSearchParams.current_campaign_id || ""}:${resolvedSearchParams.campaign_hourly_day || ""}:${resolvedSearchParams.campaign_hourly_id || ""}`;
   return (
     <AppShell
       filters={
@@ -456,6 +476,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           stocksRefresh={Boolean(resolvedSearchParams.stocks_refresh)}
           storageRefresh={storageRefresh}
           currentCampaignId={resolvedSearchParams.current_campaign_id}
+          campaignHourlyDay={resolvedSearchParams.campaign_hourly_day}
+          campaignHourlyId={resolvedSearchParams.campaign_hourly_id}
         />
       </Suspense>
     </AppShell>

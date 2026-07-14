@@ -169,3 +169,38 @@ class CurrentCampaignResponse(BaseModel):
     daily_rows: list[CurrentCampaignMetricRowResponse]
     comments: list[CurrentCampaignCommentResponse]
     test_history: list[CurrentCampaignTestResponse]
+
+
+class CampaignHourlyOptionResponse(BaseModel):
+    campaign_id: str
+    title: str
+    state: str
+
+
+class CampaignHourlySampleResponse(BaseModel):
+    sample_hour: int
+    sample_at: str | None = None
+    views: int
+    clicks: int
+    money_spent: float
+
+
+class CampaignHourlyRowResponse(BaseModel):
+    hour: int
+    label: str
+    views: int
+    clicks: int
+    money_spent: float
+    has_data: bool
+    start_sample: CampaignHourlySampleResponse | None = None
+    end_sample: CampaignHourlySampleResponse | None = None
+
+
+class CampaignHourlyResponse(BaseModel):
+    company: str
+    day: str
+    campaigns: list[CampaignHourlyOptionResponse]
+    selected_campaign_id: str
+    selected_campaign_title: str
+    last_sample_at: str | None = None
+    rows: list[CampaignHourlyRowResponse]

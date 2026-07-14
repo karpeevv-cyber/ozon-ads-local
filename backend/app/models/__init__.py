@@ -1,5 +1,6 @@
 from app.models.bids import BidChange, CampaignComment
 from app.models.campaign import Campaign, CampaignDailyMetric, CampaignProduct
+from app.models.campaign_hourly import CampaignHourlySnapshot
 from app.models.main_overview_cache import MainOverviewCache
 from app.models.organization import MarketplaceCredential, Organization
 from app.models.stock_warehouse_preference import StockWarehousePreference
@@ -16,6 +17,7 @@ __all__ = [
     "Campaign",
     "CampaignComment",
     "CampaignDailyMetric",
+    "CampaignHourlySnapshot",
     "CampaignProduct",
     "MainOverviewCache",
     "MarketplaceCredential",

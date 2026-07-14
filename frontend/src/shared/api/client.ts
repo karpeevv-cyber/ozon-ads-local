@@ -4,6 +4,7 @@ import {
   AddCampaignCommentPayload,
   AddCampaignCommentResponse,
   CampaignReport,
+  CampaignHourlyReport,
   CampaignCommentRecord,
   CompanyConfig,
   CurrentCampaignDetail,
@@ -204,6 +205,21 @@ export function getCurrentCampaignDetail(params: {
     search.set("campaign_id", params.campaignId);
   }
   return requestJson<CurrentCampaignDetail>(`/campaigns/current-detail?${search.toString()}`);
+}
+
+export function getCampaignHourlyReport(params: {
+  company?: string;
+  day: string;
+  campaignId?: string;
+}): Promise<CampaignHourlyReport> {
+  const search = new URLSearchParams({ day: params.day });
+  if (params.company) {
+    search.set("company", params.company);
+  }
+  if (params.campaignId) {
+    search.set("campaign_id", params.campaignId);
+  }
+  return requestJson<CampaignHourlyReport>(`/campaigns/hourly?${search.toString()}`);
 }
 
 export function getMainOverview(params: {

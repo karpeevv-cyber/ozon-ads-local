@@ -270,6 +270,41 @@ export type CurrentCampaignDetail = {
   test_history: CurrentCampaignTest[];
 };
 
+export type CampaignHourlyOption = {
+  campaign_id: string;
+  title: string;
+  state: string;
+};
+
+export type CampaignHourlySample = {
+  sample_hour: number;
+  sample_at: string | null;
+  views: number;
+  clicks: number;
+  money_spent: number;
+};
+
+export type CampaignHourlyRow = {
+  hour: number;
+  label: string;
+  views: number;
+  clicks: number;
+  money_spent: number;
+  has_data: boolean;
+  start_sample: CampaignHourlySample | null;
+  end_sample: CampaignHourlySample | null;
+};
+
+export type CampaignHourlyReport = {
+  company: string;
+  day: string;
+  campaigns: CampaignHourlyOption[];
+  selected_campaign_id: string;
+  selected_campaign_title: string;
+  last_sample_at: string | null;
+  rows: CampaignHourlyRow[];
+};
+
 export type StockRow = {
   sku: string;
   article: string;

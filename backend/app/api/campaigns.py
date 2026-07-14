@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.schemas.campaigns import (
     CampaignReportResponse,
+    CampaignHourlyResponse,
     CampaignSummaryResponse,
     CompanyConfigResponse,
     CurrentCampaignResponse,
@@ -21,6 +22,7 @@ from app.services.campaign_reporting import (
 from app.services.bid_log import load_bid_changes_df, load_campaign_comments_df
 from app.services.company_config import load_runtime_company_configs, resolve_company_config
 from app.services.current_campaigns import get_current_campaign_detail
+from app.services.campaign_hourly import get_campaign_hourly_report
 from app.services.campaign_report_cache import get_campaign_report_cache, set_campaign_report_cache
 from app.services.integrations.ozon_ads import get_running_campaigns
 from app.services.integrations.ozon_ads import perf_token
@@ -185,6 +187,23 @@ def current_campaign_detail(
             date_to=date_to,
             campaign_id=campaign_id,
             target_drr_pct=float(target_drr_pct),
+        )
+    )
+
+
+@router.get("/hourly", response_model=CampaignHourlyResponse)
+def campaign_hourly(
+    company: str | None = Query(default=None),
+    day: str = Query(...),
+    campaign_id: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> CampaignHourlyResponse:
+    return CampaignHourlyResponse(
+        **get_campaign_hourly_report(
+            db=db,
+            company=company,
+            day=day,
+            campaign_id=campaign_id,
         )
     )
 
