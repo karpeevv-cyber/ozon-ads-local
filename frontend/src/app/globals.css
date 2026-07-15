@@ -1849,12 +1849,10 @@ a {
   text-transform: uppercase;
 }
 
-.campaign-hours-chart {
+.campaign-hours-chart-shell {
   display: grid;
-  grid-template-columns: repeat(24, minmax(28px, 1fr));
-  align-items: flex-end;
-  gap: 8px;
-  height: 320px;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 10px;
   padding: 18px 12px 10px;
   border: 1px solid var(--line);
   border-radius: 22px;
@@ -1867,6 +1865,26 @@ a {
       transparent 1px,
       transparent 64px
     );
+}
+
+.campaign-hours-y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 292px;
+  padding: 0 0 34px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.campaign-hours-chart {
+  display: grid;
+  grid-template-columns: repeat(24, minmax(28px, 1fr));
+  align-items: flex-end;
+  gap: 8px;
+  height: 320px;
   overflow-x: auto;
 }
 

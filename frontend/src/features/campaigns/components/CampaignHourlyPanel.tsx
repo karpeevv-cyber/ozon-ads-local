@@ -21,11 +21,18 @@ function dateLabel(day: string): string {
 export function CampaignHourlyPanel({ report }: { report: CampaignHourlyReport }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const maxViews = Math.max(1, ...report.rows.map((row) => row.views));
-  const maxClicks = Math.max(1, ...report.rows.map((row) => row.clicks));
+  const scaleMax = Math.max(1, ...report.rows.flatMap((row) => [row.views, row.clicks]));
+  const axisTicks = [1, 0.75, 0.5, 0.25, 0].map((factor) => Math.round(scaleMax * factor));
   const totalViews = report.rows.reduce((sum, row) => sum + row.views, 0);
   const totalClicks = report.rows.reduce((sum, row) => sum + row.clicks, 0);
   const sampledHours = report.rows.filter((row) => row.has_data).length;
+
+  function barHeight(value: number): string {
+    if (value <= 0) {
+      return "0%";
+    }
+    return `${Math.max(3, (value / scaleMax) * 100)}%`;
+  }
 
   function updateParams(next: { day?: string; campaignId?: string }) {
     const params = new URLSearchParams(searchParams.toString());
@@ -104,24 +111,31 @@ export function CampaignHourlyPanel({ report }: { report: CampaignHourlyReport }
           {report.last_sample_at ? ` / last sample: ${report.last_sample_at}` : " / no samples collected yet"}
         </p>
 
-        <div className="campaign-hours-chart" aria-label="Hourly clicks and views chart">
-          {report.rows.map((row) => (
-            <div className={`campaign-hours-slot${row.has_data ? "" : " campaign-hours-slot-empty"}`} key={row.hour}>
-              <div className="campaign-hours-bars">
-                <span
-                  className="campaign-hours-bar campaign-hours-bar-views"
-                  style={{ height: `${Math.max(3, (row.views / maxViews) * 100)}%` }}
-                  title={`${row.label}: ${row.views} views`}
-                />
-                <span
-                  className="campaign-hours-bar campaign-hours-bar-clicks"
-                  style={{ height: `${Math.max(3, (row.clicks / maxClicks) * 100)}%` }}
-                  title={`${row.label}: ${row.clicks} clicks`}
-                />
+        <div className="campaign-hours-chart-shell">
+          <div className="campaign-hours-y-axis" aria-hidden="true">
+            {axisTicks.map((tick, index) => (
+              <span key={`${tick}-${index}`}>{formatInt(tick)}</span>
+            ))}
+          </div>
+          <div className="campaign-hours-chart" aria-label="Hourly clicks and views chart">
+            {report.rows.map((row) => (
+              <div className={`campaign-hours-slot${row.has_data ? "" : " campaign-hours-slot-empty"}`} key={row.hour}>
+                <div className="campaign-hours-bars">
+                  <span
+                    className="campaign-hours-bar campaign-hours-bar-views"
+                    style={{ height: barHeight(row.views) }}
+                    title={`${row.label}: ${row.views} views`}
+                  />
+                  <span
+                    className="campaign-hours-bar campaign-hours-bar-clicks"
+                    style={{ height: barHeight(row.clicks) }}
+                    title={`${row.label}: ${row.clicks} clicks`}
+                  />
+                </div>
+                <span className="campaign-hours-hour">{row.hour}</span>
               </div>
-              <span className="campaign-hours-hour">{row.hour}</span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         <div className="campaign-hours-legend">
