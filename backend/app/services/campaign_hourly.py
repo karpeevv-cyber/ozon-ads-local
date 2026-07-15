@@ -16,7 +16,8 @@ from app.db.session import SessionLocal
 from app.models.campaign_hourly import CampaignHourlySnapshot
 from app.services.campaign_reporting import fetch_ads_stats_by_campaign_from_credentials, parse_money
 from app.services.company_config import default_company_from_env, load_runtime_company_configs, resolve_company_config
-from app.services.integrations.ozon_ads import get_running_campaigns
+from app.services.integrations.ozon_ads import get_campaign_products_all, get_running_campaigns, perf_token
+from app.services.integrations.ozon_seller import seller_posting_fbo_list
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -209,6 +210,110 @@ def _snapshot_raw(snapshot: CampaignHourlySnapshot | None) -> dict:
     return raw if isinstance(raw, dict) else {}
 
 
+def _ads_orders_delta(start_sample: CampaignHourlySnapshot | None, end_sample: CampaignHourlySnapshot | None) -> int:
+    if start_sample is None or end_sample is None:
+        return 0
+    start_raw = _snapshot_raw(start_sample)
+    end_raw = _snapshot_raw(end_sample)
+    return max(0, int(parse_money(end_raw.get("orders")) - parse_money(start_raw.get("orders"))))
+
+
+def _extract_postings(payload: dict) -> list[dict]:
+    result = payload.get("result") if isinstance(payload, dict) else None
+    if isinstance(result, list):
+        return [item for item in result if isinstance(item, dict)]
+    if isinstance(result, dict):
+        postings = result.get("postings") or result.get("items") or []
+        return [item for item in postings if isinstance(item, dict)]
+    postings = payload.get("postings") if isinstance(payload, dict) else []
+    return [item for item in postings if isinstance(item, dict)]
+
+
+def _parse_datetime(value: str, tz: ZoneInfo) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=tz)
+    return parsed.astimezone(tz)
+
+
+def _campaign_skus(
+    *,
+    campaign_id: str,
+    perf_client_id: str | None,
+    perf_client_secret: str | None,
+) -> list[str]:
+    if not campaign_id:
+        return []
+    token = perf_token(client_id=perf_client_id, client_secret=perf_client_secret)
+    products = get_campaign_products_all(token, campaign_id)
+    skus = sorted({str(item.get("sku") or "").strip() for item in products if str(item.get("sku") or "").strip()})
+    return skus
+
+
+def _total_fbo_orders_by_hour(
+    *,
+    target_day: date,
+    skus: list[str],
+    seller_client_id: str | None,
+    seller_api_key: str | None,
+    timezone_name: str = "Europe/Moscow",
+) -> dict[int, int]:
+    if not skus or not seller_client_id or not seller_api_key:
+        return {}
+    tz = ZoneInfo(timezone_name)
+    sku_set = {str(sku) for sku in skus}
+    since_local = datetime(target_day.year, target_day.month, target_day.day, tzinfo=tz)
+    to_local = since_local + timedelta(days=1)
+    since_utc = since_local.astimezone(ZoneInfo("UTC")).isoformat().replace("+00:00", "Z")
+    to_utc = to_local.astimezone(ZoneInfo("UTC")).isoformat().replace("+00:00", "Z")
+
+    orders_by_hour: dict[int, int] = {}
+    offset = 0
+    limit = 1000
+    while True:
+        payload = seller_posting_fbo_list(
+            since=since_utc,
+            to=to_utc,
+            limit=limit,
+            offset=offset,
+            client_id=seller_client_id,
+            api_key=seller_api_key,
+        )
+        postings = _extract_postings(payload)
+        if not postings:
+            break
+        for posting in postings:
+            status = str(posting.get("status") or "").lower()
+            if "cancel" in status:
+                continue
+            created_at = _parse_datetime(str(posting.get("created_at") or posting.get("in_process_at") or ""), tz)
+            if created_at is None or created_at.date() != target_day:
+                continue
+            quantity = 0
+            for product in posting.get("products") or []:
+                sku = str(product.get("sku") or "").strip()
+                if sku not in sku_set:
+                    continue
+                try:
+                    quantity += int(float(str(product.get("quantity") or 0).replace(",", ".")))
+                except Exception:
+                    continue
+            if quantity > 0:
+                orders_by_hour[created_at.hour] = orders_by_hour.get(created_at.hour, 0) + quantity
+        if len(postings) < limit:
+            break
+        offset += limit
+    return orders_by_hour
+
+
 def get_campaign_hourly_report(
     *,
     db: Session,
@@ -220,6 +325,8 @@ def get_campaign_hourly_report(
     company_name, config = resolve_company_config(company)
     perf_client_id = (config.get("perf_client_id") or "").strip() or None
     perf_client_secret = (config.get("perf_client_secret") or "").strip() or None
+    seller_client_id = (config.get("seller_client_id") or "").strip() or None
+    seller_api_key = (config.get("seller_api_key") or "").strip() or None
 
     try:
         campaigns = get_running_campaigns(client_id=perf_client_id, client_secret=perf_client_secret)
@@ -259,6 +366,26 @@ def get_campaign_hourly_report(
     for snapshot in snapshots:
         latest_by_hour[int(snapshot.sample_hour)] = snapshot
 
+    total_orders_by_hour: dict[int, int] = {}
+    try:
+        campaign_skus = _campaign_skus(
+            campaign_id=selected_campaign_id,
+            perf_client_id=perf_client_id,
+            perf_client_secret=perf_client_secret,
+        )
+        total_orders_by_hour = _total_fbo_orders_by_hour(
+            target_day=target_day,
+            skus=campaign_skus,
+            seller_client_id=seller_client_id,
+            seller_api_key=seller_api_key,
+            timezone_name=os.getenv("TZ", "Europe/Moscow"),
+        )
+    except Exception:
+        logger.exception(
+            "campaign hourly total seller orders failed",
+            extra={"company": company_name, "campaign_id": selected_campaign_id},
+        )
+
     rows: list[dict] = []
     for hour in range(24):
         start_sample = latest_by_hour.get(hour)
@@ -267,12 +394,9 @@ def get_campaign_hourly_report(
         views = max(0, int(end_sample.views - start_sample.views)) if has_data else 0
         clicks = max(0, int(end_sample.clicks - start_sample.clicks)) if has_data else 0
         money_spent = max(0.0, float(end_sample.money_spent - start_sample.money_spent)) if has_data else 0.0
-        if has_data:
-            start_raw = _snapshot_raw(start_sample)
-            end_raw = _snapshot_raw(end_sample)
-            orders = max(0, int(parse_money(end_raw.get("orders")) - parse_money(start_raw.get("orders"))))
-        else:
-            orders = 0
+        orders = int(total_orders_by_hour.get(hour, 0))
+        if not total_orders_by_hour:
+            orders = _ads_orders_delta(start_sample, end_sample) if has_data else 0
         rows.append(
             {
                 "hour": hour,

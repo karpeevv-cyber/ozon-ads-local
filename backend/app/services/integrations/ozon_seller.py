@@ -311,6 +311,40 @@ def seller_product_info_stocks(
     return response.json()
 
 
+def seller_posting_fbo_list(
+    *,
+    since: str,
+    to: str,
+    limit: int = 1000,
+    offset: int = 0,
+    status: str = "",
+    client_id: str | None = None,
+    api_key: str | None = None,
+):
+    url = f"{SELLER_BASE}/v2/posting/fbo/list"
+    headers = {
+        "Client-Id": client_id or must_env("SELLER_CLIENT_ID"),
+        "Api-Key": api_key or must_env("SELLER_API_KEY"),
+    }
+    body = {
+        "dir": "ASC",
+        "filter": {
+            "since": str(since),
+            "to": str(to),
+            "status": str(status or ""),
+        },
+        "limit": int(limit),
+        "offset": int(offset),
+        "translit": False,
+        "with": {
+            "analytics_data": False,
+            "financial_data": False,
+        },
+    }
+    response = _post_with_backoff(url, headers=headers, body=body, timeout=60)
+    return response.json()
+
+
 def seller_analytics_stocks(
     *,
     skus: list[str],
