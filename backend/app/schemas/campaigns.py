@@ -182,6 +182,7 @@ class CampaignHourlySampleResponse(BaseModel):
     sample_at: str | None = None
     views: int
     clicks: int
+    orders: int = 0
     money_spent: float
 
 
@@ -190,6 +191,7 @@ class CampaignHourlyRowResponse(BaseModel):
     label: str
     views: int
     clicks: int
+    orders: int = 0
     money_spent: float
     has_data: bool
     start_sample: CampaignHourlySampleResponse | None = None

@@ -1809,6 +1809,10 @@ a {
   grid-column: span 12;
 }
 
+.campaign-hours-summary {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .campaign-hours-controls {
   display: grid;
   grid-template-columns: minmax(260px, 0.8fr) minmax(320px, 1.2fr);
@@ -1906,7 +1910,7 @@ a {
 }
 
 .campaign-hours-bar {
-  width: 9px;
+  width: 8px;
   min-height: 3px;
   border-radius: 999px 999px 3px 3px;
   transition: opacity 140ms ease, transform 140ms ease;
@@ -1922,6 +1926,10 @@ a {
 
 .campaign-hours-bar-clicks {
   background: linear-gradient(180deg, #c75f39, #f0a36d);
+}
+
+.campaign-hours-bar-orders {
+  background: linear-gradient(180deg, #2f8f5b, #8fd3a4);
 }
 
 .campaign-hours-slot-empty .campaign-hours-bar {
@@ -1967,6 +1975,10 @@ a {
   background: #c75f39;
 }
 
+.campaign-hours-legend-orders {
+  background: #2f8f5b;
+}
+
 @media (max-width: 1100px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -1997,6 +2009,10 @@ a {
 
   .campaign-hours-controls {
     grid-template-columns: 1fr;
+  }
+
+  .campaign-hours-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .stocks-controls-actions,

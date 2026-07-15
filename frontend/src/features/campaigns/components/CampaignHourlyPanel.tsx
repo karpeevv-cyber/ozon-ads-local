@@ -7,6 +7,10 @@ function formatInt(value: number): string {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value);
 }
 
+function formatMoney(value: number): string {
+  return `${new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value)} ₽`;
+}
+
 function shiftDay(day: string, offset: number): string {
   const date = new Date(`${day}T00:00:00`);
   date.setDate(date.getDate() + offset);
@@ -21,10 +25,12 @@ function dateLabel(day: string): string {
 export function CampaignHourlyPanel({ report }: { report: CampaignHourlyReport }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const scaleMax = Math.max(1, ...report.rows.flatMap((row) => [row.views, row.clicks]));
+  const scaleMax = Math.max(1, ...report.rows.flatMap((row) => [row.views, row.clicks, row.orders]));
   const axisTicks = [1, 0.75, 0.5, 0.25, 0].map((factor) => Math.round(scaleMax * factor));
   const totalViews = report.rows.reduce((sum, row) => sum + row.views, 0);
   const totalClicks = report.rows.reduce((sum, row) => sum + row.clicks, 0);
+  const totalOrders = report.rows.reduce((sum, row) => sum + row.orders, 0);
+  const totalSpend = report.rows.reduce((sum, row) => sum + row.money_spent, 0);
   const sampledHours = report.rows.filter((row) => row.has_data).length;
 
   function barHeight(value: number): string {
@@ -97,12 +103,20 @@ export function CampaignHourlyPanel({ report }: { report: CampaignHourlyReport }
             <strong>{dateLabel(report.day)}</strong>
           </div>
           <div>
+            <span>spend tracked</span>
+            <strong>{formatMoney(totalSpend)}</strong>
+          </div>
+          <div>
             <span>views tracked</span>
             <strong>{formatInt(totalViews)}</strong>
           </div>
           <div>
             <span>clicks tracked</span>
             <strong>{formatInt(totalClicks)}</strong>
+          </div>
+          <div>
+            <span>orders tracked</span>
+            <strong>{formatInt(totalOrders)}</strong>
           </div>
         </div>
 
@@ -128,12 +142,17 @@ export function CampaignHourlyPanel({ report }: { report: CampaignHourlyReport }
                   />
                   <span
                     className="campaign-hours-bar campaign-hours-bar-clicks"
-                    style={{ height: barHeight(row.clicks) }}
-                    title={`${row.label}: ${row.clicks} clicks`}
-                  />
-                </div>
-                <span className="campaign-hours-hour">{row.hour}</span>
+                  style={{ height: barHeight(row.clicks) }}
+                  title={`${row.label}: ${row.clicks} clicks`}
+                />
+                <span
+                  className="campaign-hours-bar campaign-hours-bar-orders"
+                  style={{ height: barHeight(row.orders) }}
+                  title={`${row.label}: ${row.orders} orders`}
+                />
               </div>
+              <span className="campaign-hours-hour">{row.hour}</span>
+            </div>
             ))}
           </div>
         </div>
@@ -141,6 +160,7 @@ export function CampaignHourlyPanel({ report }: { report: CampaignHourlyReport }
         <div className="campaign-hours-legend">
           <span><i className="campaign-hours-legend-views" />views</span>
           <span><i className="campaign-hours-legend-clicks" />clicks</span>
+          <span><i className="campaign-hours-legend-orders" />orders</span>
           <span className="muted-copy">Empty hours mean the collector does not yet have two boundary samples.</span>
         </div>
       </article>

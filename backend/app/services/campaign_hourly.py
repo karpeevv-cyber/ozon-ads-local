@@ -188,13 +188,25 @@ def collect_campaign_hourly_snapshots_for_all_companies(now: datetime | None = N
 def _snapshot_payload(snapshot: CampaignHourlySnapshot | None) -> dict | None:
     if snapshot is None:
         return None
+    raw_payload = _snapshot_raw(snapshot)
     return {
         "sample_hour": snapshot.sample_hour,
         "sample_at": snapshot.sample_at.isoformat() if snapshot.sample_at else None,
         "views": snapshot.views,
         "clicks": snapshot.clicks,
         "money_spent": snapshot.money_spent,
+        "orders": int(parse_money(raw_payload.get("orders"))),
     }
+
+
+def _snapshot_raw(snapshot: CampaignHourlySnapshot | None) -> dict:
+    if snapshot is None:
+        return {}
+    try:
+        raw = json.loads(snapshot.raw_ads_json or "{}")
+    except Exception:
+        return {}
+    return raw if isinstance(raw, dict) else {}
 
 
 def get_campaign_hourly_report(
@@ -255,12 +267,19 @@ def get_campaign_hourly_report(
         views = max(0, int(end_sample.views - start_sample.views)) if has_data else 0
         clicks = max(0, int(end_sample.clicks - start_sample.clicks)) if has_data else 0
         money_spent = max(0.0, float(end_sample.money_spent - start_sample.money_spent)) if has_data else 0.0
+        if has_data:
+            start_raw = _snapshot_raw(start_sample)
+            end_raw = _snapshot_raw(end_sample)
+            orders = max(0, int(parse_money(end_raw.get("orders")) - parse_money(start_raw.get("orders"))))
+        else:
+            orders = 0
         rows.append(
             {
                 "hour": hour,
                 "label": f"{hour:02d}:00",
                 "views": views,
                 "clicks": clicks,
+                "orders": orders,
                 "money_spent": round(money_spent, 2),
                 "has_data": has_data,
                 "start_sample": _snapshot_payload(start_sample),

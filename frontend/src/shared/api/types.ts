@@ -281,6 +281,7 @@ export type CampaignHourlySample = {
   sample_at: string | null;
   views: number;
   clicks: number;
+  orders: number;
   money_spent: number;
 };
 
@@ -289,6 +290,7 @@ export type CampaignHourlyRow = {
   label: string;
   views: number;
   clicks: number;
+  orders: number;
   money_spent: number;
   has_data: boolean;
   start_sample: CampaignHourlySample | null;
