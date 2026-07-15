@@ -8,13 +8,19 @@ function formatInt(value: number): string {
 }
 
 function formatMoney(value: number): string {
-  return `${new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value)} ₽`;
+  return `${new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value)} RUB`;
 }
 
 function shiftDay(day: string, offset: number): string {
-  const date = new Date(`${day}T00:00:00`);
-  date.setDate(date.getDate() + offset);
-  return date.toISOString().slice(0, 10);
+  const [year, month, date] = day.split("-").map((part) => Number.parseInt(part, 10));
+  if (!year || !month || !date) {
+    return day;
+  }
+  const shifted = new Date(Date.UTC(year, month - 1, date + offset));
+  const shiftedYear = shifted.getUTCFullYear();
+  const shiftedMonth = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+  const shiftedDate = String(shifted.getUTCDate()).padStart(2, "0");
+  return `${shiftedYear}-${shiftedMonth}-${shiftedDate}`;
 }
 
 function dateLabel(day: string): string {
@@ -120,18 +126,13 @@ export function CampaignHourlyPanel({ report }: { report: CampaignHourlyReport }
           </div>
         </div>
 
-        <p className="muted-copy campaign-hours-meta">
-          Campaign: {report.selected_campaign_title || report.selected_campaign_id || "-"}
-          {report.last_sample_at ? ` / last sample: ${report.last_sample_at}` : " / no samples collected yet"}
-        </p>
-
         <div className="campaign-hours-chart-shell">
           <div className="campaign-hours-y-axis" aria-hidden="true">
             {axisTicks.map((tick, index) => (
               <span key={`${tick}-${index}`}>{formatInt(tick)}</span>
             ))}
           </div>
-          <div className="campaign-hours-chart" aria-label="Hourly clicks and views chart">
+          <div className="campaign-hours-chart" aria-label="Hourly clicks, views and orders chart">
             {report.rows.map((row) => (
               <div className={`campaign-hours-slot${row.has_data ? "" : " campaign-hours-slot-empty"}`} key={row.hour}>
                 <div className="campaign-hours-bars">
@@ -142,17 +143,17 @@ export function CampaignHourlyPanel({ report }: { report: CampaignHourlyReport }
                   />
                   <span
                     className="campaign-hours-bar campaign-hours-bar-clicks"
-                  style={{ height: barHeight(row.clicks) }}
-                  title={`${row.label}: ${row.clicks} clicks`}
-                />
-                <span
-                  className="campaign-hours-bar campaign-hours-bar-orders"
-                  style={{ height: barHeight(row.orders) }}
-                  title={`${row.label}: ${row.orders} orders`}
-                />
+                    style={{ height: barHeight(row.clicks) }}
+                    title={`${row.label}: ${row.clicks} clicks`}
+                  />
+                  <span
+                    className="campaign-hours-bar campaign-hours-bar-orders"
+                    style={{ height: barHeight(row.orders) }}
+                    title={`${row.label}: ${row.orders} orders`}
+                  />
+                </div>
+                <span className="campaign-hours-hour">{row.hour}</span>
               </div>
-              <span className="campaign-hours-hour">{row.hour}</span>
-            </div>
             ))}
           </div>
         </div>
