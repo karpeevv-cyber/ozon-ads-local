@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { RunningCalendar } from "@/features/additional/components/RunningCalendar";
 import { BidAuditPanel } from "@/features/bids/components/BidAuditPanel";
 import { BidApplyCard } from "@/features/bids/components/BidApplyCard";
 import { AllCampaignsPanel } from "@/features/campaigns/components/AllCampaignsPanel";
@@ -67,6 +68,7 @@ type SupportedTab =
   | "storage"
   | "search-trends"
   | "formulas"
+  | "additional"
   | "profile";
 
 const supportedTabs = new Set<SupportedTab>([
@@ -82,6 +84,7 @@ const supportedTabs = new Set<SupportedTab>([
   "storage",
   "search-trends",
   "formulas",
+  "additional",
   "profile",
 ]);
 
@@ -335,6 +338,8 @@ async function renderTabContent(params: {
           copy="This section is reserved for formula logic and decision calculators. The navigation is ready; the feature module still needs to be extracted into the new stack."
         />
       );
+    case "additional":
+      return <RunningCalendar />;
     case "profile":
       return <ProfilePanel />;
     default:
@@ -451,12 +456,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   return (
     <AppShell
       filters={
-        <CampaignFilters
-          companies={companies}
-          selectedCompany={selectedCompany}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-        />
+        activeTab === "additional" ? null : (
+          <CampaignFilters
+            companies={companies}
+            selectedCompany={selectedCompany}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+          />
+        )
       }
     >
       <Suspense key={tabStateKey} fallback={<TabContentSkeleton />}>
