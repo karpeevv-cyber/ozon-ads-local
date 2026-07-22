@@ -496,6 +496,22 @@ a {
   text-align: right;
 }
 
+.storage-note-error {
+  color: #913328;
+}
+
+.calendar-day:disabled {
+  cursor: wait;
+}
+
+.dialog-close:disabled,
+.cancel-button:disabled,
+.delete-button:disabled,
+.save-button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
 .workout-dialog {
   width: min(660px, calc(100vw - 28px));
   max-height: calc(100vh - 32px);
@@ -580,7 +596,7 @@ a {
 
 .workout-fields {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -623,6 +639,20 @@ a {
   padding-right: 11px;
   color: var(--muted);
   font-size: 0.67rem;
+}
+
+.calculation-preview {
+  margin: 12px 2px 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.calculation-preview::before {
+  content: "↳";
+  display: inline-block;
+  margin-right: 7px;
+  color: var(--accent);
 }
 
 .form-error {

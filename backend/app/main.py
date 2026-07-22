@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from app.api.router import build_api_router
 from app.core.config import get_settings
+from app.db.bootstrap import create_all
 from app.services.auto_bids import auto_bids_scheduler_loop
 from app.services.campaign_hourly import campaign_hourly_scheduler_loop
 from app.services.finance_telegram import finance_telegram_scheduler_loop
@@ -21,6 +22,7 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
+        create_all()
         scheduler_task = asyncio.create_task(
             shipment_history_scheduler_loop(settings.timezone),
             name="shipment-history-daily-scheduler",

@@ -18,6 +18,8 @@ import {
   LoginPayload,
   MainOverview,
   RegisterPayload,
+  RunningWorkoutPayload,
+  RunningWorkoutRecord,
   RunningCampaign,
   StorageSnapshot,
   StocksSnapshot,
@@ -141,6 +143,21 @@ export async function patchJson<T>(path: string, body: unknown, token?: string):
   return (await response.json()) as T;
 }
 
+export async function deleteJson(path: string, token?: string): Promise<void> {
+  const apiUrl = `${getApiBaseUrl()}${path}`;
+  const timeout = withTimeout(25000);
+  const response = await fetch(apiUrl, {
+    method: "DELETE",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    cache: "no-store",
+    signal: timeout.signal,
+  }).finally(timeout.cleanup);
+
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, apiUrl));
+  }
+}
+
 export async function getAuthedJson<T>(path: string, token: string): Promise<T> {
   const apiUrl = `${getApiBaseUrl()}${path}`;
   const timeoutMs = typeof window === "undefined" ? 120000 : 25000;
@@ -253,6 +270,22 @@ export function register(payload: RegisterPayload): Promise<TokenResponse> {
 
 export function getCurrentUser(token: string): Promise<CurrentUser> {
   return getAuthedJson<CurrentUser>("/auth/me", token);
+}
+
+export function getRunningWorkouts(token: string): Promise<RunningWorkoutRecord[]> {
+  return getAuthedJson<RunningWorkoutRecord[]>("/running/workouts", token);
+}
+
+export function saveRunningWorkout(
+  date: string,
+  payload: RunningWorkoutPayload,
+  token: string,
+): Promise<RunningWorkoutRecord> {
+  return putJson<RunningWorkoutRecord>(`/running/workouts/${encodeURIComponent(date)}`, payload, token);
+}
+
+export function deleteRunningWorkout(date: string, token: string): Promise<void> {
+  return deleteJson(`/running/workouts/${encodeURIComponent(date)}`, token);
 }
 
 export function getProfileCompanies(token: string): Promise<CompanyProfileList> {

@@ -201,6 +201,23 @@ This replaces UI session-ish persistence that currently leaks into `ui_state_cac
   - packing_cost
   - updated_at
 
+## Running Workouts
+
+- `running_workouts`
+  - id
+  - user_id
+  - workout_date
+  - distance_km
+  - pace_seconds_per_km
+  - duration_seconds
+  - average_heart_rate
+  - workout_type
+  - calculated_from
+  - created_at
+  - updated_at
+
+`(user_id, workout_date)` is unique. Every API read, update, and delete is scoped to the authenticated user.
+
 ## Migration Priority
 
 ### First persistence targets

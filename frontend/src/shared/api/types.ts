@@ -125,6 +125,18 @@ export type CurrentUser = {
   companies: CompanyProfile[];
 };
 
+export type RunningWorkoutRecord = {
+  date: string;
+  distance: number;
+  pace: string;
+  duration: string;
+  heart_rate: number;
+  type: "base" | "intervals" | "tempo" | "long";
+  calculated_from?: "pace" | "duration" | null;
+};
+
+export type RunningWorkoutPayload = Omit<RunningWorkoutRecord, "date">;
+
 export type CompanyProfile = {
   id: number;
   name: string;
