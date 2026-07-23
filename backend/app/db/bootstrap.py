@@ -14,6 +14,7 @@ from app.models import (
     MainOverviewCache,
     MarketplaceCredential,
     Organization,
+    RunningGoal,
     RunningWorkout,
     StockWarehousePreference,
     ShipmentEvent,

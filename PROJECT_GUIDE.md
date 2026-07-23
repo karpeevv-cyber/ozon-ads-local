@@ -77,7 +77,7 @@ See `docs/STATUS.md` for current truth. Main modules already present:
 - finance
 - trends
 - unit economics
-- running workouts (the `Additional` tab, scoped to the authenticated user)
+- running workouts and distance goals (the `Additional` tab, scoped to the authenticated user)
 
 ## 5) Run commands
 

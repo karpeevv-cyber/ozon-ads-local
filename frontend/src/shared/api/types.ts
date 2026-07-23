@@ -137,6 +137,20 @@ export type RunningWorkoutRecord = {
 
 export type RunningWorkoutPayload = Omit<RunningWorkoutRecord, "date">;
 
+export type RunningGoalPayload = {
+  title: string;
+  metric_type: "distance";
+  target_value: number;
+  start_date: string;
+};
+
+export type RunningGoalRecord = RunningGoalPayload & {
+  id: number;
+  current_value: number;
+  progress_percent: number;
+  completed: boolean;
+};
+
 export type CompanyProfile = {
   id: number;
   name: string;

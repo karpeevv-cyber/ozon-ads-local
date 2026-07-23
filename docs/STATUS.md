@@ -12,6 +12,7 @@ The new `FastAPI + Next.js` contour already includes these working modules:
 - `finance`
 - `trends`
 - `unit_economics`
+- `running` workouts and distance goals
 
 ## Current backend endpoints
 
@@ -32,6 +33,8 @@ The new `FastAPI + Next.js` contour already includes these working modules:
 - `/api/unit-economics/summary`
 - `/api/unit-economics/products`
 - `/api/unit-economics/products` `PUT`
+- `/api/running/workouts`
+- `/api/running/goals`
 
 ## What is still legacy-only
 

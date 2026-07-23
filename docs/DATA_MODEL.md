@@ -218,6 +218,21 @@ This replaces UI session-ish persistence that currently leaks into `ui_state_cac
 
 `(user_id, workout_date)` is unique. Every API read, update, and delete is scoped to the authenticated user.
 
+## Running Goals
+
+- `running_goals`
+  - id
+  - user_id
+  - title
+  - metric_type
+  - target_value
+  - start_date
+  - created_at
+  - updated_at
+
+The first supported `metric_type` is `distance`. Goal progress is calculated dynamically from the authenticated
+user's running workouts on or after `start_date`, so backdated goals immediately include matching history.
+
 ## Migration Priority
 
 ### First persistence targets

@@ -18,6 +18,8 @@ import {
   LoginPayload,
   MainOverview,
   RegisterPayload,
+  RunningGoalPayload,
+  RunningGoalRecord,
   RunningWorkoutPayload,
   RunningWorkoutRecord,
   RunningCampaign,
@@ -286,6 +288,26 @@ export function saveRunningWorkout(
 
 export function deleteRunningWorkout(date: string, token: string): Promise<void> {
   return deleteJson(`/running/workouts/${encodeURIComponent(date)}`, token);
+}
+
+export function getRunningGoals(token: string): Promise<RunningGoalRecord[]> {
+  return getAuthedJson<RunningGoalRecord[]>("/running/goals", token);
+}
+
+export function createRunningGoal(payload: RunningGoalPayload, token: string): Promise<RunningGoalRecord> {
+  return postJson<RunningGoalRecord>("/running/goals", payload, token);
+}
+
+export function updateRunningGoal(
+  goalId: number,
+  payload: RunningGoalPayload,
+  token: string,
+): Promise<RunningGoalRecord> {
+  return putJson<RunningGoalRecord>(`/running/goals/${goalId}`, payload, token);
+}
+
+export function deleteRunningGoal(goalId: number, token: string): Promise<void> {
+  return deleteJson(`/running/goals/${goalId}`, token);
 }
 
 export function getProfileCompanies(token: string): Promise<CompanyProfileList> {

@@ -119,7 +119,7 @@ function workoutsByDate(rows: Workout[]) {
   return Object.fromEntries(rows.map((workout) => [workout.date, workout]));
 }
 
-export function RunningCalendar() {
+export function RunningCalendar({ onWorkoutsChanged }: { onWorkoutsChanged?: () => void }) {
   const [month, setMonth] = useState(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -306,6 +306,7 @@ export function RunningCalendar() {
       const saved = fromApi(await saveRunningWorkout(selectedDate, toApi(workout), token));
       setWorkouts((current) => ({ ...current, [selectedDate]: saved }));
       setSyncError("");
+      onWorkoutsChanged?.();
       closeEditor();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Could not save the workout.");
@@ -330,6 +331,7 @@ export function RunningCalendar() {
         return next;
       });
       setSyncError("");
+      onWorkoutsChanged?.();
       closeEditor();
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Could not delete the workout.");
@@ -346,7 +348,7 @@ export function RunningCalendar() {
     : "";
 
   return (
-    <section className="running-workspace">
+    <section className="running-calendar-section">
       <header className="running-header">
         <div>
           <p className="eyebrow">Additional · Running log</p>

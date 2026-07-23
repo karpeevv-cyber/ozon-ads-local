@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { RunningCalendar } from "@/features/additional/components/RunningCalendar";
+import { AdditionalWorkspace } from "@/features/additional/components/AdditionalWorkspace";
 import { BidAuditPanel } from "@/features/bids/components/BidAuditPanel";
 import { BidApplyCard } from "@/features/bids/components/BidApplyCard";
 import { AllCampaignsPanel } from "@/features/campaigns/components/AllCampaignsPanel";
@@ -339,7 +339,7 @@ async function renderTabContent(params: {
         />
       );
     case "additional":
-      return <RunningCalendar />;
+      return <AdditionalWorkspace />;
     case "profile":
       return <ProfilePanel />;
     default:
