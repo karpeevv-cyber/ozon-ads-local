@@ -1985,6 +1985,47 @@ a {
   font-size: 1.35rem;
 }
 
+.auto-bid-setting {
+  display: grid;
+  gap: 5px;
+  min-width: 240px;
+}
+
+.auto-bid-setting label,
+.auto-bid-setting small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.auto-bid-setting > div {
+  display: flex;
+  gap: 8px;
+}
+
+.auto-bid-setting input {
+  width: 110px;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+}
+
+.auto-bid-setting button {
+  padding: 9px 16px;
+  border: 1px solid rgba(50, 103, 58, 0.28);
+  border-radius: 12px;
+  background: #32673a;
+  color: #fff;
+  cursor: pointer;
+}
+
+.auto-bid-setting button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 .main-header-actions {
   display: inline-flex;
   align-items: center;

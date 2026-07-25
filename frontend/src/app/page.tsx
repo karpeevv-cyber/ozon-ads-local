@@ -18,6 +18,7 @@ import {
   getCampaignComments,
   getCampaignHourlyReport,
   getCampaignReport,
+  getAutoBidSettings,
   getCompanies,
   getCurrentCampaignDetail,
   getFinanceSummary,
@@ -228,6 +229,7 @@ async function renderTabContent(params: {
         dateFrom,
         dateTo,
       });
+      const autoBidSettingsPromise = getAutoBidSettings(selectedCompany);
       const detailPromise = currentCampaignId
         ? getCurrentCampaignDetail({
             company: selectedCompany,
@@ -236,8 +238,12 @@ async function renderTabContent(params: {
             campaignId: currentCampaignId,
           })
         : Promise.resolve(emptyCurrentCampaignDetail({ company: selectedCompany, dateFrom, dateTo }));
-      const [report, detail] = await Promise.all([reportPromise, detailPromise]);
-      return <AllCampaignsPanel report={report} currentDetail={detail} />;
+      const [report, detail, autoBidSettings] = await Promise.all([
+        reportPromise,
+        detailPromise,
+        autoBidSettingsPromise,
+      ]);
+      return <AllCampaignsPanel report={report} currentDetail={detail} autoBidSettings={autoBidSettings} />;
     }
     case "current-campaigns": {
       const detail = await getCurrentCampaignDetail({

@@ -46,6 +46,11 @@ export type CampaignReport = {
   rows: CampaignReportRow[];
 };
 
+export type AutoBidSettings = {
+  company: string;
+  max_bid_rub: number;
+};
+
 export type MainOverviewChartRow = {
   day: string;
   total_revenue: number;

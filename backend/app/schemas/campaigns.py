@@ -8,6 +8,16 @@ class CompanyConfigResponse(BaseModel):
     display_name: str | None = None
 
 
+class AutoBidSettingsResponse(BaseModel):
+    company: str
+    max_bid_rub: float
+
+
+class AutoBidSettingsUpdateRequest(BaseModel):
+    company: str
+    max_bid_rub: float = Field(gt=0, le=10_000)
+
+
 class CampaignSummaryResponse(BaseModel):
     campaign_id: str = Field(alias="id")
     title: str = ""

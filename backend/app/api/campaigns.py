@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.schemas.campaigns import (
+    AutoBidSettingsResponse,
+    AutoBidSettingsUpdateRequest,
     CampaignReportResponse,
     CampaignHourlyResponse,
     CampaignSummaryResponse,
@@ -11,6 +13,9 @@ from app.schemas.campaigns import (
     CurrentCampaignResponse,
     MainOverviewResponse,
 )
+from app.api.deps import get_current_user
+from app.models.user import User
+from app.services.auto_bid_settings import get_auto_bid_max_bid, save_auto_bid_max_bid
 from app.services.campaign_reporting import (
     build_active_test_map,
     build_bid_change_map,
@@ -40,6 +45,33 @@ def list_companies() -> list[CompanyConfigResponse]:
     if not configs:
         return [CompanyConfigResponse(name="default", display_name="default")]
     return [CompanyConfigResponse(name=name, display_name=name) for name in sorted(configs.keys())]
+
+
+@router.get("/auto-bid-settings", response_model=AutoBidSettingsResponse)
+def auto_bid_settings(
+    company: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> AutoBidSettingsResponse:
+    company_name, _config = resolve_company_config(company)
+    return AutoBidSettingsResponse(
+        company=company_name,
+        max_bid_rub=get_auto_bid_max_bid(company_name, db),
+    )
+
+
+@router.put("/auto-bid-settings", response_model=AutoBidSettingsResponse)
+def update_auto_bid_settings(
+    payload: AutoBidSettingsUpdateRequest,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
+) -> AutoBidSettingsResponse:
+    company_name, _config = resolve_company_config(payload.company)
+    value = save_auto_bid_max_bid(
+        company_name=company_name,
+        max_bid_rub=payload.max_bid_rub,
+        db=db,
+    )
+    return AutoBidSettingsResponse(company=company_name, max_bid_rub=value)
 
 
 @router.get("/running", response_model=list[CampaignSummaryResponse])

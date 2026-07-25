@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 import requests
 
 from app.services.bid_commands import apply_bid_command
+from app.services.auto_bid_settings import get_auto_bid_max_bid
 from app.services.bid_history import load_bid_changes
 from app.services.campaign_reporting import (
     build_report_rows,
@@ -119,6 +120,7 @@ def _decide_bid(
     company: str,
     day: str,
     row: dict,
+    max_bid_rub: float = 25.0,
 ) -> BidDecision:
     spend = parse_money(row.get("money_spent"))
     revenue = parse_money(row.get("total_revenue"))
@@ -155,7 +157,11 @@ def _decide_bid(
         return base
 
     if spend < 50:
-        base.new_bid_rub = _round_bid(old_bid * 1.2)
+        proposed_bid = _round_bid(old_bid * 1.2)
+        if old_bid >= max_bid_rub:
+            base.reason = f"Расход менее 50 ₽, но достигнут лимит ставки {max_bid_rub:g} ₽"
+            return base
+        base.new_bid_rub = min(proposed_bid, max_bid_rub)
         base.reason = "Расход менее 50 ₽ — недостаточный объем рекламного трафика"
         base.action = "increase"
         return base
@@ -166,12 +172,12 @@ def _decide_bid(
 
     if spend <= 250:
         if ordered_units <= 0 or revenue <= 0:
-            base.new_bid_rub = _round_bid(old_bid * 0.9)
+            base.new_bid_rub = min(_round_bid(old_bid * 0.9), max_bid_rub)
             base.reason = "Расход выше 150 ₽ без заказов"
             base.action = "decrease"
             return base
         if drr_pct is not None and drr_pct > 25:
-            base.new_bid_rub = _round_bid(old_bid * 0.9)
+            base.new_bid_rub = min(_round_bid(old_bid * 0.9), max_bid_rub)
             base.reason = "Расход 150–250 ₽, ДРР выше 25%"
             base.action = "decrease"
             return base
@@ -222,6 +228,7 @@ def _fetch_sku_offer_map(
 
 
 def build_company_bid_decisions(*, config: CompanyAutoBidConfig, day: str) -> list[BidDecision]:
+    max_bid_rub = get_auto_bid_max_bid(config.name)
     running_campaigns = get_running_campaigns(
         client_id=config.perf_client_id,
         client_secret=config.perf_client_secret,
@@ -269,7 +276,7 @@ def build_company_bid_decisions(*, config: CompanyAutoBidConfig, day: str) -> li
         target_drr=0.2,
     )
     return [
-        _decide_bid(company=config.name, day=day, row=row)
+        _decide_bid(company=config.name, day=day, row=row, max_bid_rub=max_bid_rub)
         for row in rows
         if str(row.get("campaign_id") or "") != "GRAND_TOTAL"
     ]
@@ -325,7 +332,16 @@ def _fmt_drr(value: float | None) -> str:
 
 
 def build_telegram_message(*, company: str, day: str, decisions: list[BidDecision], dry_run: bool) -> str:
-    changed = [item for item in decisions if item.new_bid_rub is not None and not item.manual_review]
+    increased = [
+        item
+        for item in decisions
+        if item.new_bid_rub is not None and not item.manual_review and item.action == "increase"
+    ]
+    decreased = [
+        item
+        for item in decisions
+        if item.new_bid_rub is not None and not item.manual_review and item.action == "decrease"
+    ]
     manual = [item for item in decisions if item.manual_review]
     errors = [item for item in decisions if item.error]
 
@@ -336,9 +352,13 @@ def build_telegram_message(*, company: str, day: str, decisions: list[BidDecisio
     lines.append(f"Компания: {company}")
     lines.append("")
 
-    if changed:
-        lines.append("Изменения:")
-        for item in changed:
+    def append_changes(title: str, items: list[BidDecision]) -> None:
+        if not items:
+            return
+        if lines and lines[-1]:
+            lines.append("")
+        lines.append(title)
+        for item in sorted(items, key=lambda row: row.article.casefold()):
             status = ""
             if item.skipped_duplicate:
                 status = " (уже применялось ранее)"
@@ -354,13 +374,17 @@ def build_telegram_message(*, company: str, day: str, decisions: list[BidDecisio
                     f"  причина: {item.reason}",
                 ]
             )
-    else:
+
+    append_changes("ПОВЫШЕНЫ СТАВКИ:", increased)
+    append_changes("СНИЖЕНЫ СТАВКИ:", decreased)
+
+    if not increased and not decreased:
         lines.append("Изменений ставок нет.")
 
     if manual:
         lines.append("")
         lines.append("РУЧНОЙ РАЗБОР:")
-        for item in manual:
+        for item in sorted(manual, key=lambda row: row.article.casefold()):
             lines.extend(
                 [
                     f"- {item.article}",

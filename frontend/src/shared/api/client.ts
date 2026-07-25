@@ -3,6 +3,7 @@ import {
   ApplyBidResponse,
   AddCampaignCommentPayload,
   AddCampaignCommentResponse,
+  AutoBidSettings,
   CampaignReport,
   CampaignHourlyReport,
   CampaignCommentRecord,
@@ -40,6 +41,22 @@ export function getApiBaseUrl(): string {
     return process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
   }
   return process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
+}
+
+export function getAutoBidSettings(company?: string): Promise<AutoBidSettings> {
+  const search = new URLSearchParams();
+  if (company) {
+    search.set("company", company);
+  }
+  const query = search.toString();
+  return requestJson<AutoBidSettings>(`/campaigns/auto-bid-settings${query ? `?${query}` : ""}`);
+}
+
+export function updateAutoBidSettings(
+  payload: { company: string; max_bid_rub: number },
+  token: string,
+): Promise<AutoBidSettings> {
+  return putJson<AutoBidSettings>("/campaigns/auto-bid-settings", payload, token);
 }
 
 function withTimeout(ms: number): { signal: AbortSignal; cleanup: () => void } {

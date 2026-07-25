@@ -2,9 +2,9 @@
 
 import type { CSSProperties } from "react";
 import { useState } from "react";
-import { getCurrentCampaignDetail } from "@/shared/api/client";
+import { getCurrentCampaignDetail, updateAutoBidSettings } from "@/shared/api/client";
 import { CurrentCampaignsPanel } from "@/features/campaigns/components/CurrentCampaignsPanel";
-import { CampaignReport, CampaignReportRow, CurrentCampaignDetail } from "@/shared/api/types";
+import { AutoBidSettings, CampaignReport, CampaignReportRow, CurrentCampaignDetail } from "@/shared/api/types";
 
 type SortKey = keyof CampaignReportRow;
 type SortDirection = "asc" | "desc";
@@ -93,13 +93,24 @@ function metricTone(key: SortKey, value: unknown, max: number): string {
   return "bad";
 }
 
-export function AllCampaignsPanel({ report, currentDetail }: { report: CampaignReport; currentDetail: CurrentCampaignDetail }) {
+export function AllCampaignsPanel({
+  report,
+  currentDetail,
+  autoBidSettings,
+}: {
+  report: CampaignReport;
+  currentDetail: CurrentCampaignDetail;
+  autoBidSettings: AutoBidSettings;
+}) {
   const [selectedDetail, setSelectedDetail] = useState(currentDetail);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("article");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [maxBid, setMaxBid] = useState(String(autoBidSettings.max_bid_rub));
+  const [savingMaxBid, setSavingMaxBid] = useState(false);
+  const [maxBidStatus, setMaxBidStatus] = useState("");
 
   const grandTotal = report.rows.find((row) => row.campaign_id === "GRAND_TOTAL");
   const query = search.trim().toLowerCase();
@@ -166,6 +177,33 @@ export function AllCampaignsPanel({ report, currentDetail }: { report: CampaignR
     void loadCampaignDetail(campaignId);
   }
 
+  async function saveMaxBid() {
+    const parsed = Number(maxBid.replace(",", "."));
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setMaxBidStatus("Enter a value greater than zero");
+      return;
+    }
+    const token = window.localStorage.getItem("ozon_ads_token");
+    if (!token) {
+      setMaxBidStatus("Authentication token is missing");
+      return;
+    }
+    setSavingMaxBid(true);
+    setMaxBidStatus("");
+    try {
+      const saved = await updateAutoBidSettings(
+        { company: report.company, max_bid_rub: parsed },
+        token,
+      );
+      setMaxBid(String(saved.max_bid_rub));
+      setMaxBidStatus("Saved");
+    } catch (error) {
+      setMaxBidStatus(error instanceof Error ? error.message : "Failed to save");
+    } finally {
+      setSavingMaxBid(false);
+    }
+  }
+
   return (
     <section className="dashboard-grid section-grid all-campaigns-dashboard">
       <article className="panel-card panel-card-wide section-card">
@@ -173,6 +211,24 @@ export function AllCampaignsPanel({ report, currentDetail }: { report: CampaignR
           <div>
             <p className="eyebrow">All campaigns</p>
             <h3>Grand total</h3>
+          </div>
+          <div className="auto-bid-setting">
+            <label htmlFor="auto-bid-max">Max auto bid, RUB</label>
+            <div>
+              <input
+                id="auto-bid-max"
+                inputMode="decimal"
+                value={maxBid}
+                onChange={(event) => {
+                  setMaxBid(event.target.value);
+                  setMaxBidStatus("");
+                }}
+              />
+              <button type="button" onClick={() => void saveMaxBid()} disabled={savingMaxBid}>
+                {savingMaxBid ? "Saving..." : "Save"}
+              </button>
+            </div>
+            {maxBidStatus ? <small>{maxBidStatus}</small> : null}
           </div>
         </div>
         {grandTotal ? (

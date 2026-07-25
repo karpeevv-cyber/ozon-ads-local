@@ -1,3 +1,4 @@
+from app.models.auto_bid_settings import AutoBidSettings
 from app.models.bids import BidChange, CampaignComment
 from app.models.campaign import Campaign, CampaignDailyMetric, CampaignProduct
 from app.models.campaign_hourly import CampaignHourlySnapshot
@@ -15,6 +16,7 @@ from app.models.unit_economics import UnitEconomicsOverride
 from app.models.user import OrganizationMembership, User
 
 __all__ = [
+    "AutoBidSettings",
     "BidChange",
     "Campaign",
     "CampaignComment",
