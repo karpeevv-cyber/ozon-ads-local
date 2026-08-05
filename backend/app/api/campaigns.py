@@ -15,7 +15,11 @@ from app.schemas.campaigns import (
 )
 from app.api.deps import get_current_user
 from app.models.user import User
-from app.services.auto_bid_settings import get_auto_bid_max_bid, save_auto_bid_max_bid
+from app.services.auto_bid_settings import (
+    get_auto_bid_max_bid,
+    get_campaign_bid_limits,
+    save_campaign_bid_limit,
+)
 from app.services.campaign_reporting import (
     build_active_test_map,
     build_bid_change_map,
@@ -56,6 +60,10 @@ def auto_bid_settings(
     return AutoBidSettingsResponse(
         company=company_name,
         max_bid_rub=get_auto_bid_max_bid(company_name, db),
+        campaign_limits=[
+            {"campaign_id": campaign_id, "sku": sku, "max_bid_rub": max_bid}
+            for (campaign_id, sku), max_bid in sorted(get_campaign_bid_limits(company_name, db).items())
+        ],
     )
 
 
@@ -66,12 +74,21 @@ def update_auto_bid_settings(
     _current_user: User = Depends(get_current_user),
 ) -> AutoBidSettingsResponse:
     company_name, _config = resolve_company_config(payload.company)
-    value = save_auto_bid_max_bid(
+    save_campaign_bid_limit(
         company_name=company_name,
+        campaign_id=payload.campaign_id,
+        sku=payload.sku,
         max_bid_rub=payload.max_bid_rub,
         db=db,
     )
-    return AutoBidSettingsResponse(company=company_name, max_bid_rub=value)
+    return AutoBidSettingsResponse(
+        company=company_name,
+        max_bid_rub=get_auto_bid_max_bid(company_name, db),
+        campaign_limits=[
+            {"campaign_id": campaign_id, "sku": sku, "max_bid_rub": max_bid}
+            for (campaign_id, sku), max_bid in sorted(get_campaign_bid_limits(company_name, db).items())
+        ],
+    )
 
 
 @router.get("/running", response_model=list[CampaignSummaryResponse])

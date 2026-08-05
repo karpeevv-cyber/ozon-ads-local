@@ -108,9 +108,21 @@ export function AllCampaignsPanel({
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("article");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const [maxBid, setMaxBid] = useState(String(autoBidSettings.max_bid_rub));
-  const [savingMaxBid, setSavingMaxBid] = useState(false);
-  const [maxBidStatus, setMaxBidStatus] = useState("");
+  const initialLimits = new Map(
+    autoBidSettings.campaign_limits.map((item) => [`${item.campaign_id}:${item.sku}`, item.max_bid_rub]),
+  );
+  const [limitDrafts, setLimitDrafts] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      report.rows
+        .filter((row) => row.campaign_id !== "GRAND_TOTAL")
+        .map((row) => {
+          const key = `${row.campaign_id}:${row.sku}`;
+          return [key, String(initialLimits.get(key) ?? autoBidSettings.max_bid_rub)];
+        }),
+    ),
+  );
+  const [savingLimitKey, setSavingLimitKey] = useState("");
+  const [savedLimitKey, setSavedLimitKey] = useState("");
 
   const grandTotal = report.rows.find((row) => row.campaign_id === "GRAND_TOTAL");
   const query = search.trim().toLowerCase();
@@ -177,30 +189,37 @@ export function AllCampaignsPanel({
     void loadCampaignDetail(campaignId);
   }
 
-  async function saveMaxBid() {
-    const parsed = Number(maxBid.replace(",", "."));
+  async function saveCampaignLimit(row: CampaignReportRow) {
+    const key = `${row.campaign_id}:${row.sku}`;
+    const parsed = Number((limitDrafts[key] ?? "").replace(",", "."));
     if (!Number.isFinite(parsed) || parsed <= 0) {
-      setMaxBidStatus("Enter a value greater than zero");
       return;
     }
     const token = window.localStorage.getItem("ozon_ads_token");
     if (!token) {
-      setMaxBidStatus("Authentication token is missing");
       return;
     }
-    setSavingMaxBid(true);
-    setMaxBidStatus("");
+    setSavingLimitKey(key);
+    setSavedLimitKey("");
     try {
       const saved = await updateAutoBidSettings(
-        { company: report.company, max_bid_rub: parsed },
+        {
+          company: report.company,
+          campaign_id: row.campaign_id,
+          sku: row.sku,
+          max_bid_rub: parsed,
+        },
         token,
       );
-      setMaxBid(String(saved.max_bid_rub));
-      setMaxBidStatus("Saved");
-    } catch (error) {
-      setMaxBidStatus(error instanceof Error ? error.message : "Failed to save");
+      const updated = saved.campaign_limits.find(
+        (item) => item.campaign_id === row.campaign_id && item.sku === row.sku,
+      );
+      setLimitDrafts((current) => ({ ...current, [key]: String(updated?.max_bid_rub ?? parsed) }));
+      setSavedLimitKey(key);
+    } catch {
+      setSavedLimitKey("");
     } finally {
-      setSavingMaxBid(false);
+      setSavingLimitKey("");
     }
   }
 
@@ -211,24 +230,6 @@ export function AllCampaignsPanel({
           <div>
             <p className="eyebrow">All campaigns</p>
             <h3>Grand total</h3>
-          </div>
-          <div className="auto-bid-setting">
-            <label htmlFor="auto-bid-max">Max auto bid, RUB</label>
-            <div>
-              <input
-                id="auto-bid-max"
-                inputMode="decimal"
-                value={maxBid}
-                onChange={(event) => {
-                  setMaxBid(event.target.value);
-                  setMaxBidStatus("");
-                }}
-              />
-              <button type="button" onClick={() => void saveMaxBid()} disabled={savingMaxBid}>
-                {savingMaxBid ? "Saving..." : "Save"}
-              </button>
-            </div>
-            {maxBidStatus ? <small>{maxBidStatus}</small> : null}
           </div>
         </div>
         {grandTotal ? (
@@ -278,12 +279,13 @@ export function AllCampaignsPanel({
                     </button>
                   </th>
                 ))}
+                <th>max bid</th>
               </tr>
             </thead>
             <tbody>
               {reportRows.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length} className="empty-cell">
+                  <td colSpan={columns.length + 1} className="empty-cell">
                     No report rows returned by the backend for selected filters.
                   </td>
                 </tr>
@@ -323,6 +325,29 @@ export function AllCampaignsPanel({
                         </td>
                       );
                     })}
+                    <td className="campaign-limit-cell" onClick={(event) => event.stopPropagation()}>
+                      <input
+                        aria-label={`Max bid for ${row.article}`}
+                        inputMode="decimal"
+                        value={limitDrafts[`${row.campaign_id}:${row.sku}`] ?? ""}
+                        onChange={(event) => {
+                          const key = `${row.campaign_id}:${row.sku}`;
+                          setLimitDrafts((current) => ({ ...current, [key]: event.target.value }));
+                          setSavedLimitKey("");
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={savingLimitKey === `${row.campaign_id}:${row.sku}`}
+                        onClick={() => void saveCampaignLimit(row)}
+                      >
+                        {savingLimitKey === `${row.campaign_id}:${row.sku}`
+                          ? "..."
+                          : savedLimitKey === `${row.campaign_id}:${row.sku}`
+                            ? "OK"
+                            : "Save"}
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}

@@ -2026,6 +2026,33 @@ a {
   opacity: 0.6;
 }
 
+.campaign-limit-cell {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 126px;
+}
+
+.campaign-limit-cell input {
+  width: 58px;
+  min-width: 0;
+  padding: 6px 7px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+}
+
+.campaign-limit-cell button {
+  padding: 6px 8px;
+  border: 1px solid rgba(50, 103, 58, 0.25);
+  border-radius: 9px;
+  background: rgba(50, 103, 58, 0.1);
+  color: #32673a;
+  cursor: pointer;
+  font-size: 0.72rem;
+}
+
 .main-header-actions {
   display: inline-flex;
   align-items: center;

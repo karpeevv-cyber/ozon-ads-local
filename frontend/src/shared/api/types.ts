@@ -49,6 +49,13 @@ export type CampaignReport = {
 export type AutoBidSettings = {
   company: string;
   max_bid_rub: number;
+  campaign_limits: AutoBidCampaignLimit[];
+};
+
+export type AutoBidCampaignLimit = {
+  campaign_id: string;
+  sku: string;
+  max_bid_rub: number;
 };
 
 export type MainOverviewChartRow = {

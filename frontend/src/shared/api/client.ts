@@ -53,7 +53,7 @@ export function getAutoBidSettings(company?: string): Promise<AutoBidSettings> {
 }
 
 export function updateAutoBidSettings(
-  payload: { company: string; max_bid_rub: number },
+  payload: { company: string; campaign_id: string; sku: string; max_bid_rub: number },
   token: string,
 ): Promise<AutoBidSettings> {
   return putJson<AutoBidSettings>("/campaigns/auto-bid-settings", payload, token);

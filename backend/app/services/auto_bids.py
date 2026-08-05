@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 import requests
 
 from app.services.bid_commands import apply_bid_command
-from app.services.auto_bid_settings import get_auto_bid_max_bid
+from app.services.auto_bid_settings import get_auto_bid_max_bid, get_campaign_bid_limits
 from app.services.bid_history import load_bid_changes
 from app.services.campaign_reporting import (
     build_report_rows,
@@ -228,7 +228,8 @@ def _fetch_sku_offer_map(
 
 
 def build_company_bid_decisions(*, config: CompanyAutoBidConfig, day: str) -> list[BidDecision]:
-    max_bid_rub = get_auto_bid_max_bid(config.name)
+    default_max_bid_rub = get_auto_bid_max_bid(config.name)
+    campaign_limits = get_campaign_bid_limits(config.name)
     running_campaigns = get_running_campaigns(
         client_id=config.perf_client_id,
         client_secret=config.perf_client_secret,
@@ -276,7 +277,15 @@ def build_company_bid_decisions(*, config: CompanyAutoBidConfig, day: str) -> li
         target_drr=0.2,
     )
     return [
-        _decide_bid(company=config.name, day=day, row=row, max_bid_rub=max_bid_rub)
+        _decide_bid(
+            company=config.name,
+            day=day,
+            row=row,
+            max_bid_rub=campaign_limits.get(
+                (str(row.get("campaign_id") or ""), str(row.get("sku") or "")),
+                default_max_bid_rub,
+            ),
+        )
         for row in rows
         if str(row.get("campaign_id") or "") != "GRAND_TOTAL"
     ]

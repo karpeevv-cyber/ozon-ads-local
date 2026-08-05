@@ -8,13 +8,22 @@ class CompanyConfigResponse(BaseModel):
     display_name: str | None = None
 
 
+class AutoBidCampaignLimitResponse(BaseModel):
+    campaign_id: str
+    sku: str
+    max_bid_rub: float
+
+
 class AutoBidSettingsResponse(BaseModel):
     company: str
     max_bid_rub: float
+    campaign_limits: list[AutoBidCampaignLimitResponse] = Field(default_factory=list)
 
 
 class AutoBidSettingsUpdateRequest(BaseModel):
     company: str
+    campaign_id: str
+    sku: str
     max_bid_rub: float = Field(gt=0, le=10_000)
 
 
