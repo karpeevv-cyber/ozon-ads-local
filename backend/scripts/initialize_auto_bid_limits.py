@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -44,9 +45,14 @@ def main() -> None:
     changes = load_bid_changes_df()
     saved = 0
 
-    with SessionLocal() as db:
-        for config in _iter_company_configs():
-            decisions = build_company_bid_decisions(config=config, day=report_day)
+    for config in _iter_company_configs():
+        with SessionLocal() as db:
+            company_saved = 0
+            try:
+                decisions = build_company_bid_decisions(config=config, day=report_day)
+            except Exception:
+                logging.exception("Failed to initialize auto-bid limits", extra={"company": config.name})
+                continue
             for decision in decisions:
                 if not decision.campaign_id or not decision.sku or decision.old_bid_rub is None:
                     continue
@@ -66,8 +72,10 @@ def main() -> None:
                     commit=False,
                 )
                 saved += 1
+                company_saved += 1
                 print(f"{config.name} {decision.article}: {max_bid_rub:g} RUB")
-        db.commit()
+            db.commit()
+            print(f"Saved {company_saved} limits for {config.name}")
 
     print(f"Saved {saved} limits for historical state at end of {target_day}")
 
