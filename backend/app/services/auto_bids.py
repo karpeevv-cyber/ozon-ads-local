@@ -170,22 +170,17 @@ def _decide_bid(
         base.reason = "Расход находится в допустимом диапазоне 50–150 ₽"
         return base
 
-    if spend <= 250:
-        if ordered_units <= 0 or revenue <= 0:
-            base.new_bid_rub = min(_round_bid(old_bid * 0.9), max_bid_rub)
-            base.reason = "Расход выше 150 ₽ без заказов"
-            base.action = "decrease"
-            return base
-        if drr_pct is not None and drr_pct > 25:
-            base.new_bid_rub = min(_round_bid(old_bid * 0.9), max_bid_rub)
-            base.reason = "Расход 150–250 ₽, ДРР выше 25%"
-            base.action = "decrease"
-            return base
-        base.reason = "Расход 150–250 ₽, ДРР не превышает 25%"
+    if ordered_units <= 0 or revenue <= 0:
+        base.new_bid_rub = min(_round_bid(old_bid * 0.9), max_bid_rub)
+        base.reason = "Расход выше 150 ₽ без заказов"
+        base.action = "decrease"
         return base
-
-    base.manual_review = True
-    base.reason = "Расход выше 250 ₽ — нужен ручной разбор"
+    if drr_pct is not None and drr_pct > 25:
+        base.new_bid_rub = min(_round_bid(old_bid * 0.9), max_bid_rub)
+        base.reason = "Расход выше 150 ₽, ДРР выше 25%"
+        base.action = "decrease"
+        return base
+    base.reason = "Расход выше 150 ₽, ДРР не превышает 25%"
     return base
 
 
