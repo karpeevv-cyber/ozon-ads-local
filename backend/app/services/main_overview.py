@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timedelta
 
 import pandas as pd
+import requests
 from sqlalchemy.orm import Session
 
 from app.services.bid_log import load_bid_changes_df, load_campaign_comments_df
@@ -495,14 +496,39 @@ def get_main_overview_cached(
             payload["cached_at"] = row.updated_at.isoformat() if row.updated_at else None
             return payload
 
-    payload = get_main_overview(
-        company=company,
-        date_from=date_from,
-        date_to=date_to,
-        target_drr_pct=target_drr_pct,
-    )
+    try:
+        payload = get_main_overview(
+            company=company,
+            date_from=date_from,
+            date_to=date_to,
+            target_drr_pct=target_drr_pct,
+        )
+    except requests.RequestException:
+        fallback_row = (
+            db.query(MainOverviewCache)
+            .filter(MainOverviewCache.company_name == company_name)
+            .filter(MainOverviewCache.target_drr_pct == cache_key_target)
+            .order_by(MainOverviewCache.updated_at.desc())
+            .first()
+        )
+        if fallback_row is None:
+            raise
+        try:
+            fallback_payload = json.loads(fallback_row.payload_json or "{}")
+        except Exception:
+            fallback_payload = {}
+        if not fallback_payload:
+            raise
+        fallback_payload["cache_hit"] = True
+        fallback_payload["cached_at"] = fallback_row.updated_at.isoformat() if fallback_row.updated_at else None
+        fallback_payload["warning"] = (
+            "Ozon Performance API is unavailable. "
+            f"Showing cached data for {fallback_payload.get('date_from', '?')}–{fallback_payload.get('date_to', '?')}."
+        )
+        return fallback_payload
     payload["cache_hit"] = False
     payload["cached_at"] = datetime.utcnow().isoformat()
+    payload["warning"] = None
     cache_payload = json.dumps(payload, ensure_ascii=False, default=str)
     if row is None:
         row = MainOverviewCache(

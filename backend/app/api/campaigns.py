@@ -277,9 +277,13 @@ def main_overview(
             db=db,
         )
     except requests.HTTPError as exc:
-        if exc.response is None or exc.response.status_code != 429:
+        if exc.response is None or exc.response.status_code not in {403, 429}:
             raise
-        logger.warning("main_overview degraded due to upstream 429", extra={"company": company_name})
+        status_code = exc.response.status_code
+        logger.warning(
+            "main_overview degraded due to upstream error",
+            extra={"company": company_name, "status_code": status_code},
+        )
         payload = {
             "company": company_name,
             "date_from": date_from,
@@ -287,6 +291,7 @@ def main_overview(
             "target_drr_pct": float(target_drr_pct),
             "cache_hit": False,
             "cached_at": None,
+            "warning": f"Ozon Performance API returned {status_code}; live advertising data is unavailable.",
             "chart_rows": [],
             "daily_rows": [],
             "weekly_rows": [],
@@ -300,6 +305,7 @@ def main_overview(
             "target_drr_pct": float(target_drr_pct),
             "cache_hit": False,
             "cached_at": None,
+            "warning": "Main data is temporarily unavailable.",
             "chart_rows": [],
             "daily_rows": [],
             "weekly_rows": [],

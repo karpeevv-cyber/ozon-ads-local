@@ -432,6 +432,18 @@ function DailyTable({ overview }: MainDashboardProps) {
 export function MainDashboard({ overview }: MainDashboardProps) {
   return (
     <section className="dashboard-grid section-grid main-dashboard">
+      {overview.warning ? (
+        <article className="panel-card panel-card-wide" role="alert">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Data warning</p>
+              <h3>Данные Ozon Performance временно недоступны</h3>
+            </div>
+            {overview.cache_hit ? <span className="status-badge">cached</span> : null}
+          </div>
+          <p className="muted-copy">{overview.warning}</p>
+        </article>
+      ) : null}
       <RevenueChart overview={overview} />
       <WeeklyTable overview={overview} />
       <DailyTable overview={overview} />
