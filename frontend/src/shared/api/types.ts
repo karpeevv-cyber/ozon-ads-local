@@ -507,6 +507,7 @@ export type FinanceRow = {
   change: number;
   avoidable: number;
   sales: number;
+  finance_sales: number;
   fee: number;
   acquiring: number;
   payments: number;

@@ -19,6 +19,7 @@ class FinanceTelegramTests(TestCase):
             "avoidable": -2800,
             "sales": 1000,
             "revenue": 1000,
+            "finance_sales": 800,
             "fee": -100,
             "acquiring": -20,
             "payments": -500,
@@ -47,9 +48,10 @@ class FinanceTelegramTests(TestCase):
         message = build_finance_telegram_message(company_name="aura", row=row)
         lines = message.splitlines()
 
-        self.assertEqual(lines[:9], [
+        self.assertEqual(lines[:10], [
             "день: 2026-07-06",
             "продажи: 1000",
+            "завершённые продажи: 800",
             "дрр: 3.3%",
             "",
             "на начало дня: 100",

@@ -133,7 +133,7 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
             if name == "points_for_reviews":
                 points_for_reviews += value
 
-        sales_val = float(revenue or 0)
+        sales_val = float(sales or 0)
         pct_logistics = (logistics / sales_val * 100.0) if sales_val else 0.0
         check_value = (
             float(sales or 0)
@@ -214,10 +214,12 @@ def get_finance_summary(*, company: str | None, date_from: str, date_to: str) ->
                 continue
             totals[key] = float(totals.get(key, 0) or 0) + float(value or 0)
     if "logistics_pct" in totals:
-        totals["logistics_pct"] = round(
-            sum(float(row.get("logistics_pct") or 0) for row in rows) / len(rows),
-            1,
-        ) if rows else 0.0
+        total_finance_sales = float(totals.get("finance_sales") or 0)
+        totals["logistics_pct"] = (
+            round(float(totals.get("logistics") or 0) / total_finance_sales * 100.0, 1)
+            if total_finance_sales
+            else 0.0
+        )
 
     return {
         "company": company_name,

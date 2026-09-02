@@ -8,6 +8,7 @@ class FinanceRowResponse(BaseModel):
     change: int
     avoidable: int
     sales: int
+    finance_sales: int
     fee: int
     acquiring: int
     payments: int

@@ -27,6 +27,7 @@ const columns: FinanceColumn[] = [
   column("change", "delta", "изменение"),
   column("avoidable", "avoidable", "расходы, которых потенциально можно избежать"),
   column("sales", "sales", "продажи"),
+  column("finance_sales", "completed", "завершённые продажи"),
   { key: "fee_acquiring", keys: ["fee", "acquiring"], label: "fee + acq.", title: "комиссия + эквайринг" },
   column("payments", "pays", "выплаты"),
   column("payment_commission", "pay comm.", "комиссия за выплату"),
@@ -59,7 +60,7 @@ const columns: FinanceColumn[] = [
   column("logistics_pct", "log. %", "% логистики", true),
 ];
 
-const highlightedColumns = new Set(["opening_balance", "closing_balance", "change", "sales"]);
+const highlightedColumns = new Set(["opening_balance", "closing_balance", "change", "sales", "finance_sales"]);
 
 function formatValue(value: string | number, isPercent?: boolean) {
   if (typeof value === "string") {
