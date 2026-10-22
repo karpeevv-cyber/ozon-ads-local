@@ -27,6 +27,8 @@ from app.services.storage_paths import backend_data_path
 logger = logging.getLogger("uvicorn.error")
 
 AUTO_REASON_PREFIX = "Auto bid"
+AUTO_BID_INCREASE_FACTOR = 1.05
+AUTO_BID_DECREASE_FACTOR = 0.95
 
 
 @dataclass(frozen=True)
@@ -157,7 +159,7 @@ def _decide_bid(
         return base
 
     if spend < 50:
-        proposed_bid = _round_bid(old_bid * 1.2)
+        proposed_bid = _round_bid(old_bid * AUTO_BID_INCREASE_FACTOR)
         if old_bid >= max_bid_rub:
             base.reason = f"Расход менее 50 ₽, но достигнут лимит ставки {max_bid_rub:g} ₽"
             return base
@@ -171,12 +173,12 @@ def _decide_bid(
         return base
 
     if ordered_units <= 0 or revenue <= 0:
-        base.new_bid_rub = min(_round_bid(old_bid * 0.9), max_bid_rub)
+        base.new_bid_rub = min(_round_bid(old_bid * AUTO_BID_DECREASE_FACTOR), max_bid_rub)
         base.reason = "Расход выше 150 ₽ без заказов"
         base.action = "decrease"
         return base
     if drr_pct is not None and drr_pct > 25:
-        base.new_bid_rub = min(_round_bid(old_bid * 0.9), max_bid_rub)
+        base.new_bid_rub = min(_round_bid(old_bid * AUTO_BID_DECREASE_FACTOR), max_bid_rub)
         base.reason = "Расход выше 150 ₽, ДРР выше 25%"
         base.action = "decrease"
         return base

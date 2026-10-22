@@ -131,10 +131,10 @@ No secret values belong in this file or repository.
 - Auto-bid strategy runs daily at `08:00` application timezone and analyzes the previous calendar day.
 - Ozon Seller Analytics can finalize previous-day revenue after `08:00`; a zero in the early Telegram finance summary may be stale even when a later query returns revenue.
 - Auto-bid rules currently are:
-  - spend `< 50 RUB`: increase bid by 20%, capped by the campaign/SKU maximum;
+  - spend `< 50 RUB`: increase bid by 5%, capped by the campaign/SKU maximum;
   - spend `50..150 RUB`: no change;
-  - spend `> 150 RUB` with no total SKU sales: decrease by 10%;
-  - spend `> 150 RUB` with DRR above 25%: decrease by 10%;
+  - spend `> 150 RUB` with no total SKU sales: decrease by 5%;
+  - spend `> 150 RUB` with DRR above 25%: decrease by 5%;
   - spend `> 150 RUB` with sales and DRR at or below 25%: no change.
 - Per-campaign/SKU maximum bids are stored in PostgreSQL and editable in `All campaigns` under `max bid`. The company fallback maximum is `25 RUB` when no individual limit exists.
 - Telegram auto-bid messages are grouped into increased bids, decreased bids, manual review, and errors.
